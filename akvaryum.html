@@ -1,0 +1,897 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Akvaryum Siparişi</title>
+<style>
+:root{
+  --deep:#06202C;
+  --panel:#0C3243;
+  --panel2:#124559;
+  --water1:#0E4257;
+  --water2:#07293A;
+  --sand:#D9C08C;
+  --sand2:#B79C6A;
+  --ink:#EAF6F9;
+  --ink-soft:#8FB4C0;
+  --ink-dim:#5E8695;
+  --line:#1B4E63;
+  --coral:#FF7A59;
+  --gold:#FFC94A;
+  --ok:#4FD18B;
+  --bad:#FF5B6E;
+  --shadow:0 24px 64px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--deep);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(800px 480px at 50% -8%, rgba(31,120,150,.28), transparent 72%);
+  /* mobil: cift dokunusta yakinlasma, metin secimi ve mavi vurgu oyunu bozuyor */
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+  overscroll-behavior:none;
+  touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;
+}
+#app{min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;
+  padding:14px 10px 32px}
+.stage{
+  width:min(400px,100%);background:var(--panel);
+  border:1px solid var(--line);border-radius:22px;
+  padding:14px 20px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+}
+
+/* ---------- HUD ---------- */
+.hud{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;
+  padding-bottom:10px;border-bottom:1px solid var(--line)}
+.lv{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);line-height:1.5}
+.lv b{display:block;color:var(--gold);font-size:19px;letter-spacing:0;font-variant-numeric:tabular-nums}
+.stat{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-dim);text-align:right;line-height:1.5}
+.stat b{display:block;font-size:15px;color:var(--ink);font-weight:700;letter-spacing:0;font-variant-numeric:tabular-nums}
+/* Süre kaldırıldı: tek baskı kaynağı artık 5 slot. */
+.stat.warn b{color:var(--gold)}
+.stat.crit b{color:var(--bad);animation:statPulse .8s ease-in-out infinite}
+@keyframes statPulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* ---------- sipariş ---------- */
+/* İKİ EŞZAMANLI SİPARİŞ — yan yana iki kart. */
+.orders{display:flex;align-items:stretch;gap:8px;margin-top:12px}
+.order{
+  flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:8px 9px;
+  background:linear-gradient(180deg,var(--panel2),#0E3B4D);
+  border:1px solid var(--line);border-radius:13px;position:relative;overflow:hidden;
+}
+.order::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.07),transparent 55%)}
+.order.empty{opacity:.32}
+.order .pic{width:38px;height:31px;flex:0 0 auto}
+.order .meta{flex:1;min-width:0}
+.order .cap{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.order .prog{display:flex;align-items:center;gap:6px;margin-top:4px}
+.order .prog b{font-size:12.5px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
+.order .pips{display:flex;gap:3px}
+.order .pips i{width:12px;height:7px;border-radius:4px;background:rgba(255,255,255,.14);
+  transition:background .25s ease, transform .25s ease}
+.order .pips i.on{background:var(--gold);transform:scaleY(1.3)}
+.order.done{animation:orderDone .5s ease-out}
+@keyframes orderDone{0%{transform:scale(1)}40%{transform:scale(1.06)}100%{transform:scale(1)}}
+
+/* "Sırada" önizlemesi kaldırıldı — gelecek sipariş gizli. */
+
+/* ---------- tepsi (5 slot) ---------- */
+.tray{display:flex;gap:7px;margin-top:11px;padding:9px;border-radius:14px;position:relative;
+  background:rgba(0,0,0,.22);border:1px solid var(--line);transition:border-color .25s, box-shadow .25s}
+.tray.warn{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold), 0 0 22px rgba(255,201,74,.22)}
+.tray.full{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad), 0 0 26px rgba(255,91,110,.3);
+  animation:trayPulse 1s ease-in-out infinite}
+@keyframes trayPulse{0%,100%{box-shadow:0 0 0 1px var(--bad), 0 0 12px rgba(255,91,110,.18)}
+  50%{box-shadow:0 0 0 2px var(--bad), 0 0 30px rgba(255,91,110,.45)}}
+.tray.deny{animation:denyShake .4s ease-in-out}
+@keyframes denyShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}
+  50%{transform:translateX(7px)}75%{transform:translateX(-4px)}}
+.slot{flex:1;aspect-ratio:1/.86;border-radius:10px;border:2px dashed rgba(255,255,255,.14);
+  display:flex;align-items:center;justify-content:center;position:relative;transition:border-color .2s}
+.slot.on{border-style:solid;border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.06)}
+.slot svg{width:34px;height:27px}
+.slot .drop{animation:slotDrop .3s cubic-bezier(.3,1.5,.5,1)}
+@keyframes slotDrop{0%{transform:translateY(-10px) scale(.7);opacity:0}100%{transform:none;opacity:1}}
+.slot.freeing{animation:freePop .45s ease-out}
+@keyframes freePop{0%{transform:scale(1)}45%{transform:scale(1.25);filter:brightness(1.7)}100%{transform:scale(1)}}
+
+/* ---------- akvaryum ---------- */
+.tank{
+  position:relative;margin-top:11px;border-radius:18px;overflow:hidden;
+  height:352px;                        /* eski tarayicilar icin yedek */
+  height:clamp(270px, 45dvh, 352px);   /* balik konumlari olculdugu icin serbestce kisalir */
+  background:linear-gradient(180deg,var(--water1) 0%,var(--water2) 78%);
+  border:2px solid var(--line);box-shadow:inset 0 12px 34px rgba(0,0,0,.4);
+}
+/* ışık huzmeleri */
+.tank .ray{position:absolute;top:-14%;width:52px;height:130%;pointer-events:none;
+  background:linear-gradient(180deg,rgba(190,240,255,.14),transparent 72%);
+  transform:skewX(-13deg);animation:rayShift 9s ease-in-out infinite alternate}
+.tank .ray.r2{left:44%;width:34px;animation-duration:12s;animation-delay:-3s;opacity:.7}
+.tank .ray.r3{left:74%;width:44px;animation-duration:11s;animation-delay:-6s;opacity:.5}
+@keyframes rayShift{from{transform:skewX(-13deg) translateX(-9px)}to{transform:skewX(-6deg) translateX(11px)}}
+/* kum + bitkiler */
+.tank .sand{position:absolute;left:0;right:0;bottom:0;height:44px;
+  background:linear-gradient(180deg,var(--sand) 0%,var(--sand2) 100%);
+  border-radius:44% 56% 0 0 / 30px 26px 0 0}
+.tank .weed{position:absolute;bottom:26px;width:12px;border-radius:6px 6px 0 0;
+  background:linear-gradient(180deg,#2E9E7A,#17694F);transform-origin:bottom center;
+  animation:sway 4.4s ease-in-out infinite alternate}
+@keyframes sway{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
+.tank .bub{position:absolute;border-radius:50%;background:rgba(220,248,255,.24);
+  border:1px solid rgba(220,248,255,.3);animation:rise linear infinite}
+@keyframes rise{
+  0%{transform:translateY(0) scale(.7);opacity:0}
+  12%{opacity:.85}
+  100%{transform:translateY(-300px) scale(1.15);opacity:0}
+}
+
+/* ---------- balıklar ---------- */
+.swim{position:absolute;inset:0;pointer-events:none;z-index:6}
+.fish{position:absolute;left:0;top:0;width:42px;height:34px;pointer-events:auto;cursor:pointer;
+  will-change:transform;filter:drop-shadow(0 3px 6px rgba(0,0,0,.4));touch-action:manipulation}
+/* parmak hedefi gorselden buyuk: 42x34 mobilde kucuk kaliyor */
+.fish::before{content:"";position:absolute;inset:-8px;border-radius:12px}
+.fish svg{width:100%;height:100%;display:block;overflow:visible}
+.fish:hover{filter:drop-shadow(0 0 8px rgba(255,255,255,.55)) drop-shadow(0 3px 6px rgba(0,0,0,.4))}
+.fish.fly{pointer-events:none;transition:transform .42s cubic-bezier(.4,.05,.25,1), opacity .42s ease-in;z-index:9}
+/* Paketten çıkan balık: transform KONUM için kullanıldığından
+   doğuş animasyonu yalnızca opaklık/parlaklık üzerinden yapılır. */
+.fish.born{animation:fishBorn .5s ease-out}
+@keyframes fishBorn{
+  0%{opacity:0;filter:brightness(2.4) drop-shadow(0 0 14px #fff)}
+  40%{opacity:1}
+  100%{opacity:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.4))}
+}
+
+/* ---------- kilitli paketler ---------- */
+.packs{position:absolute;inset:0;pointer-events:none;z-index:5}
+.pack{position:absolute;left:0;top:0;width:66px;height:56px;will-change:transform}
+/* SAYDAM SANDIK: içindeki balıklar görünsün — kilit sürpriz değil, plan aracı. */
+.pack .crate{position:absolute;inset:0;border-radius:10px;
+  background:linear-gradient(180deg, rgba(198,242,255,.20), rgba(120,192,218,.10));
+  border:2px solid rgba(203,242,255,.45);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.28), inset 0 -8px 16px rgba(0,0,0,.22),
+             0 8px 18px rgba(0,0,0,.45);
+  overflow:hidden}
+.pack .crate::before{content:"";position:absolute;left:-30%;top:-60%;width:44%;height:220%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);
+  transform:rotate(18deg)}
+.pack .peek{position:absolute;inset:4px;display:flex;flex-wrap:wrap;
+  align-items:center;justify-content:center;gap:1px 2px;pointer-events:none}
+.pack .peek svg{width:18px;height:15px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.pack .lock{position:absolute;left:50%;top:-12px;transform:translateX(-50%);
+  min-width:25px;height:23px;padding:0 6px;border-radius:12px;
+  background:var(--gold);color:#2A1F00;border:2px solid #93720A;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;
+  box-shadow:0 3px 9px rgba(0,0,0,.45)}
+.pack.burst .crate{animation:crateBurst .5s ease-out forwards}
+.pack.burst .lock{animation:lockGo .3s ease-out forwards}
+@keyframes crateBurst{
+  0%{transform:scale(1);opacity:1}
+  32%{transform:scale(1.28) rotate(-7deg)}
+  100%{transform:scale(.35) rotate(14deg);opacity:0}
+}
+@keyframes lockGo{to{transform:translateX(-50%) translateY(-18px) scale(.4);opacity:0}}
+.fish.deny{animation:fishDeny .4s ease-in-out}
+@keyframes fishDeny{0%,100%{filter:none}30%{filter:brightness(1.6) drop-shadow(0 0 10px var(--bad))}}
+
+/* ---------- kontroller ---------- */
+.ctrls{display:flex;gap:7px;margin-top:13px}
+button{flex:1;appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+  font:inherit;font-size:12px;font-weight:700;padding:9px 6px;border-radius:10px;cursor:pointer;
+  transition:background .12s,border-color .12s,opacity .12s}
+button:hover:not(:disabled){background:#17586F;border-color:#2B7A96}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.mini{flex:0 0 40px;padding:9px 0;font-size:14px}
+button.go{background:var(--gold);color:#2A1F00;border-color:var(--gold)}
+button.go:hover{background:#FFD976}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* ---------- uyarı / bitiş ---------- */
+.danger{position:absolute;inset:0;pointer-events:none;z-index:14;opacity:0;border-radius:22px;
+  box-shadow:inset 0 0 58px 11px rgba(255,91,110,.6)}
+.danger.on{animation:dangerPulse 1.05s ease-in-out infinite}
+.danger.on.fast{animation-duration:.48s;box-shadow:inset 0 0 70px 16px rgba(255,91,110,.78)}
+@keyframes dangerPulse{0%,100%{opacity:0}45%{opacity:1}}
+
+.ov{position:absolute;inset:0;background:rgba(6,32,44,.94);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:30px 26px;z-index:20;backdrop-filter:blur(3px)}
+.ov h2{margin:0 0 6px;font-size:26px;letter-spacing:-.02em}
+.ov .sub{color:var(--ink-soft);font-size:13.5px;line-height:1.6;margin:0 0 20px;max-width:280px}
+.ov .big{font-size:46px;margin-bottom:6px;line-height:1}
+.ov .ctrls{width:100%;max-width:280px}
+.help{text-align:left;overflow-y:auto;align-items:stretch;justify-content:flex-start}
+.help h2{font-size:19px;margin-bottom:12px}
+.help ol{margin:0 0 16px;padding-left:20px}
+.help li{font-size:12.5px;line-height:1.65;color:var(--ink-soft);margin-bottom:7px}
+.help li b{color:var(--ink)}
+.help .box{border-left:2px solid var(--gold);padding-left:11px;font-size:12.5px;
+  line-height:1.65;color:var(--ink-soft);margin-bottom:16px}
+.foot{margin-top:13px;padding-top:10px;border-top:1px solid var(--line);
+  font-size:10px;letter-spacing:.06em;color:var(--ink-dim);display:flex;justify-content:space-between}
+@media (max-width:430px){
+  #app{padding:8px 6px 24px}
+  .stage{padding:10px 12px 14px;border-radius:16px}
+  .lv b{font-size:17px}
+  .stat b{font-size:14px}
+  .stat.clock b{font-size:19px}
+  .orders{gap:6px;margin-top:10px}
+  .order{padding:7px;gap:6px}
+  .order .pic{width:34px;height:28px}
+  .order .prog b{font-size:11.5px}
+  .order .pips i{width:10px;height:6px}
+  .tray{padding:7px;gap:5px;margin-top:9px}
+  .slot svg{width:30px;height:24px}
+  .tank{margin-top:9px}
+  .ctrls{margin-top:10px;gap:6px}
+  button{font-size:11.5px;padding:10px 4px}
+  button.mini{flex:0 0 38px}
+  .foot{font-size:9px;margin-top:10px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* Onyukleme tanisi: JS hic calismazsa bu kutu ekranda kalir ve sebebini soyler.
+   Onceden bos bir sahne goruluyor, sorunun ne oldugu anlasilmiyordu. */
+.boot{position:fixed;left:10px;right:10px;top:10px;z-index:9999;padding:12px 14px;
+  border-radius:10px;background:#3B1512;color:#FFD9D2;border:1px solid #A8422F;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font-size:13px;line-height:1.55;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.boot b{color:#fff}
+.boot small{opacity:.75;font-size:11px;word-break:break-all}
+</style>
+
+<div class="boot" id="boot">
+  <b>Oyun başlatılamadı — JavaScript çalışmıyor.</b><br>
+  Dosyayı dosya yöneticisi ya da uygulama içi önizleme yerine
+  <b>Chrome / Safari</b> ile aç, veya paylaşılan bağlantıyı kullan.
+</div>
+<script>
+window.addEventListener("error", function(e){
+  var b = document.getElementById("boot");
+  if(!b) return;
+  b.innerHTML = "<b>Oyun hata verdi</b><br>" + (e.message || "bilinmeyen hata") +
+    "<br><small>" + (e.filename || "") + " : " + (e.lineno || "?") + "</small>";
+});
+</script>
+<div id="app"><div class="stage" id="stage">
+  <div class="hud">
+    <div class="lv">Bölüm<b id="hLv">1</b></div>
+    <div class="stat" id="hTrayStat">Tepsi<b id="hTray">0/5</b></div>
+    <div class="stat">Sipariş<b id="hOrd">0/0</b></div>
+  </div>
+
+  <div class="orders">
+    <div class="order" id="ord0">
+      <span class="pic" id="ordPic0"></span>
+      <span class="meta">
+        <span class="cap" id="ordCap0">—</span>
+        <span class="prog"><b id="ordCnt0">0/3</b><span class="pips" id="ordPips0"></span></span>
+      </span>
+    </div>
+    <div class="order" id="ord1">
+      <span class="pic" id="ordPic1"></span>
+      <span class="meta">
+        <span class="cap" id="ordCap1">—</span>
+        <span class="prog"><b id="ordCnt1">0/3</b><span class="pips" id="ordPips1"></span></span>
+      </span>
+    </div>
+  </div>
+
+
+  <div class="tray" id="tray"></div>
+
+  <div class="tank" id="tank">
+    <span class="ray"></span><span class="ray r2"></span><span class="ray r3"></span>
+    <span class="sand"></span>
+  </div>
+
+  <div class="packs" id="packs"></div>
+  <div class="swim" id="swim"></div>
+
+  <div class="ctrls">
+    <button id="bReset">⟲ Baştan</button>
+    <button id="bFirst" class="mini" title="1. bölümden başla">⏮</button>
+    <button id="bHelp" class="mini" title="Kurallar">?</button>
+  </div>
+
+  <div class="foot"><span>DAWNBRIGHT · PROTOTİP</span><span id="fSeed">—</span></div>
+
+  <div class="danger" id="danger"></div>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ═══════════ türler ═══════════
+   Her tür FARKLI SİLUET + farklı renk taşır. Renk körlüğü için şekil tek
+   başına yeterli olsun diye gövdeler kasten birbirine benzemiyor. */
+var SPECIES = [
+  { name:"Palyaço", hex:"#FF8A3D", svg:
+    '<ellipse cx="18" cy="17" rx="12" ry="8.5"/>'+
+    '<path d="M30 17 L40 10 L40 24 Z"/>'+
+    '<path d="M20 9 q2.5 8 0 16" stroke="rgba(255,255,255,.55)" stroke-width="3" fill="none"/>'+
+    '<circle cx="12" cy="14.5" r="2" fill="#06202C"/>' },
+  { name:"Melek",   hex:"#FFD34E", svg:
+    '<path d="M20 2 L32 17 L20 32 L8 17 Z"/>'+
+    '<path d="M32 17 L40 12 L40 22 Z"/>'+
+    '<circle cx="15" cy="14" r="2" fill="#06202C"/>' },
+  { name:"Balon",   hex:"#FF6FA5", svg:
+    '<circle cx="20" cy="17" r="11"/>'+
+    '<path d="M20 2 l3 5 h-6 Z M35 17 l-5 3 v-6 Z M20 32 l-3 -5 h6 Z M5 17 l5 -3 v6 Z"/>'+
+    '<circle cx="15" cy="13.5" r="2" fill="#06202C"/>' },
+  { name:"Denizatı",hex:"#5FD08A", svg:
+    '<path d="M25 3 q7 3 5 10 q-2 6 -7 8 q-5 2 -4 7 q1 4 5 3 q-11 4 -12 -5 q-1 -8 7 -11 q4 -2 4 -6 q0 -4 -4 -4 Z"/>'+
+    '<path d="M27 6 l6 -3 l-2 6 Z"/>'+
+    '<circle cx="26" cy="9" r="1.8" fill="#06202C"/>' },
+  { name:"Mürekkep",hex:"#A87CE8", svg:
+    '<path d="M20 3 q10 0 10 11 v4 H10 v-4 q0 -11 10 -11 Z"/>'+
+    '<path d="M12 18 q-2 8 -4 12 M17 18 q-1.5 9 -2.5 13 M23 18 q1.5 9 2.5 13 M28 18 q2 8 4 12" '+
+      'stroke="currentColor" stroke-width="2.8" fill="none" stroke-linecap="round"/>'+
+    '<circle cx="16" cy="12" r="1.9" fill="#06202C"/><circle cx="24" cy="12" r="1.9" fill="#06202C"/>' },
+  { name:"Karides", hex:"#4FD1E0", svg:
+    '<path d="M33 8 q-16 -4 -22 7 q-5 10 5 13 q8 2 10 -4 q-8 2 -9 -3 q-1 -6 8 -7 q6 -1 8 -6 Z"/>'+
+    '<path d="M33 8 l5 -4 M33 8 l6 1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>'+
+    '<circle cx="30" cy="10" r="1.8" fill="#06202C"/>' }
+];
+function fishSVG(sp, w, h){
+  var s = SPECIES[sp];
+  return '<svg viewBox="0 0 42 34" style="color:'+s.hex+'" fill="'+s.hex+'"'+
+    (w?' width="'+w+'" height="'+h+'"':'')+'>'+s.svg+'</svg>';
+}
+
+var NEED = 3, SLOTS = 5, FISH_W = 42, FISH_H = 34;
+var ACTIVE = 2;              // aynı anda açık sipariş sayısı
+var SPEED_MUL = 1.25;        // balık hızı çarpanı
+var LS = "dbg.aqua.v1";
+
+function el(id){ return document.getElementById(id); }
+function rnd(n){ return Math.floor(Math.random()*n); }
+
+/* ═══════════ bölüm ═══════════ */
+function cfgFor(n){
+  return {
+    species: Math.min(SPECIES.length, 3 + Math.floor((n-1)/2)),
+    /* Havuz = sipariş × 3, yani akvaryumdaki balık sayısı buradan gelir.
+       HER BÖLÜMDE BİR SİPARİŞ ARTAR: L1 = 3 sipariş = 9 balık (seyrek başlangıç),
+       L8 = 10 sipariş = 30 balık. */
+    orders : Math.min(10, 2 + n)
+  };
+}
+/* Havuz siparişlerden TÜRETİLİR: her sipariş için tam NEED balık.
+   Böylece her balığın er ya da geç sırası gelir — yanlış seçim ölüm değil,
+   sadece o ana kadar işgal edilmiş kapasitedir. */
+/* PAKETLER (4. bölümden itibaren): içinde balık olan kilitli sandıklar.
+   Belirli sayıda balık teslim edilmeden açılmazlar.
+   Kilitli balıklar havuzun parçasıdır — dışarıda fazladan balık yoktur. */
+function packCount(n){
+  if(n < 4) return 0;
+  if(n < 6) return 1;
+  if(n < 8) return 2;
+  return 3;
+}
+/* Perfect-player benzetimi: paketli bölüm gerçekten bitirilebiliyor mu?
+   Kilitli balık erken bir siparişe lazımsa oyun kilitlenir — bunu ELEMEK için. */
+function solvable(orders, packs, freeCounts){
+  var avail = freeCounts.slice();
+  var locked = packs.map(function(p){ return { at:p.at, fish:p.fish.slice(), open:false }; });
+  var queue = orders.slice(), active = [], delivered = 0, guard = 0;
+
+  function pull(){ return queue.length ? { sp:queue.shift(), need:NEED } : null; }
+  for(var a=0;a<ACTIVE;a++) active.push(pull());
+  function unlock(){
+    for(var i=0;i<locked.length;i++){
+      if(!locked[i].open && delivered >= locked[i].at){
+        locked[i].open = true;
+        for(var k=0;k<locked[i].fish.length;k++) avail[locked[i].fish[k]]++;
+      }
+    }
+  }
+  unlock();
+  while(guard++ < 500){
+    var live = 0, moved = false;
+    for(var i=0;i<active.length;i++){
+      var o = active[i]; if(!o) continue;
+      live++;
+      if(avail[o.sp] > 0){
+        avail[o.sp]--; o.need--; delivered++; moved = true;
+        if(o.need <= 0) active[i] = pull();
+        unlock();
+        break;
+      }
+    }
+    if(live === 0) return true;            // bütün siparişler bitti
+    if(!moved) return false;               // hamle yok, paket de açılamıyor -> kilit
+  }
+  return false;
+}
+
+/* Paket içeriğini FARKLI TÜRLERDEN seçer: önce her türden birer tane,
+   sonra kalanı doldurur. Tek tür paket bilgi taşımıyordu. */
+function pickMixed(tokens, elig, size){
+  var chosen = [], seen = {}, i;
+  for(i=0;i<elig.length && chosen.length<size;i++){
+    var sp = tokens[elig[i]].sp;
+    if(!seen[sp]){ seen[sp] = 1; chosen.push(elig[i]); }
+  }
+  for(i=0;i<elig.length && chosen.length<size;i++)
+    if(chosen.indexOf(elig[i]) < 0) chosen.push(elig[i]);
+  chosen.sort(function(a,b){ return b - a; });        // yüksekten sil, indeks kaymasın
+  var out = [];
+  for(i=0;i<chosen.length;i++) out.push(tokens.splice(chosen[i],1)[0].sp);
+  return out;
+}
+
+function buildLevel(n){
+  var cfg = cfgFor(n), attempt, i, k;
+  var np = packCount(n);
+
+  for(attempt=0; attempt<200; attempt++){
+    /* Türler DENGELİ dağıtılır (round-robin + karıştır). Serbest rastgelede
+       kuyruk tek türe düşüp iki kart aynı balığı isteyebiliyordu — o durumda
+       ikinci kartın bilgi değeri sıfır. */
+    var orders = [];
+    for(i=0;i<cfg.orders;i++) orders.push(i % cfg.species);
+    for(i=orders.length-1;i>0;i--){ var j=rnd(i+1); var t=orders[i]; orders[i]=orders[j]; orders[j]=t; }
+
+    /* Balıklar tek tek "jeton"a çevrilir: {tür, ait olduğu sipariş}.
+       Paketler bu jetonlardan KARIŞIK TÜR seçer; kalanlar akvaryuma girer.
+       Havuz büyümez — paket içindekiler de toplamın parçasıdır. */
+    var tokens = [];
+    for(i=0;i<orders.length;i++) for(k=0;k<NEED;k++) tokens.push({ sp:orders[i], oi:i });
+
+    var maxLock = Math.floor(tokens.length / 3);
+    var packs = [], failed = false, locked = 0;
+    for(var p=0;p<np;p++){
+      var minOi = 2 + p, elig = [];
+      for(i=0;i<tokens.length;i++) if(tokens[i].oi >= minOi) elig.push(i);
+      var size = Math.min(3 + rnd(3), elig.length, maxLock - locked);   // 3-5 balık
+      if(size < 3){ failed = true; break; }
+      var take = pickMixed(tokens, elig, size);
+      locked += take.length;
+      packs.push({ at: NEED + p*NEED, fish: take });
+    }
+    if(failed) continue;
+
+    var free = [], counts = new Array(SPECIES.length).fill(0);
+    for(i=0;i<tokens.length;i++){ free.push(tokens[i].sp); counts[tokens[i].sp]++; }
+
+    if(np === 0 || solvable(orders, packs, counts))
+      return { cfg:cfg, orders:orders, pool:free, packs:packs, tries:attempt+1 };
+  }
+  // güvenli geri çekilme: paketsiz kur
+  var o2 = [];
+  for(i=0;i<cfg.orders;i++) o2.push(rnd(cfg.species));
+  var p2 = [];
+  for(i=0;i<o2.length;i++) for(k=0;k<NEED;k++) p2.push(o2[i]);
+  return { cfg:cfg, orders:o2, pool:p2, packs:[], tries:-1 };
+}
+
+/* ═══════════ durum ═══════════ */
+var S = null, fishes = [], fishSeq = 0, raf = null, lastTs = 0;
+
+function startLevel(n){
+  var L = buildLevel(n);
+  S = {
+    n:n, cfg:L.cfg, queue:L.orders.slice(),
+    active:[], slots:new Array(SLOTS).fill(null),
+    done:0, total:L.orders.length, over:null,
+    delivered:0, packs:L.packs.map(function(p,i){
+      return { id:i, at:p.at, fish:p.fish.slice(), open:false, el:null };
+    })
+  };
+  for(var a=0;a<ACTIVE;a++) S.active.push(pullOrder(activeSpecies()));
+  el("danger").className = "danger";
+  try{ localStorage.setItem(LS, String(n)); }catch(e){}
+
+  spawnFish(L.pool);
+  spawnPacks();
+  renderAll();
+  startAnim();
+}
+
+/* ═══════════ balık simülasyonu ═══════════ */
+function tankBox(){
+  var t = el("tank");
+  var w = t.offsetWidth || 356, h = t.offsetHeight || 328;
+  var x = t.offsetLeft, y = t.offsetTop;
+  if(typeof x !== "number" || !isFinite(x)) x = 20;
+  if(typeof y !== "number" || !isFinite(y)) y = 250;
+  return { x:x, y:y, w:w, h:h };
+}
+function addFish(sp, atX, atY){
+  var box = tankBox(), pad = 8, sandH = 46;
+  var lo = { x: box.x + pad, y: box.y + pad };
+  var hi = { x: box.x + box.w - FISH_W - pad, y: box.y + box.h - FISH_H - sandH };
+  var f = {
+    id: fishSeq++, sp: sp, taken: false,
+    x: (atX === undefined) ? lo.x + Math.random()*(hi.x - lo.x) : Math.max(lo.x, Math.min(hi.x, atX)),
+    y: (atY === undefined) ? lo.y + Math.random()*(hi.y - lo.y) : Math.max(lo.y, Math.min(hi.y, atY)),
+    vx: (Math.random()<0.5?-1:1) * (14 + Math.random()*22) * SPEED_MUL,
+    vy: (Math.random()<0.5?-1:1) * (5 + Math.random()*10) * SPEED_MUL,
+    ph: Math.random()*6.28, el: null
+  };
+  var d = document.createElement("div");
+  d.className = "fish" + (atX === undefined ? "" : " born");
+  d.innerHTML = fishSVG(f.sp);
+  (function(fi){ d.addEventListener("click", function(){ tapFish(fi); }); })(f);
+  el("swim").appendChild(d);
+  f.el = d;
+  place(f);
+  fishes.push(f);
+  return f;
+}
+function spawnFish(pool){
+  el("swim").innerHTML = "";
+  fishes = []; fishSeq = 0;
+  for(var i=0;i<pool.length;i++) addFish(pool[i]);
+  decorateTank();
+}
+/* Sandıklar kumun üstünde durur; kilit rozetinde kalan teslimat sayısı yazar. */
+function spawnPacks(){
+  var box = tankBox(), i;
+  var lay = el("packs"); lay.innerHTML = "";
+  var n = S.packs.length;
+  for(i=0;i<n;i++){
+    var p = S.packs[i];
+    var frac = (i + 1) / (n + 1);
+    p.x = box.x + 16 + frac * (box.w - 32) - 33;
+    p.y = box.y + box.h - 88;
+    var peek = "";
+    for(var k=0;k<p.fish.length;k++) peek += fishSVG(p.fish[k], 18, 15);
+    var d = document.createElement("div");
+    d.className = "pack";
+    d.style.transform = "translate(" + p.x.toFixed(1) + "px," + p.y.toFixed(1) + "px)";
+    d.innerHTML = '<span class="crate"><span class="peek">' + peek + '</span></span>' +
+                  '<span class="lock"><b>' + p.at + '</b></span>';
+    lay.appendChild(d);
+    p.el = d;
+  }
+}
+function openPacks(){
+  for(var i=0;i<S.packs.length;i++){
+    var p = S.packs[i];
+    if(p.open) continue;
+    if(S.delivered < p.at){                      // kalan sayıyı güncelle
+      if(p.el){
+        var b = p.el.querySelector("b");
+        if(b) b.textContent = String(p.at - S.delivered);
+      }
+      continue;
+    }
+    p.open = true;
+    burstPack(p);
+  }
+}
+function burstPack(p){
+  if(p.el){
+    p.el.className = "pack burst";
+    (function(node){ setTimeout(function(){
+      if(node.parentNode) node.parentNode.removeChild(node);
+    }, 520); })(p.el);
+    p.el = null;
+  }
+  for(var k=0;k<p.fish.length;k++){
+    addFish(p.fish[k], p.x + 8 + rnd(44), p.y - 4 - rnd(34));
+  }
+}
+function place(f){
+  if(!f.el) return;
+  f.el.style.transform = "translate(" + f.x.toFixed(1) + "px," + f.y.toFixed(1) + "px) scaleX(" +
+    (f.vx < 0 ? -1 : 1) + ")";
+}
+function step(dt){
+  var box = tankBox(), pad = 6, sandH = 44;
+  var minX = box.x + pad, maxX = box.x + box.w - FISH_W - pad;
+  var minY = box.y + pad, maxY = box.y + box.h - FISH_H - sandH;
+  for(var i=0;i<fishes.length;i++){
+    var f = fishes[i];
+    if(f.taken) continue;
+    f.ph += dt * 1.7;
+    f.x += f.vx * dt;
+    f.y += f.vy * dt + Math.sin(f.ph) * 7 * dt;
+    if(f.x < minX){ f.x = minX; f.vx = Math.abs(f.vx); }
+    if(f.x > maxX){ f.x = maxX; f.vx = -Math.abs(f.vx); }
+    if(f.y < minY){ f.y = minY; f.vy = Math.abs(f.vy); }
+    if(f.y > maxY){ f.y = maxY; f.vy = -Math.abs(f.vy); }
+    place(f);
+  }
+}
+function startAnim(){
+  if(typeof requestAnimationFrame !== "function") return;
+  if(raf) cancelAnimationFrame(raf);
+  lastTs = 0;
+  raf = requestAnimationFrame(function loop(ts){
+    raf = requestAnimationFrame(loop);
+    if(!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts - lastTs) / 1000);
+    lastTs = ts;
+    if(S && !S.over) step(dt);
+  });
+}
+function decorateTank(){
+  var t = el("tank");
+  var old = t.querySelectorAll ? t.querySelectorAll(".weed,.bub") : [];
+  for(var k=0;k<old.length;k++) if(old[k].parentNode) old[k].parentNode.removeChild(old[k]);
+  var i, d;
+  var weeds = [[16,52],[34,34],[74,44],[88,60]];
+  for(i=0;i<weeds.length;i++){
+    d = document.createElement("span"); d.className = "weed";
+    d.style.left = weeds[i][0] + "%"; d.style.height = weeds[i][1] + "px";
+    d.style.animationDelay = (-i*0.8) + "s";
+    t.appendChild(d);
+  }
+  for(i=0;i<7;i++){
+    d = document.createElement("span"); d.className = "bub";
+    var sz = 4 + rnd(7);
+    d.style.left = (6 + rnd(88)) + "%";
+    d.style.bottom = "36px";
+    d.style.width = sz + "px"; d.style.height = sz + "px";
+    d.style.animationDuration = (7 + Math.random()*7) + "s";
+    d.style.animationDelay = (-Math.random()*9) + "s";
+    t.appendChild(d);
+  }
+}
+
+/* ═══════════ kurallar ═══════════ */
+function activeSpecies(){
+  var out = [];
+  for(var a=0;a<S.active.length;a++) if(S.active[a]) out.push(S.active[a].sp);
+  return out;
+}
+/* Kuyruktan sipariş çeker; mümkünse açık olanlardan FARKLI tür seçer.
+   İki kart aynı türü isterse oyuncu için bilgi değeri düşüyor. */
+function pullOrder(avoid){
+  if(!S.queue.length) return null;
+  var idx = 0;
+  if(avoid && avoid.indexOf(S.queue[0]) >= 0){
+    for(var i=1;i<S.queue.length;i++)
+      if(avoid.indexOf(S.queue[i]) < 0){ idx = i; break; }
+  }
+  return { sp: S.queue.splice(idx,1)[0], need: NEED };
+}
+function completeOrder(a){
+  S.done++;
+  S.active[a] = null;
+  S.active[a] = pullOrder(activeSpecies());
+}
+function freeSlot(){
+  for(var i=0;i<SLOTS;i++) if(S.slots[i] === null) return i;
+  return -1;
+}
+/* Bir sipariş açıldığında, tepside o türden ne varsa SERBEST KALIR ve sayar.
+   İki kart olduğu için değişiklik oldukça baştan taranır: bir kartın
+   tamamlanması yeni bir kart açar, o da tepsiden balık kurtarabilir. */
+function releaseFromSlots(){
+  var freed = [], guard = 0, changed = true;
+  while(changed && guard++ < 80){
+    changed = false;
+    for(var a=0;a<S.active.length && !changed;a++){
+      var o = S.active[a]; if(!o) continue;
+      for(var i=0;i<SLOTS;i++){
+        if(S.slots[i] === o.sp){
+          S.slots[i] = null; freed.push(i);
+          S.delivered++;                    // serbest kalan balık da teslimattır
+          if(--o.need <= 0) completeOrder(a);
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+  return freed;
+}
+function matchIndex(sp){
+  for(var a=0;a<S.active.length;a++) if(S.active[a] && S.active[a].sp === sp) return a;
+  return -1;
+}
+/* Model ANINDA güncellenir, uçuş yalnızca animasyondur.
+   İniş anında güncellenseydi aynı siparişe uçan iki balık çakışır,
+   ikincisi boşa giderdi (havuz korunumu bozulur). */
+function usedSlots(){
+  var k = 0;
+  for(var i=0;i<SLOTS;i++) if(S.slots[i] !== null) k++;
+  return k;
+}
+function tapFish(f){
+  if(!S || S.over || f.taken) return;
+
+  var a = matchIndex(f.sp);
+  if(a >= 0){
+    f.taken = true;
+    var o = S.active[a];
+    S.delivered++;
+    if(--o.need <= 0) completeOrder(a);
+    var freed = releaseFromSlots();
+    openPacks();                         // teslimat paketleri açabilir
+    checkEnd();
+    flyTo(f, orderTarget(a), function(){});
+    renderAll(freed);
+    return;
+  }
+
+  var slot = freeSlot();
+  if(slot < 0){ denyFeedback(f); return; }   // teoride ulaşılmaz: 5'te zaten biter
+  f.taken = true;
+  S.slots[slot] = f.sp;
+  flyTo(f, slotTarget(slot), function(){});
+  /* BEŞİNCİ SLOT DOLDUĞU AN kaybedilir — "dolu tepsiyle yanlış dokunuş" değil. */
+  if(usedSlots() >= SLOTS){
+    S.over = "lose-tray";
+    denyFeedback(f);
+    flashDanger();
+  }
+  checkEnd();
+  renderAll();
+}
+function checkEnd(){
+  if(S.over) return;
+  for(var a=0;a<S.active.length;a++) if(S.active[a]) return;
+  S.over = "win";
+}
+
+/* ═══════════ uçuş ═══════════ */
+function stagePos(node){
+  var st = el("stage"), x = 0, y = 0, guard = 0;
+  while(node && node !== st && guard++ < 20){
+    x += node.offsetLeft || 0;
+    y += node.offsetTop  || 0;
+    node = node.offsetParent;
+  }
+  return { x:x, y:y };
+}
+function orderTarget(a){
+  return stagePos(el("ordPic" + a));
+}
+function slotTarget(i){
+  var s = el("tray").children[i];
+  if(!s) return { x:0, y:0 };
+  var p = stagePos(s);
+  return { x:p.x + 2, y:p.y + 2 };
+}
+function flyTo(f, tgt, done){
+  var d = f.el;
+  if(!d){ done(); return; }
+  d.classList.add("fly");
+  d.style.transform = "translate(" + tgt.x + "px," + tgt.y + "px) scale(.62)";
+  d.style.opacity = "0";
+  setTimeout(function(){
+    if(d.parentNode) d.parentNode.removeChild(d);
+    f.el = null;
+    done();
+  }, 420);
+}
+function denyFeedback(f){
+  if(f.el){ f.el.classList.remove("deny"); void f.el.offsetWidth; f.el.classList.add("deny"); }
+  var t = el("tray");
+  t.classList.remove("deny"); void t.offsetWidth; t.classList.add("deny");
+}
+
+/* Kayıp anında tek seferlik kırmızı yansıma (süre kalktığı için sürekli değil). */
+function flashDanger(){
+  var d = el("danger");
+  d.className = "danger"; void d.offsetWidth;
+  d.className = "danger on fast";
+  setTimeout(function(){ d.className = "danger"; }, 900);
+}
+
+/* ═══════════ çizim ═══════════ */
+function renderOrder(){
+  for(var a=0;a<ACTIVE;a++){
+    var o = S.active[a];
+    var got = o ? (NEED - o.need) : 0;
+    el("ordPic" + a).innerHTML = o ? fishSVG(o.sp, 38, 31) : "";
+    el("ordCap" + a).textContent = o ? SPECIES[o.sp].name : "—";
+    el("ordCnt" + a).textContent = o ? (got + "/" + NEED) : "";   // sayısal doluluk
+    el("ord" + a).className = "order" + (o ? "" : " empty");
+    var pips = el("ordPips" + a); pips.innerHTML = "";
+    for(var i=0;i<NEED;i++){
+      var p = document.createElement("i");
+      if(o && i < got) p.className = "on";
+      pips.appendChild(p);
+    }
+  }
+}
+function renderTray(freed){
+  var t = el("tray"); t.innerHTML = "";
+  var used = 0;
+  for(var i=0;i<SLOTS;i++){
+    var s = document.createElement("div");
+    s.className = "slot" + (S.slots[i] !== null ? " on" : "");
+    if(S.slots[i] !== null){
+      used++;
+      s.innerHTML = '<span class="drop">' + fishSVG(S.slots[i], 34, 27) + '</span>';
+    } else if(freed && freed.indexOf(i) >= 0){
+      s.className += " freeing";
+    }
+    t.appendChild(s);
+  }
+  var mood = (used >= SLOTS) ? " full" : (used === SLOTS - 1 ? " warn" : "");
+  t.className = "tray" + mood;
+}
+function renderAll(freed){
+  if(!S) return;
+  var u = usedSlots();
+  el("hLv").textContent  = S.n;
+  el("hOrd").textContent = S.done + "/" + S.total;
+  el("hTray").textContent = u + "/" + SLOTS;
+  el("hTrayStat").className = "stat" + (u >= SLOTS - 1 ? " crit" : (u >= SLOTS - 2 ? " warn" : ""));
+  el("fSeed").textContent = S.cfg.species + " tür · " + S.total + " sipariş" +
+    (S.packs.length ? " · " + S.packs.length + " paket" : "");
+  renderOrder();
+  renderTray(freed);
+  if(S.over) setTimeout(showEnd, 420);
+}
+
+/* ═══════════ overlay ═══════════ */
+function hideOverlay(){ var o = el("ovNode"); if(o && o.parentNode) o.parentNode.removeChild(o); }
+function overlay(html, cls){
+  hideOverlay();
+  var d = document.createElement("div");
+  d.className = "ov " + (cls || ""); d.id = "ovNode"; d.innerHTML = html;
+  el("stage").appendChild(d);
+  return d;
+}
+function showEnd(){
+  if(!S || !S.over) return;
+  var T = {
+    "win":        ["🐠","Akvaryum tamam","Bütün siparişler teslim edildi."],
+    "lose-tray":  ["🪣","Tepsi doldu","Beş slot da doldu — yanlış balık kalmadı."]
+  }[S.over];
+  var win = S.over === "win";
+  var d = overlay(
+    '<div class="big">'+T[0]+'</div><h2>'+T[1]+'</h2>'+
+    '<p class="sub">'+T[2]+'<br><b style="color:var(--ink)">'+S.done+'/'+S.total+'</b> sipariş</p>'+
+    '<div class="ctrls">'+
+      (win ? '<button class="go" data-a="next">Sonraki bölüm →</button>' : '')+
+      '<button data-a="retry">⟲ Tekrar</button>'+
+    '</div>');
+  d.addEventListener("click", function(e){
+    var a = e.target.getAttribute && e.target.getAttribute("data-a");
+    if(!a) return;
+    hideOverlay();
+    if(a === "next")  startLevel(S.n + 1);
+    if(a === "retry") startLevel(S.n);
+  });
+}
+function showHelp(){
+  var d = overlay(
+    '<h2>Nasıl oynanır</h2>'+
+    '<ol>'+
+      '<li>Soldaki <b>sipariş kartı</b> hangi balığın istendiğini gösterir. <b>3 tane</b> lazım — çubuklar dolar.</li>'+
+      '<li>Akvaryumdaki <b>balığa dokun</b>. Doğruysa siparişe uçar.</li>'+
+      '<li>Yanlışsa <b>5 slotluk tepsiye</b> takılır ve orada bekler.</li>'+
+      '<li>Takılan balık, <b>sırası gelince kendiliğinden kurtulur</b> ve siparişe sayılır.</li>'+
+      '<li>Kumdaki <b>saydam sandıklar</b> içinde <b>karışık türden 3–5 balık</b> bekler. '+
+        'İçini görebilirsin; üstündeki sayı kaç balık daha teslim etmen gerektiğini söyler.</li>'+
+    '</ol>'+
+    '<div class="box"><b style="color:var(--ink)">Kaybetme</b><br>'+
+      '<b>Beş slot dolduğu an bölüm biter.</b> Dördüncüde tepsi sararır, beşincide kızarır. '+
+      'Gelecek siparişler gizli — biriktirmek risktir.</div>'+
+    '<div class="ctrls"><button class="go" data-a="close">Anladım</button></div>', "help");
+  d.addEventListener("click", function(e){
+    if(e.target.getAttribute && e.target.getAttribute("data-a") === "close") hideOverlay();
+  });
+}
+
+/* ═══════════ bağlama ═══════════ */
+el("bReset").addEventListener("click", function(){ hideOverlay(); startLevel(S.n); });
+el("bFirst").addEventListener("click", function(){ hideOverlay(); startLevel(1); });
+el("bHelp").addEventListener("click", showHelp);
+document.addEventListener("keydown", function(e){ if(e.key === "Escape") hideOverlay(); });
+
+var start = 1;
+try{ var v = parseInt(localStorage.getItem(LS), 10); if(v > 0 && v < 200) start = v; }catch(e){}
+startLevel(start);
+
+var bt = el("boot");                 // buraya gelindiyse JS calisti
+if(bt && bt.parentNode) bt.parentNode.removeChild(bt);
+})();
+</script>
