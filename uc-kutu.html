@@ -60,6 +60,17 @@ body{
   border:1px solid var(--line);background:#0A0704}
 #cv{display:block;margin:0 auto}
 .fx{position:absolute;inset:0;pointer-events:none;z-index:4}
+/* Bolum yeni bir mekanik tanitiyorsa kisa bir seride yazar. */
+.note{position:absolute;left:8px;right:8px;top:9px;z-index:6;pointer-events:none;
+  text-align:center;font-family:Bitter,Georgia,serif;font-weight:700;font-size:12px;
+  color:#2A1B04;background:var(--brass);border-radius:8px;padding:7px 9px;
+  box-shadow:0 6px 18px rgba(0,0,0,.5);opacity:0;transform:translateY(-8px)}
+.note.on{animation:noteIn 3.4s ease-out forwards}
+@keyframes noteIn{
+  0%{opacity:0;transform:translateY(-10px)}
+  9%{opacity:1;transform:translateY(0)}
+  78%{opacity:1;transform:translateY(0)}
+  100%{opacity:0;transform:translateY(-8px)}}
 .pop{position:absolute;font-family:Bitter,Georgia,serif;font-size:14px;font-weight:800;
   text-shadow:0 2px 8px #000;animation:popUp .85s ease-out forwards;white-space:nowrap}
 .pop.ok{color:#B6F09A} .pop.bad{color:var(--bad)} .pop.gold{color:var(--brass-lit)}
@@ -164,6 +175,7 @@ window.addEventListener("error", function(e){
 
   <div class="table" id="table">
     <canvas id="cv"></canvas>
+    <div class="note" id="note"></div>
     <div class="fx" id="fx"></div>
     <div class="veil" id="veil"></div>
   </div>
@@ -197,6 +209,9 @@ window.addEventListener("error", function(e){
       için KATI DUVAR. "Yanlış renk geri düşsün" ayrı bir kural değil, fizik. */
 /* <<<FIZIK>>> */
 var TW = 320, TH = 500, BR = 8;
+/* Kucultucu yuzunden yaricap artik TOP BASINA (b.r). BR yalnizca baslangic
+   degeri; yari boyut BR*0.5 = 4 px. */
+var R_MIN = BR*0.5, PUSH_V = 560;
 var GRAV = 860, VMAX = 1200, EBALL = 0.34;
 var SUB_MAX = 16, SUB_STEP = 5;
 var TUBE_IN = 488, TUBE_SPD = 470;   /* ağzın y eşiği, boruda ilerleme hızı */
@@ -215,6 +230,17 @@ function makeTable(L){
   for(i=0;i<L.segs.length;i++)  t.segs.push(seg(L.segs[i]));
   for(i=0;i<L.bumps.length;i++) t.bumps.push(circ(L.bumps[i]));
   for(i=0;i<L.posts.length;i++) t.posts.push(circ(L.posts[i]));
+  /* KUCULTUCU: [x, y, yaricap] — carpan mermer yariya iner (bir kez). */
+  t.shrinks = [];
+  if(L.shrinks) for(i=0;i<L.shrinks.length;i++)
+    t.shrinks.push({ x:L.shrinks[i][0], y:L.shrinks[i][1], r:L.shrinks[i][2], hit:0 });
+  /* ITICI: [x, y, yukseklik, yon] — duvardaki ped, degen mermeri yana firlatir. */
+  t.pushes = [];
+  if(L.pushes) for(i=0;i<L.pushes.length;i++){
+    var pu = L.pushes[i];
+    t.pushes.push({ seg:seg([pu[0], pu[1], pu[0], pu[1]+pu[2], 5, 0.3, 0]),
+                    x:pu[0], y:pu[1], h:pu[2], dir:pu[3], hit:0 });
+  }
   /* Kutular bolume ait: [yuva, renk, adet]. Ilk bolumlerde masada tek kutu
      olabilir — ogretmek icin once bir hedef, sonra iki, sonra uc. */
   for(i=0;i<L.boxes.length;i++){
@@ -278,7 +304,7 @@ function spawnBalls(t, rnd){
   t.balls = [];
   for(i=0;i<cols.length && i<t.L.spawn.length;i++)
     t.balls.push({ x:t.L.spawn[i][0], y:t.L.spawn[i][1],
-                   vx:(rnd()-0.5)*40, vy:0, c:cols[i],
+                   vx:(rnd()-0.5)*40, vy:0, c:cols[i], r:BR,
                    alive:true, tube:-1, ts:0, trail:[] });
 }
 function ballsLeft(t){
@@ -301,7 +327,7 @@ function closestOnSeg(px, py, s){
 }
 function hitCapsule(b, qx, qy, capR, e, kick, cvx, cvy){
   var dx = b.x - qx, dy = b.y - qy;
-  var d2 = dx*dx + dy*dy, rr = BR + capR;
+  var d2 = dx*dx + dy*dy, rr = b.r + capR;
   if(d2 >= rr*rr) return 0;
   var d = Math.sqrt(d2), nx, ny;
   if(d > 1e-6){ nx = dx/d; ny = dy/d; } else { nx = 0; ny = -1; d = 0; }
@@ -340,8 +366,9 @@ function ballPairs(t){
     for(j=i+1;j<t.balls.length;j++){
       o = t.balls[j]; if(!o.alive || o.tube >= 0) continue;
       var dx = o.x - b.x, dy = o.y - b.y, d2 = dx*dx + dy*dy;
-      if(d2 >= 4*BR*BR || d2 < 1e-9) continue;
-      var d = Math.sqrt(d2), nx = dx/d, ny = dy/d, pen = (2*BR - d)*0.5;
+      var sr = b.r + o.r;
+      if(d2 >= sr*sr || d2 < 1e-9) continue;
+      var d = Math.sqrt(d2), nx = dx/d, ny = dy/d, pen = (sr - d)*0.5;
       b.x -= nx*pen; b.y -= ny*pen;
       o.x += nx*pen; o.y += ny*pen;
       var rvn = (o.vx - b.vx)*nx + (o.vy - b.vy)*ny;
@@ -355,6 +382,9 @@ function ballPairs(t){
 }
 function substepBall(t, b, sdt, ev){
   var i, k, q, res;
+  /* Yaricap tanimsizsa butun carpisma testleri NaN olur ve mermer her seyin
+     icinden gecer — sessiz ve yikici bir hata. Bir satirlik guvence. */
+  if(!b.r) b.r = BR;
   b.vy += GRAV*sdt;
   b.vx *= DAMP; b.vy *= DAMP;
   clampSpeed(b);
@@ -374,6 +404,32 @@ function substepBall(t, b, sdt, ev){
     var p = t.posts[i];
     hitCapsule(b, p.x, p.y, p.r, p.e, 0, 0, 0);
   }
+  /* --- KUCULTUCU --- once yuzeyden sektirir, sonra yaricabi yariya iner.
+     Tek kademe: R_MIN'in altina inmez, yoksa mermer kapali sanilan
+     centiklerden gecebilecek kadar kucuk olurdu. */
+  for(i=0;i<t.shrinks.length;i++){
+    var sh = t.shrinks[i];
+    if(hitCapsule(b, sh.x, sh.y, sh.r, 0.55, 0, 0, 0)){
+      sh.hit = 1;
+      if(b.r > R_MIN){
+        b.r = b.r*0.5;
+        if(b.r < R_MIN) b.r = R_MIN;
+        b.trail.length = 0;
+        ev.push(["shrink", b.x, b.y]);
+      }
+    }
+  }
+  /* --- ITICI --- duvardaki ped: degen mermer yatayda hizla karsiya firlar. */
+  for(i=0;i<t.pushes.length;i++){
+    var pz = t.pushes[i];
+    q = closestOnSeg(b.x, b.y, pz.seg);
+    if(hitCapsule(b, q.x, q.y, pz.seg.r, 0.2, 0, 0, 0)){
+      pz.hit = 1;
+      b.vx = pz.dir * PUSH_V;
+      b.vy = b.vy*0.35 - 60;          /* biraz da yukari, drenaja surmesin */
+      ev.push(["push", b.x, b.y, pz.dir]);
+    }
+  }
   /* --- kutular ---
      Kutunun DORT KENARI da renk zari: dogru renk mermer kutuya nereden
      degerse degsin yakalanir — altindan, yanindan, ustunden. Onceden yalniz
@@ -382,8 +438,8 @@ function substepBall(t, b, sdt, ev){
   for(i=0;i<t.boxes.length;i++){
     var bx = t.boxes[i];
     if(b.c === bx.c && bx.stack < bx.cap){
-      if(b.x > bx.cx - bx.w/2 - BR && b.x < bx.cx + bx.w/2 + BR &&
-         b.y > bx.top - BR && b.y < bx.bot + BR){
+      if(b.x > bx.cx - bx.w/2 - b.r && b.x < bx.cx + bx.w/2 + b.r &&
+         b.y > bx.top - b.r && b.y < bx.bot + b.r){
         b.alive = false;
         bx.stack++; bx.lit = 1;
         ev.push(["stack", bx.cx, bx.bot, i]);
@@ -398,7 +454,7 @@ function substepBall(t, b, sdt, ev){
     }
     q = closestOnSeg(b.x, b.y, bx.mem);
     var dx2 = b.x - q.x, dy2 = b.y - q.y;
-    var rr2 = BR + bx.mem.r;
+    var rr2 = b.r + bx.mem.r;
     if(dx2*dx2 + dy2*dy2 < rr2*rr2){
       hitCapsule(b, q.x, q.y, bx.mem.r, bx.mem.e, 0, 0, 0);
       bx.rej = 1;
@@ -417,9 +473,9 @@ function substepBall(t, b, sdt, ev){
   }
   clampSpeed(b);
 
-  if(b.x < BR){ b.x = BR; b.vx = Math.abs(b.vx)*0.4; t.clamps++; }
-  if(b.x > TW - BR){ b.x = TW - BR; b.vx = -Math.abs(b.vx)*0.4; t.clamps++; }
-  if(b.y < BR){ b.y = BR; b.vy = Math.abs(b.vy)*0.4; t.clamps++; }
+  if(b.x < b.r){ b.x = b.r; b.vx = Math.abs(b.vx)*0.4; t.clamps++; }
+  if(b.x > TW - b.r){ b.x = TW - b.r; b.vx = -Math.abs(b.vx)*0.4; t.clamps++; }
+  if(b.y < b.r){ b.y = b.r; b.vy = Math.abs(b.vy)*0.4; t.clamps++; }
   /* Dip KAPALI ve kayıp yok: eğimli zemin her mermeri ortadaki TÜNEL AĞZINA
      indirir. Oraya varan mermer yutulur, borudan geçip yukarıdan çıkar.
      Zemin eğimleri x=150..170 dışında y>488'e inmeyi engellediği için
@@ -430,7 +486,7 @@ function substepBall(t, b, sdt, ev){
     ev.push(["in", b.x, b.y]);
     return;
   }
-  if(b.y > TH - BR){ b.y = TH - BR; b.vy = -Math.abs(b.vy)*0.5; t.clamps++; }
+  if(b.y > TH - b.r){ b.y = TH - b.r; b.vy = -Math.abs(b.vy)*0.5; t.clamps++; }
 }
 function flipsMoving(t){
   for(var i=0;i<t.flips.length;i++){
@@ -452,6 +508,7 @@ function stepTable(t, dt){
       var e = tube.path[tube.path.length-1];
       tb2.x = e[0]; tb2.y = e[1];
       tb2.vx = tube.out[0]; tb2.vy = tube.out[1];
+      tb2.r = BR;                     /* tunel mermeri eski boyuna dondurur */
       tb2.tube = -1; tb2.ts = 0;
       ev.push(["out", tb2.x, tb2.y]);
     } else {
@@ -505,7 +562,10 @@ var TABLE = {
      kutunun kose yaklasimlarini kesiyor, yandan gelen mermer sortlanmak
      yerine sekiyordu. Bitisik kutu hem sikisma bosluğunu hem direkleri
      ortadan kaldiriyor: tepenin tamami hedef. */
-  slots: [ [64, 28, 96, 40], [160, 28, 96, 40], [256, 28, 96, 40] ],
+  /* Kutu ustu y=20'ye cekildi: eskiden tepe duvariyla arasinda 9 px kanal
+     vardi. Tam boy mermer (16 px) sigmiyordu ama KUCULTULMUS mermer (8 px)
+     sigar ve orada takilabilirdi. Simdi kutu ustu cerceveyle ust uste. */
+  slots: [ [64, 20, 96, 48], [160, 20, 96, 48], [256, 20, 96, 48] ],
   /* Dogus noktalari ORTADAN disa dogru siralı: az mermerli bolumlerde
      mermerler masanin ortasinda toplanir, kenara dagilmaz. */
   spawn: [ [160,140],[110,140],[210,140],[60,140],[260,140],
@@ -554,26 +614,36 @@ var TABLE = {
   ]
 };
 
-/* Bolumler: [yuva, renk, adet]. Once TEK renk tek kutu — oyuncu once
-   "kolla vur, kutuya sok" fikrini ogrensin; sonra iki taraf, sonra uc.
-   3. bolum eski 1. bolumun ayni: 6 mermer / 30 hamle. */
+/* Bolumler: [yuva, renk, adet]. Once TEK renk tek kutu, sonra iki taraf,
+   sonra uc. 4. bolum KUCULTUCU'yu, 6. bolum ITICI'yi tek basina tanitir —
+   her bolumde en fazla bir yeni sey. */
+var SHR1 = [[160,196,15]];
+var SHR2 = [[104,200,14],[216,200,14]];
+var PU1  = [[20,196,62,1],[300,196,62,-1]];
+var PU2  = [[20,150,56,1],[300,150,56,-1],[20,268,56,1],[300,268,56,-1]];
 var LEVELS = [
   { boxes:[[1,0,3]],                       moves:14 },
   { boxes:[[0,0,2],[2,2,2]],               moves:20 },
   { boxes:[[0,0,2],[1,1,2],[2,2,2]],       moves:30 },
-  { boxes:[[0,0,3],[1,1,2],[2,2,2]],       moves:34 },
-  { boxes:[[0,0,3],[1,1,3],[2,2,2]],       moves:38 },
-  { boxes:[[0,0,3],[1,1,3],[2,2,3]],       moves:42 },
-  { boxes:[[0,0,4],[1,1,3],[2,2,3]],       moves:46 },
-  { boxes:[[0,0,4],[1,1,4],[2,2,3]],       moves:50 },
-  { boxes:[[0,0,4],[1,1,4],[2,2,4]],       moves:56 },
-  { boxes:[[0,0,5],[1,1,5],[2,2,5]],       moves:70 }
+  { boxes:[[0,0,2],[1,1,2],[2,2,2]],       moves:32, shrinks:SHR1,
+    note:"Küçültücü: çarpan mermer yarıya iner" },
+  { boxes:[[0,0,3],[1,1,2],[2,2,2]],       moves:36, shrinks:SHR1 },
+  { boxes:[[0,0,3],[1,1,3],[2,2,2]],       moves:40, pushes:PU1,
+    note:"İtici: duvara çarpan mermer karşıya fırlar" },
+  { boxes:[[0,0,3],[1,1,3],[2,2,3]],       moves:46, shrinks:SHR1, pushes:PU1 },
+  { boxes:[[0,0,4],[1,1,3],[2,2,3]],       moves:52, shrinks:SHR2, pushes:PU1 },
+  { boxes:[[0,0,4],[1,1,4],[2,2,4]],       moves:60, shrinks:SHR2, pushes:PU2 },
+  { boxes:[[0,0,5],[1,1,5],[2,2,5]],       moves:72,
+    shrinks:[[160,170,16],[104,246,13],[216,246,13]], pushes:PU2 }
 ];
 function levelDef(n){
   var L = LEVELS[Math.min(n, LEVELS.length) - 1], o = {}, k;
   for(k in TABLE) if(TABLE.hasOwnProperty(k)) o[k] = TABLE[k];
-  o.boxes = L.boxes;
-  o.moves = L.moves;
+  o.boxes   = L.boxes;
+  o.moves   = L.moves;
+  o.shrinks = L.shrinks || [];
+  o.pushes  = L.pushes  || [];
+  o.note    = L.note || "";
   return o;
 }
 function levelBalls(n){
@@ -629,6 +699,14 @@ function newGame(){
   hideOverlay();
   fitCanvas(); fitCanvas();      /* ilk gecis kabin yuksekligini olcer, ikincisi oturtur */
   renderHud();
+  showNote(T.L.note);
+}
+function showNote(txt){
+  var n = el("note");
+  if(!n) return;
+  if(!txt){ n.className = "note"; n.textContent = ""; return; }
+  n.textContent = txt;
+  n.className = "note"; void n.offsetWidth; n.className = "note on";
 }
 /* Masa yalniz genislige gore olceklenirse kisa telefonlarda (375x667) kabin
    749 px oluyor, 104 px tasiyor ve kollar ekranin tam dibine siniyor.
@@ -677,6 +755,10 @@ function onEvent(e){
     popAt(e[1], e[2] - 14, "bad", "yanlış kutu");
   } else if(k === "out"){
     popAt(e[1], e[2] - 16, "gold", "↑");
+  } else if(k === "shrink"){
+    popAt(e[1], e[2] - 16, "bad", "yarıya indi");
+  } else if(k === "push"){
+    popAt(e[1] + e[3]*16, e[2] - 14, "gold", e[3] > 0 ? "»»" : "««");
   }
 }
 function win(){
@@ -891,6 +973,47 @@ function drawTable(){
     ctx.beginPath(); ctx.arc(c.x, c.y, c.r - 3.5, 0, Math.PI*2); ctx.stroke();
   }
 
+  /* ---- ITICI: duvardaki ped, ice bakan cift chevron ---- */
+  for(i=0;i<T.pushes.length;i++){
+    var pz = T.pushes[i];
+    if(pz.hit > 0) pz.hit -= 0.07;
+    var ph = pz.hit > 0 ? pz.hit : 0;
+    capsule(pz.x, pz.y, pz.x, pz.y + pz.h, 5,
+            ph > 0 ? "#4E7FB8" : "#2E4C70", ph > 0 ? "#BFE0FF" : "#6D9CC9");
+    ctx.save();
+    ctx.strokeStyle = "rgba(191,224,255," + (0.45 + 0.5*ph) + ")";
+    ctx.lineWidth = 2; ctx.lineCap = "round";
+    for(k=0;k<3;k++){
+      var cy2 = pz.y + pz.h*(0.22 + 0.28*k);
+      ctx.beginPath();
+      ctx.moveTo(pz.x - pz.dir*3, cy2 - 6);
+      ctx.lineTo(pz.x + pz.dir*5, cy2);
+      ctx.lineTo(pz.x - pz.dir*3, cy2 + 6);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  /* ---- KUCULTUCU: ice dogru daralan halkalar ---- */
+  for(i=0;i<T.shrinks.length;i++){
+    var sh = T.shrinks[i];
+    if(sh.hit > 0) sh.hit -= 0.06;
+    var k2 = sh.hit > 0 ? sh.hit : 0;
+    ctx.fillStyle = "#0B0710";
+    ctx.beginPath(); ctx.arc(sh.x, sh.y + 2, sh.r + 3, 0, Math.PI*2); ctx.fill();
+    var sg = ctx.createRadialGradient(sh.x - sh.r*0.3, sh.y - sh.r*0.35, 1, sh.x, sh.y, sh.r);
+    sg.addColorStop(0, k2 > 0 ? "#E7C7FF" : "#8E6BB8");
+    sg.addColorStop(1, "#3A2352");
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, sh.r, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "rgba(231,199,255," + (0.55 + 0.45*k2) + ")";
+    for(k=1;k<=3;k++){
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(sh.x, sh.y, sh.r*(1 - 0.26*k) - k2*2, 0, Math.PI*2);
+      ctx.stroke();
+    }
+  }
+
   /* kutular */
   for(i=0;i<T.boxes.length;i++){
     var bx = T.boxes[i], p2 = PAL[bx.c];
@@ -950,12 +1073,14 @@ function drawTable(){
     if(!b.alive) continue;
     if(b.tube >= 0){                      /* boruda: sahanin altinda, sonuk */
       ctx.save(); ctx.globalAlpha = 0.55;
-      marble(b.x, b.y, b.c, BR - 1);
+      marble(b.x, b.y, b.c, Math.max(3, b.r - 1));
       ctx.restore();
       continue;
     }
     ctx.fillStyle = "rgba(0,0,0,.34)";
-    ctx.beginPath(); ctx.ellipse(b.x + 2.5, b.y + 3.5, BR*0.92, BR*0.72, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(b.x + b.r*0.31, b.y + b.r*0.44, b.r*0.92, b.r*0.72, 0, 0, Math.PI*2);
+    ctx.fill();
 
     /* İZ: uzunlugu HIZA bagli — yavas yuvarlanan mermer leke birakmaz,
        havada ucan uzun bir kuyruk birakir. Renk mermerin kendi rengi ve
@@ -973,12 +1098,12 @@ function drawTable(){
         ctx.globalAlpha = 0.05 + 0.36*ff*ff;
         ctx.fillStyle = ff > 0.72 ? tp.lit : tp.hex;
         ctx.beginPath();
-        ctx.arc(b.trail[k][0], b.trail[k][1], BR*(0.22 + 0.72*ff), 0, Math.PI*2);
+        ctx.arc(b.trail[k][0], b.trail[k][1], b.r*(0.22 + 0.72*ff), 0, Math.PI*2);
         ctx.fill();
       }
       ctx.restore();
     }
-    marble(b.x, b.y, b.c, BR);
+    marble(b.x, b.y, b.c, b.r);
   }
 }
 
@@ -1032,7 +1157,12 @@ function showIntro(){
     legendHTML() +
     '<div class="bar"><button class="go" data-a="start">▶ Başla</button></div>', "scroll");
   d.addEventListener("click", function(e){
-    if(e.target.getAttribute && e.target.getAttribute("data-a") === "start") hideOverlay();
+    if(e.target.getAttribute && e.target.getAttribute("data-a") === "start"){
+      hideOverlay();
+      /* Not, kunyenin ARKASINDA oynayip bitiyordu; oyuncu Basla'ya bastiginda
+         goremiyordu. Kunye kapaninca yeniden baslatiyoruz. */
+      showNote(T.L.note);
+    }
   });
 }
 function showHelp(){
@@ -1100,6 +1230,15 @@ el("bNew").addEventListener("click", function(){ level = 1; newGame(); });
 el("bHelp").addEventListener("click", showHelp);
 window.addEventListener("resize", function(){ fitCanvas(); fitCanvas(); drawTable(); });
 
+/* Adres sonuna #4 yazarak o bolumden baslanabilir — bolumleri tek tek
+   gozden gecirmek icin (ornek: .../uc-kutu.html#6 ). */
+(function(){
+  var m = /^#(\d+)$/.exec(window.location.hash || "");
+  if(m){
+    var n = parseInt(m[1], 10);
+    if(n >= 1 && n <= LEVELS.length) level = n;
+  }
+})();
 newGame();
 showIntro();
 raf = requestAnimationFrame(loop);
