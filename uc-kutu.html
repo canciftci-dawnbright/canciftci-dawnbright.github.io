@@ -37,11 +37,18 @@ body{
 /* ---------- HUD ---------- */
 .hud{display:flex;align-items:center;justify-content:space-between;gap:10px;
   padding:0 2px 9px;border-bottom:1px solid var(--line)}
-.mv,.left{font-family:Bitter,Georgia,serif;font-weight:800;font-size:21px;
+.mv{font-family:Bitter,Georgia,serif;font-weight:800;font-size:21px;
   font-variant-numeric:tabular-nums;line-height:1}
-.left{text-align:right}
-.mv small,.left small{display:block;font-family:inherit;font-size:8.5px;font-weight:600;
+.mv small{display:block;font-family:inherit;font-size:8.5px;font-weight:600;
   letter-spacing:.15em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:3px}
+/* Mod dugmesi sag UST kosede: tek elle oynarken bas parmagin ulasmadigi yer. */
+.mode{flex:0 0 auto;width:auto;min-width:46px;padding:5px 8px;border-radius:9px;
+  background:var(--wood);border:1px solid var(--line);color:var(--ink-soft);
+  display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;
+  font:inherit;line-height:1}
+.mode b{font-size:14px;color:var(--brass-lit);font-weight:400}
+.mode span{font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.mode:hover{border-color:var(--brass);background:#31220F}
 .mv.low b{color:var(--bad)}
 .mv.bump{animation:mvBump .3s ease-out}
 @keyframes mvBump{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
@@ -103,7 +110,11 @@ body{
 .flip .k{position:absolute;bottom:5px;width:100%;text-align:center;font-size:8.5px;
   font-weight:700;letter-spacing:.14em;color:var(--ink-dim);text-transform:uppercase}
 
-.bar{display:flex;gap:7px;margin-top:9px}
+/* "Yeni oyun" kollarin hemen altindaydi ve oynarken yanlislikla basiliyordu.
+   Hem asagi cektik hem de iki adimli onay koyduk: ilk dokunus soruyor. */
+.bar{display:flex;gap:7px;margin-top:26px}
+button.ask{background:#3A1512;border-color:var(--bad);color:#FFD9D2}
+@media (max-width:420px){ .bar{margin-top:30px} }
 button{flex:1;appearance:none;border:1px solid var(--line);background:var(--wood);color:var(--ink);
   font:inherit;font-size:11.5px;font-weight:700;padding:10px 6px;border-radius:9px;cursor:pointer}
 button:hover:not(:disabled){background:#31220F;border-color:var(--brass-dim)}
@@ -168,9 +179,9 @@ window.addEventListener("error", function(e){
 
 <div id="app"><div class="cab" id="cab">
   <div class="hud">
-    <span class="mv"><small><span id="hLvl">Bölüm 1</span> · Hamle</small><b id="hMoves">0</b></span>
+    <span class="mv"><small><span id="hLvl">Bölüm 1</span> · <span id="hBudLbl">Hamle</span></small><b id="hMoves">0</b></span>
     <span class="socks" id="hBoxes"></span>
-    <span class="left"><small>Masada</small><b id="hLeft">6</b></span>
+    <button class="mode" id="bMode" title="Hamleli / süreli mod"><b id="hModeIco">◷</b><span id="hModeTxt">süre</span></button>
   </div>
 
   <div class="table" id="table">
@@ -683,6 +694,20 @@ function el(id){ return document.getElementById(id); }
 
 var T = null, cv = null, ctx = null, raf = null, lastTs = 0, scale = 1, tms = 0;
 var over = false, graceMs = 0, level = 1;
+/* Iki mod: hamleli (kola basis sayili) ve sureli (basis bedava, saat isliyor).
+   Sure butcesi hamle butcesinden turetilir — hamle sayilari oyuncunun
+   onayladigi degerler, sureyi de onlara bagli tutuyoruz. */
+var MODE_LS = "dbg.uckutu.mod";
+var mode = "hamle", timeLeft = 0, askNew = 0;
+function levelSecs(n){
+  var mv = LEVELS[Math.min(n, LEVELS.length) - 1].moves;
+  return Math.round(mv*2.5/5)*5;
+}
+function loadMode(){
+  try{ var v = localStorage.getItem(MODE_LS); if(v === "sure" || v === "hamle") mode = v; }catch(e){}
+}
+function saveMode(){ try{ localStorage.setItem(MODE_LS, mode); }catch(e){} }
+function budgetOut(){ return mode === "hamle" ? (T.moves <= 0) : (timeLeft <= 0); }
 
 function best(){ try{ var v = parseInt(localStorage.getItem(LS), 10); return v > 0 ? v : 0; }catch(e){ return 0; } }
 function saveBest(n){ try{ if(n > best()) localStorage.setItem(LS, String(n)); }catch(e){} }
@@ -695,7 +720,10 @@ function totalBalls(){
 function newGame(){
   T = makeTable(levelDef(level));
   spawnBalls(T, Math.random);
-  over = false; graceMs = 0;
+  over = false; graceMs = 0; askNew = 0;
+  timeLeft = levelSecs(level);
+  /* Sureli modda basis hamle yakmasin: butce saatte, kolda degil. */
+  if(mode === "sure") T.moves = 1e9;
   hideOverlay();
   fitCanvas(); fitCanvas();      /* ilk gecis kabin yuksekligini olcer, ikincisi oturtur */
   renderHud();
@@ -736,11 +764,18 @@ function loop(ts){
   if(T && !over){
     var ev = stepTable(T, dt);
     for(var i=0;i<ev.length;i++) onEvent(ev[i]);
-    /* Hamle bitti: havadaki mermerler yerine oturana kadar sure taniyoruz. */
-    if(T.moves <= 0 && !allFull(T)){
-      graceMs += dt*1000;
-      if(graceMs > 4200) lose();
+    if(mode === "sure" && timeLeft > 0){
+      timeLeft -= dt;
+      if(timeLeft < 0) timeLeft = 0;
     }
+    /* Butce bitti: havadaki mermerler yerine oturana kadar sure taniyoruz. */
+    if(budgetOut() && !allFull(T)){
+      graceMs += dt*1000;
+      if(graceMs > (mode === "hamle" ? 4200 : 1600)) lose();
+    }
+    /* Donguye periyodik HUD yenilemesi yoktu; sureli modda saat ekranda
+       hic ilerlemezdi. Sureli modda 6 karede bir, hamleli modda gerek yok. */
+    if(mode === "sure" && T.frames % 6 === 0) renderHud();
   }
   drawTable();
 }
@@ -803,10 +838,23 @@ function bindPad(node, side){
 }
 
 /* ---------- HUD ---------- */
+function fmtSec(x){
+  var n = Math.ceil(x), m = Math.floor(n/60), r = n%60;
+  return m + ":" + (r < 10 ? "0" : "") + r;
+}
 function renderHud(){
   var mv = el("hMoves"), wrap = mv.parentNode;
-  mv.textContent = T.moves;
-  wrap.className = "mv" + (T.moves <= 5 ? " low" : "");
+  if(mode === "hamle"){
+    el("hBudLbl").textContent = "Hamle";
+    mv.textContent = T.moves;
+    wrap.className = "mv" + (T.moves <= 5 ? " low" : "");
+  } else {
+    el("hBudLbl").textContent = "Süre";
+    mv.textContent = fmtSec(timeLeft);
+    wrap.className = "mv" + (timeLeft <= 10 ? " low" : "");
+  }
+  el("hModeIco").textContent = mode === "hamle" ? "◷" : "☰";
+  el("hModeTxt").textContent = mode === "hamle" ? "süre" : "hamle";
   var h = "", i, k;
   for(i=0;i<T.boxes.length;i++){
     var bx = T.boxes[i];
@@ -815,9 +863,8 @@ function renderHud(){
   }
   el("hBoxes").innerHTML = h;
   el("hLvl").textContent = "Bölüm " + level;
-  el("hLeft").textContent = ballsLeft(T);
-  el("fInfo").textContent = totalBalls() + " mermer · " + T.used + " hamle harcandı" +
-    (best() > 1 ? " · en uzak bölüm " + best() : "");
+  el("fInfo").textContent = "Masada " + ballsLeft(T) + "/" + totalBalls() +
+    " · " + T.used + " vuruş" + (best() > 1 ? " · en uzak bölüm " + best() : "");
 }
 
 /* ---------- cizim ---------- */
@@ -1135,6 +1182,8 @@ function legendHTML(){
   return '<div class="legend">' +
     '<div class="lrow"><span class="lart"><span class="lbat"></span></span>' +
       '<p><b>Sol ve sağ kola bas</b>, mermerler yukarı fırlar. Her <b>basış bir hamle</b> yakar — basılı tutmak bedava.</p></div>' +
+    '<div class="lrow"><span class="lart"><b style="font-size:19px;color:var(--brass-lit)">◷</b></span>' +
+      '<p>Hamle saymak istemiyorsan <b>sağ üstteki düğme</b> seni <b>süreli moda</b> alır: vuruş bedava, saat işler.</p></div>' +
     '<div class="lrow"><span class="lart"><span class="lbat" style="transform:rotate(6deg)"></span>' +
       '<span class="lmar" style="position:absolute;top:2px;right:4px;width:12px;height:12px;' +
       'background:radial-gradient(circle at 33% 30%,var(--c2l),var(--c2))"></span></span>' +
@@ -1177,8 +1226,10 @@ function showWin(){
   var nx = son ? null : LEVELS[level];
   var d = overlay('<div class="big">' + (son ? "👑" : "🏆") + '</div>' +
     '<h2>' + (son ? "On bölüm bitti" : "Bölüm " + level + " tamam") + '</h2>' +
-    '<div class="num">' + T.used + '</div>' +
-    '<p class="sub">hamlede bitirdin · ' + T.moves + ' hamle arttı' +
+    '<div class="num">' + (mode === "hamle" ? T.used : fmtSec(levelSecs(level) - timeLeft)) + '</div>' +
+    '<p class="sub">' + (mode === "hamle"
+        ? "hamlede bitirdin · " + T.moves + " hamle arttı"
+        : "sürede bitirdin · " + fmtSec(timeLeft) + " kaldı") +
     (nx ? '<br>Sıradaki bölüm: <b>' + levelBalls(level+1) +
           ' mermer, ' + nx.moves + ' hamle</b>' : '') + '</p>' +
     '<div class="bar">' +
@@ -1194,9 +1245,12 @@ function showWin(){
 function showLose(){
   var n = 0;
   for(var i=0;i<T.boxes.length;i++) n += T.boxes[i].stack;
-  var d = overlay('<div class="big">🪙</div><h2>Hamle bitti</h2>' +
+  var d = overlay('<div class="big">🪙</div>' +
+    '<h2>' + (mode === "hamle" ? "Hamle bitti" : "Süre bitti") + '</h2>' +
     '<p class="why"><b>' + n + '/' + totalBalls() + ' mermer yerleşti.</b><br>' +
-    'Kolu basılı tutup mermeri durdur, sonra at: durgun mermer üç kat isabetli.</p>' +
+    (mode === "hamle"
+      ? 'Hamle saymak istemiyorsan sağ üstteki düğmeyle <b>süreli moda</b> geçebilirsin.'
+      : 'Kolu basılı tutup mermeri durdur, sonra at: durgun mermer üç kat isabetli.') + '</p>' +
     '<div class="bar"><button class="go" data-a="retry">↻ Tekrar dene</button>' +
     (level > 1 ? '<button data-a="back">◀ Bölüm ' + (level-1) + '</button>' : '') +
     '</div>');
@@ -1210,6 +1264,7 @@ function showLose(){
 /* ---------- bagla ---------- */
 cv = el("cv"); ctx = cv.getContext("2d");
 loadArt();
+loadMode();
 bindPad(el("fL"), 0);
 bindPad(el("fR"), 1);
 cv.addEventListener("pointerdown", function(e){
@@ -1226,7 +1281,30 @@ document.addEventListener("keyup", function(e){
   if(e.key === "ArrowLeft"  || e.key === "z" || e.key === "Z") setFlip(0, false);
   if(e.key === "ArrowRight" || e.key === "m" || e.key === "M") setFlip(1, false);
 });
-el("bNew").addEventListener("click", function(){ level = 1; newGame(); });
+/* Iki adimli onay: ilk dokunus sorar, 2.6 sn icinde ikinci dokunus baslatir. */
+el("bNew").addEventListener("click", function(){
+  var b = el("bNew");
+  if(askNew && Date.now() < askNew){
+    askNew = 0; b.className = "go"; b.textContent = "▶ Yeni oyun";
+    level = 1; newGame();
+    return;
+  }
+  askNew = Date.now() + 2600;
+  b.className = "go ask"; b.textContent = "Emin misin?";
+  setTimeout(function(){
+    if(askNew && Date.now() >= askNew - 60){
+      askNew = 0; b.className = "go"; b.textContent = "▶ Yeni oyun";
+    }
+  }, 2700);
+});
+el("bMode").addEventListener("click", function(){
+  mode = (mode === "hamle") ? "sure" : "hamle";
+  saveMode();
+  newGame();
+  showNote(mode === "sure"
+    ? "Süreli mod: vuruş bedava, saat işliyor"
+    : "Hamleli mod: her basış bir hamle");
+});
 el("bHelp").addEventListener("click", showHelp);
 window.addEventListener("resize", function(){ fitCanvas(); fitCanvas(); drawTable(); });
 
