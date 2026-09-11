@@ -1,0 +1,2051 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14171C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tablo">
+<title>Tablo Kırma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&display=swap">
+<style>
+:root{
+  --bg:#14171C; --panel:#1D222A; --panel2:#262D36; --line:#333C47;
+  --ink:#ECF0F4; --ink-soft:#9AA8B6; --ink-dim:#6B7887;
+  --gold:#E8B84B; --gold-dk:#1A1305;
+  --steel:#7E8A96; --steel-lo:#525C66;
+  --ball:#FFF3D6;
+  --ok:#4FC07E; --bad:#DE5A4E;
+  --shadow:0 20px 50px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:Archivo,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;overscroll-behavior:none;touch-action:none;
+  user-select:none;-webkit-user-select:none;
+  background-image:radial-gradient(620px 340px at 50% 0%, rgba(232,184,75,.08), transparent 70%);
+}
+#app{min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;padding:7px 5px 12px}
+.cab{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);
+  border-radius:16px;padding:8px 9px 10px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+
+.hud{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:1px 3px 7px;
+  border-bottom:1px solid var(--line)}
+.stat{line-height:1.05}
+.stat small{display:block;font-size:8.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-dim)}
+.stat b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat .u{font-size:12px;font-weight:600;color:var(--ink-soft)}
+.title{text-align:center;line-height:1.1}
+.title b{font-size:12.5px;font-weight:800;letter-spacing:.02em}
+.title small{display:block;font-size:8.5px;font-weight:600;color:var(--ink-dim);letter-spacing:.08em}
+
+.stage{position:relative;margin-top:7px;border-radius:12px;overflow:hidden;
+  border:1px solid var(--line);background:#0C0F13;touch-action:none;cursor:crosshair}
+#cv{display:block;margin:0 auto}
+.fx{position:absolute;inset:0;pointer-events:none;z-index:4}
+.pop{position:absolute;font-weight:800;font-size:14px;text-shadow:0 2px 7px rgba(0,0,0,.75);
+  animation:popUp .8s ease-out forwards;white-space:nowrap;transform:translateX(-50%)}
+.pop.ok{color:#8CE8AE} .pop.gold{color:var(--gold)} .pop.bad{color:#FF9C93}
+/* Zincir rozeti: normal pop 14px, bu %50 büyük. Vuruş anında okunması
+   gereken tek sayı bu. */
+.pop.zincir{font-size:21px;font-weight:800;letter-spacing:-.01em;
+  text-shadow:0 2px 10px rgba(0,0,0,.85), 0 0 18px currentColor}
+@keyframes popUp{0%{transform:translate(-50%,4px) scale(.7);opacity:0}
+  22%{transform:translate(-50%,-6px) scale(1.12);opacity:1}
+  100%{transform:translate(-50%,-30px) scale(1);opacity:0}}
+.stage.shake{animation:shk .28s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shk{0%,100%{transform:translate(0)}30%{transform:translate(-4px,2px)}
+  65%{transform:translate(3px,-1px)}}
+
+.row{display:flex;gap:6px;margin-top:8px}
+button{flex:1;appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+  font:inherit;font-size:12px;font-weight:800;padding:10px 6px;border-radius:10px;cursor:pointer}
+button:hover:not(:disabled){background:#323B46;border-color:var(--steel-lo)}
+button.go{background:var(--gold);color:var(--gold-dk);border-color:var(--gold)}
+button.mini{flex:0 0 44px;padding:10px 0;font-size:14px}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.foot{margin-top:7px;padding-top:6px;border-top:1px solid var(--line);
+  font-size:9.5px;font-weight:600;letter-spacing:.05em;color:var(--ink-dim);
+  display:flex;justify-content:space-between;gap:8px}
+
+.ov{position:absolute;inset:0;background:rgba(17,20,25,.96);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:20px 18px;z-index:20}
+.ov h2{font-weight:800;margin:0 0 4px;font-size:24px}
+.ov.scroll{padding-top:16px}
+.ov .big{font-size:38px;line-height:1;margin-bottom:2px}
+.ov .sub{color:var(--ink-soft);font-size:12.5px;line-height:1.55;margin:0 0 12px;max-width:290px;
+  font-weight:600}
+.ov .num{font-size:42px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
+.ov .row{width:100%;max-width:290px;margin-top:12px}
+.ov.scroll{justify-content:flex-start;overflow-y:auto}
+.legend{display:flex;flex-direction:column;gap:6px;width:100%;max-width:300px;margin:4px 0 8px}
+.lrow{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:10px;
+  background:var(--panel2);border:1px solid var(--line)}
+.lrow p{margin:0;font-size:12px;line-height:1.45;color:var(--ink-soft);text-align:left;font-weight:600}
+.lrow p b{color:var(--ink)}
+.lart{flex:0 0 30px;text-align:center}
+/* Kart ekranı: TEK SÜTUN, yatay düzen.
+   İki sütuna sıkıştırdığımda açıklama 10 px'e iniyor, başlıklar sarıyor
+   ve ekran okunmuyordu. Genişliği tek karta vermek yazıyı büyütüyor. */
+.kartlar{display:flex;flex-direction:column;gap:9px;width:100%;max-width:340px;
+  margin:10px 0 4px}
+.kart{display:grid;grid-template-columns:42px 1fr;gap:11px;align-items:start;
+  text-align:left;padding:12px 13px;border-radius:13px;
+  background:var(--panel2);border:1px solid var(--line);cursor:pointer;color:var(--ink);
+  transition:border-color .12s, background .12s, transform .12s}
+.kart:hover,.kart:focus-visible{border-color:var(--gold);background:#2F3742;
+  transform:translateY(-1px);outline:none}
+.kart:active{transform:translateY(0)}
+.kart .ki{display:flex;align-items:center;justify-content:center;
+  width:42px;height:42px;border-radius:11px;font-size:21px;line-height:1;
+  color:var(--gold);background:rgba(232,184,75,.11);border:1px solid rgba(232,184,75,.26)}
+.kart .gov{min-width:0}
+.kart b{display:block;font-size:15px;font-weight:800;line-height:1.2;margin-bottom:1px}
+.kart .ust{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:5px}
+.kart small{font-size:9px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-dim)}
+.kart .rozet{font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--gold);background:rgba(232,184,75,.13);border:1px solid rgba(232,184,75,.3);
+  border-radius:999px;padding:2px 7px;white-space:nowrap}
+/* Nadirlik: ölçülen güce göre. Kart kenarı ve ikon rengi kademeyi
+   bir bakışta anlatsın. */
+.kart.n1{border-color:rgba(120,190,255,.42)}
+.kart.n1 .ki{color:#7FBCFF;background:rgba(127,188,255,.11);border-color:rgba(127,188,255,.3)}
+.kart.n2{border-color:rgba(198,130,255,.5)}
+.kart.n2 .ki{color:#C682FF;background:rgba(198,130,255,.12);border-color:rgba(198,130,255,.34)}
+.kart .nd{font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  border-radius:999px;padding:2px 7px;white-space:nowrap}
+.kart .nd1{color:#7FBCFF;background:rgba(127,188,255,.13);border:1px solid rgba(127,188,255,.32)}
+.kart .nd2{color:#C682FF;background:rgba(198,130,255,.14);border:1px solid rgba(198,130,255,.36)}
+.kart.n1:hover{border-color:#7FBCFF}
+.kart.n2:hover{border-color:#C682FF}
+.yeniden{margin-top:4px;width:100%;max-width:340px}
+.kart .kat{font-size:8.5px;font-weight:800;color:#1A1305;background:var(--gold);
+  border-radius:999px;padding:2px 7px;white-space:nowrap}
+.kart p{margin:0;font-size:12.5px;line-height:1.5;color:#B9C6D4;font-weight:600}
+@media (max-width:400px){
+  .kart{grid-template-columns:38px 1fr;gap:10px;padding:11px}
+  .kart .ki{width:38px;height:38px;font-size:19px}
+  .kart b{font-size:14px} .kart p{font-size:12px}
+}
+.ic{width:22px;height:22px;display:inline-block;vertical-align:middle}
+@media (max-width:430px){
+  #app{padding:4px 3px 8px}
+  .cab{padding:6px 7px 8px;border-radius:13px}
+}
+@media (prefers-reduced-motion:reduce){.pop,.stage{animation:none!important}}
+.boot{position:fixed;left:10px;right:10px;top:10px;z-index:9999;padding:12px 14px;border-radius:10px;
+  background:#3B1512;color:#FFD9D2;border:1px solid #A8422F;font-size:13px;line-height:1.55;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.boot b{color:#fff}
+</style>
+
+<div class="boot" id="boot">
+  <b>Oyun başlatılamadı — JavaScript çalışmıyor.</b><br>
+  Dosyayı dosya yöneticisi yerine <b>Chrome / Safari</b> ile aç.
+</div>
+<script>
+window.addEventListener("error", function(e){
+  var b = document.getElementById("boot"); if(!b) return;
+  b.innerHTML = "<b>Oyun hata verdi</b><br>" + (e.message||"?") + "<br><small>satır " + (e.lineno||"?") + "</small>";
+});
+</script>
+
+<div id="app"><div class="cab" id="cab">
+  <div class="hud">
+    <span class="stat"><small>Top</small><b id="hBall">20</b></span>
+    <span class="title"><b id="hAd">Mona Lisa</b><small id="hYazar">Leonardo da Vinci</small></span>
+    <span class="stat" style="text-align:right"><small>Atış</small><b id="hTur">1</b></span>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="cv"></canvas>
+    <div class="fx" id="fx"></div>
+  </div>
+
+  <div class="row">
+    <button id="bFast" class="go">» Hızlandır</button>
+    <button id="bNew" class="mini" title="Yeniden başla">↻</button>
+    <button id="bHelp" class="mini" title="Nasıl oynanır">?</button>
+  </div>
+
+  <div class="foot"><span id="fLeft">DAWNBRIGHT · PROTOTİP</span><span id="fInfo">—</span></div>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ═══════════════════ FİZİK — SAF, DOM YOK ═══════════════════
+   Node testleri tam olarak bu bloğu kesip çalıştırır, böylece
+   doğrulanan fizikle oynanan fizik ayrışamaz.                        */
+/* <<<FIZIK>>> */
+/* 22 sütun x 28 satır resim: DİKEY portre oranı. Kare ızgara gerçek
+   Mona Lisa'yı (2:3) eziyordu; resimler artık tablodan örneklendiği
+   için oran da doğru olmak zorunda.
+   Hücre 24 -> 14 px küçüldüğü için top yarıçapı ve alt adım mesafesi
+   de küçülmek ZORUNDA: aynı SUB=5 ile 14 px hücrede tünelleme başlar.
+   Tahta 38 satır, yani inmeye 10 satır pay. Ölçüm: 6 satır payla bot
+   hiç kazanamıyordu, 10 satırla kazanıyor. */
+var COLS = 22, CELL = 14, BX = 36, BY = 12, ROWS = 46;
+var BR = 2.9;                    /* top yarıçapı */
+var SPD = 700;                   /* top hızı, px/sn */
+var SUB = 2.4;                   /* bir alt adımda en fazla yol (px) */
+var ATES_ARA = 0.055;            /* topların çıkış aralığı, sn */
+var YER = BY + ROWS*CELL;        /* taban çizgisi = kaybetme çizgisi */
+/* Toplar buradan çıkar ve buradan AŞAĞI geçince toplanır. İkisini de
+   YER'e eşitlemiştim: top doğduğu karede ölüyordu, her atış 1.1 sn
+   sürüyordu (yani 20 topun çıkış süresi) ve 0 blok kırılıyordu. */
+var ATIS_Y = YER + 14, OLUM_Y = YER + 26;
+var SOL = BX, SAG = BX + COLS*CELL, TAVAN = BY;
+/* Topun sekme hakkı. 5'te atış başına 13 blok yıkılıyordu (can
+   mekaniğinden önce 75'ti) ve tablo bitirilemiyordu. */
+var TEMEL_CAN = 12;              /* topun sekme hakkı (can) */
+/* Kaç blok kırılınca kart ekranı gelir. 40'ta tablo başına ~15 kart
+   düşüyordu, yani sürekli kart seçiliyordu; 200 ile tablo başına ~3. */
+/* Kaç blok kırılınca kart ekranı gelir. 40'ta sürekli kart seçiliyordu,
+   200'de tablo başına ~3 kart kalıyordu — en eğlenceli sistem en kısa
+   ömürlü olandı. 140 ile ~5 kart. */
+var KART_ESIK = 140;
+var REST_BASLA = 5;              /* restoratör bu turdan sonra başlar */
+var REST_TAVAN = 5;              /* turda en fazla bu kadar kare onarır */
+var SIKIS_SN = 1.4;              /* bu kadar süre dikey ilerlemezse müdahale */
+var SIKIS_VY = 26;               /* "dikey ilerlemiyor" eşiği, px/sn */
+/* Atış süresi tavanı. 13'te en uzun atış 10.5 sn sürüyordu; 5-6'da
+   kuyruk 8 sn'ye iniyor ve hiçbir atış takılmıyor. */
+var TUR_TAVAN = 6;               /* atış süresi tavanı, sn */
+
+/* Hücre türleri */
+var BOS = 0, RESIM = 1, CELIK = 2, HEDIYE = 3, ZIP = 4;
+
+function hucre(tur, hp, renk){
+  /* parla: vuruş parlaması (0..1, çizim katmanında sönümlenir) */
+  return { tur:tur, hp:hp, renk:renk, vur:0, asit:0, ates:0, parla:0 };
+}
+/* Blok dayanıklılığı. Burada, fizik bloğunun İÇİNDE duruyor: oyun
+   katmanında tutunca Node testi kendi kopyasını kullanıyor ve eski
+   zorluğu ölçüyordu (bot 12/12 kazanıyor sanıldı).
+   400 blok tek dayanıklılıkla dengelenmiyor: HP 1 çok kolay (7 tur),
+   HP 2 kazanılamıyor. O yüzden FON ile FİGÜR ayrı: puslu manzara
+   çabuk dağılır, figür direnir. Toplam HP ikisinin arasına düşüyor. */
+function blokHp(no){ return Math.min(3, 1 + Math.floor(no/2)); }
+function sertHp(no){
+  /* Ilk tabloda sert bonusu YOK: olcumde sert+1 ile bot 1/6 kazaniyor
+     ve 51 blok kaliyordu; bonussuz 6/6 ve 9 tur. Bonus sonraki
+     tablolarda devreye giriyor, oyuncu da top devrettigi icin
+     elinde daha cok topla karsiliyor. */
+  return blokHp(no) + (no === 0 ? 0 : 1);
+}
+
+function mkBoard(){
+  var g = new Array(COLS*ROWS), i;
+  for(i=0;i<g.length;i++) g[i] = null;
+  /* YARA HAFIZASI: yıkılan resim karelerinin rengi burada durur, tahta
+     indikçe onunla birlikte iner. Restoratör bunlara bakarak tabloyu
+     geri boyuyor. Diziye özellik takmak, bütün imzaları değiştirmemek
+     için bilinçli bir tercih. */
+  g.yara = new Array(COLS*ROWS);
+  for(i=0;i<g.yara.length;i++) g.yara[i] = null;
+  return g;
+}
+function al(g, c, r){
+  if(c < 0 || c >= COLS || r < 0 || r >= ROWS) return null;
+  return g[r*COLS + c];
+}
+function koy(g, c, r, h){
+  if(c < 0 || c >= COLS || r < 0 || r >= ROWS) return;
+  g[r*COLS + c] = h;
+}
+/* Tabloyu ızgaraya yerleştir (üstten hizalı).
+   Blok canı TEK değer değil: palet koyudan açığa sıralı olduğu için
+   rengin sıra numarası dayanıklılığı belirliyor. Koyu üçte bir (figür)
+   en dayanıklı, açık üçte bir (fon) en zayıf. Böylece tabloda 1-2-3
+   canlı bloklar doğal olarak dağılıyor ve figür direniyor. */
+var PAL_SIRA = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+function blokCani(ch, palUzunluk, taban){
+  var i = PAL_SIRA.indexOf(ch);
+  if(i < 0 || palUzunluk < 2) return taban;
+  var oran = i / (palUzunluk - 1);
+  if(oran < 0.34) return taban + 2;
+  if(oran < 0.67) return taban + 1;
+  return taban;
+}
+function tabloYerlestir(g, px, pal, hp){
+  var r, c, anahtar = [], k;
+  for(k in pal) anahtar.push(k);
+  for(r=0;r<px.length;r++){
+    for(c=0;c<COLS;c++){
+      var ch = px[r].charAt(c);
+      if(ch === "." || ch === " ") continue;
+      koy(g, c, r, hucre(RESIM, blokCani(ch, anahtar.length, hp), pal[ch] || "#888"));
+    }
+  }
+  g.basBlok = resimKaldi(g);        /* son düzlük hesabı için */
+}
+function indir(g){
+  var r, c, tasti = false;
+  for(r = ROWS-1; r > 0; r--){
+    for(c=0;c<COLS;c++){
+      g[r*COLS+c] = g[(r-1)*COLS+c];
+      if(g.yara) g.yara[r*COLS+c] = g.yara[(r-1)*COLS+c];
+    }
+  }
+  for(c=0;c<COLS;c++){ g[c] = null; if(g.yara) g.yara[c] = null; }
+  /* HEDIYE tasma sayilmaz: alta serptigim hediyeler asagi inip son
+     satira varinca oyunu bitiriyordu ve tur sayisi 11'den 4'e dustu.
+     Oyuncuyu odul oldurmemeli. */
+  for(c=0;c<COLS;c++){
+    var hh = g[(ROWS-1)*COLS+c];
+    if(hh && hh.tur !== HEDIYE) tasti = true;
+  }
+  return tasti;
+}
+/* Üstteki boş satıra engel dizisi koy. */
+function engelSatiri(g, tur, rnd){
+  var c, kondu = 0;
+  var yogun = Math.min(4, 1 + Math.floor(tur/3));
+  for(c=0;c<COLS;c++){
+    if(al(g, c, 0)) continue;
+    if(rnd() < 0.10 + yogun*0.035){
+      koy(g, c, 0, hucre(CELIK, Infinity, null));
+      kondu++;
+    }
+  }
+  /* Her satırda en az bir hediye: top sayısı büyümezse oyun tıkanır. */
+  var dene = 0;
+  while(dene < 30){
+    c = Math.floor(rnd()*COLS);
+    if(!al(g, c, 0)){ koy(g, c, 0, hucre(HEDIYE, 1, null)); break; }
+    dene++;
+  }
+  /* ÜSTTEKİ hediye çoğu zaman ULAŞILAMAZ: tablo dolu bir dikdörtgen
+     olduğu için topların değdiği tek yüzey resmin alt kenarı, hediye
+     ise resmin üstünde kalıyor. Ölçümde 11 tur boyunca hiç hediye
+     toplanmadı ve top sayısı hiç büyümedi. O yüzden resmin ALTINDAKİ
+     boş alana da hediye koyuyoruz — topların gerçekten uçtuğu yere. */
+  hediyeAlttaKoy(g, rnd, 4);
+  /* Ara sıra zıplatıcı: topun yönünü sertçe değiştirir. */
+  if(tur >= 4 && rnd() < 0.5){
+    dene = 0;
+    while(dene < 20){
+      c = Math.floor(rnd()*COLS);
+      if(!al(g, c, 0)){ koy(g, c, 0, hucre(ZIP, Infinity, null)); break; }
+      dene++;
+    }
+  }
+  return kondu;
+}
+/* ═══ RESTORATÖR ═══
+   Tablo kendini onarır. Bu olmadan kaybetmek neredeyse imkânsızdı:
+   kartsız bot 6/6 kazanıyordu, yani hiçbir karar gerçek risk
+   taşımıyordu. Onarılan kareler 1 canla geri gelir — baskı olsun
+   ama duvar olmasın.
+   Öncelik: yaşayan resme KOMŞU yaralar. Böylece tablo kenarlarından
+   içeri doğru iyileşir ve oyuncunun az önce temizlediği alt kenar
+   geri gelir — asıl baskı burada. */
+var SON_DUZLUK = 0.18;           /* bu orandan az kaldıysa restoratör durur */
+function restoreAdet(g, tur, basla, tavan){
+  if(tur < basla) return 0;
+  /* SON DÜZLÜK. Bu koşul olmadan her oyun tam "tavan" kadar blok kala
+     kilitleniyordu: oyuncu her şeyi kırıyor, restoratör tam o kadarını
+     geri boyuyor ve kazanmak imkânsız oluyordu. Tablo bitmeye yakınsa
+     restoratör pes eder — son düzlük bir koşuya dönüşür. */
+  if(g && g.basBlok && resimKaldi(g) < g.basBlok*SON_DUZLUK) return 0;
+  var a = Math.ceil((tur - basla + 1) / 2);
+  return a > tavan ? tavan : a;
+}
+function komsuResimVar(g, c, r){
+  var d = [[1,0],[-1,0],[0,1],[0,-1]], i;
+  for(i=0;i<4;i++){
+    var h = al(g, c + d[i][0], r + d[i][1]);
+    if(h && h.tur === RESIM) return true;
+  }
+  return false;
+}
+function restoreEt(g, adet, rnd){
+  if(!g.yara || adet <= 0) return [];
+  var komsu = [], uzak = [], i;
+  for(i=0;i<g.length;i++){
+    if(!g.yara[i] || g[i]) continue;
+    var c = i % COLS, r = Math.floor(i / COLS);
+    if(r >= ROWS - 1) continue;                  /* taban çizgisine boyama */
+    (komsuResimVar(g, c, r) ? komsu : uzak).push(i);
+  }
+  var havuz = komsu.length ? komsu : uzak;
+  var yapilan = [];
+  while(yapilan.length < adet && havuz.length){
+    var k = Math.floor(rnd()*havuz.length);
+    var idx = havuz.splice(k, 1)[0];
+    g[idx] = hucre(RESIM, 1, g.yara[idx]);
+    g[idx].parla = 1;
+    g.yara[idx] = null;
+    yapilan.push(idx);
+  }
+  return yapilan;
+}
+
+/* Resmin altındaki boş bölgeye hediye serp. */
+function hediyeAlttaKoy(g, rnd, adet){
+  var alt = enAltDolu(g);
+  var bas = alt + 2;                     /* dolu bölgenin hemen altı */
+  if(bas >= ROWS - 1) return 0;
+  var kondu = 0, dene = 0;
+  while(kondu < adet && dene < 60){
+    dene++;
+    var c = Math.floor(rnd()*COLS);
+    var r = bas + Math.floor(rnd()*(ROWS - 1 - bas));
+    if(al(g, c, r)) continue;
+    koy(g, c, r, hucre(HEDIYE, 1, null));
+    kondu++;
+  }
+  return kondu;
+}
+function resimKaldi(g){
+  var i, n = 0;
+  for(i=0;i<g.length;i++) if(g[i] && g[i].tur === RESIM) n++;
+  return n;
+}
+/* En alttaki TEHLIKELI satir. Hediye sayilmaz (bkz. indir). */
+function enAltDolu(g){
+  var r, c;
+  for(r = ROWS-1; r >= 0; r--)
+    for(c=0;c<COLS;c++){
+      var h = g[r*COLS+c];
+      if(h && h.tur !== HEDIYE) return r;
+    }
+  return -1;
+}
+
+/* ═══ KARTLAR ═══
+   Her kart bir sayı: kaç kez alındığı. Aynı kart yığılabilir. */
+function bosKartlar(){
+  return { sacilma:0, delici:0, patlayici:0, titanyum:0, mitoz:0, statik:0,
+           agir:0, meditasyon:0, inatci:0, phoenix:0, buzul:0, kamikaze:0,
+           hayalet:0, vampir:0, sonNefes:0, geriDonusum:0, asit:0, nekro:0,
+           ritim:0, sansli7:0, ekTop:0 };
+}
+/* Topun en fazla canı. Şanslı 7 "diğer kartlar ne derse desin" diyor,
+   o yüzden her şeyin önünde. */
+function topMaxCan(K){
+  if(!K) return TEMEL_CAN;
+  if(K.sansli7) return 7;
+  if(K.kamikaze) return 1;
+  var m = TEMEL_CAN + K.titanyum*3 - K.sacilma - K.delici*2;
+  return m < 1 ? 1 : m;
+}
+function topHizi(K){
+  if(!K || !K.titanyum) return SPD;
+  var h = SPD * Math.pow(0.68, K.titanyum);   /* ağırlaşır, yavaşlar */
+  return h < 200 ? 200 : h;
+}
+function topAdedi(K, taban){
+  if(!K) return taban;
+  return taban + K.sacilma*2 + K.ekTop;
+}
+
+/* ---------- atış durumu ---------- */
+function mkShot(g, x0, aci, adet, K, rnd){
+  K = K || bosKartlar();
+  var hiz = topHizi(K);
+  return { g:g, K:K, rnd:rnd || Math.random,
+           balls:[], bekleyen:topAdedi(K, adet), x0:x0, y0:ATIS_Y,
+           aci:aci, hiz:hiz,
+           vx:Math.cos(aci)*hiz, vy:Math.sin(aci)*hiz,
+           t:0, sonrakiAtes:0, inenX:-1, biten:0, adet:topAdedi(K, adet),
+           hediye:0, kirilan:0, yokEdilen:0, enZincir:0, bitti:false, zorla:false,
+           havadaOlen:0, yeniTop:0, simsek:[] };
+}
+function topYap(S, x, y, vx, vy, can){
+  var K = S.K;
+  return { x:x, y:y, vx:vx, vy:vy, canli:true,
+           can: can || topMaxCan(K),
+           buz: K.buzul*2,              /* Buzul Zırh: ilk N çarpışma bedava */
+           delindi: false,              /* Delici Uç: tek kullanımlık */
+           zincir: 0,                   /* Ritim: duvarsız üst üste blok */
+           bosSure: 0,                  /* Meditasyon: temassız süre */
+           vurus: 0, sonC:-1, sonR:-1, zombi:false,
+           dikeySure:0 };
+}
+function topEkle(S){
+  var K = S.K, aci = S.aci;
+  /* Saçılma: namludan fazladan top ve rastgele açı sapması */
+  if(K.sacilma) aci += (S.rnd() - 0.5) * 0.30 * K.sacilma;
+  S.balls.push(topYap(S, S.x0, S.y0, Math.cos(aci)*S.hiz, Math.sin(aci)*S.hiz));
+}
+/* Daire-dikdörtgen çarpışması: en yakın nokta + en sığ eksenden itme. */
+function kutuCarp(b, rx, ry, rw, rh){
+  var nx = b.x < rx ? rx : (b.x > rx+rw ? rx+rw : b.x);
+  var ny = b.y < ry ? ry : (b.y > ry+rh ? ry+rh : b.y);
+  var dx = b.x - nx, dy = b.y - ny;
+  var d2 = dx*dx + dy*dy;
+  if(d2 >= BR*BR) return null;
+  if(d2 > 1e-9){
+    var d = Math.sqrt(d2);
+    return { nx:dx/d, ny:dy/d, derin:BR - d };
+  }
+  /* Merkez kutunun İÇİNDE: en sığ eksenden çıkar. Bu dal olmazsa top
+     kutunun içinde kilitlenir. */
+  var sol = b.x - rx, sag = rx + rw - b.x;
+  var ust = b.y - ry, alt = ry + rh - b.y;
+  var en = Math.min(sol, sag, ust, alt);
+  if(en === sol) return { nx:-1, ny:0, derin:sol + BR };
+  if(en === sag) return { nx: 1, ny:0, derin:sag + BR };
+  if(en === ust) return { nx:0, ny:-1, derin:ust + BR };
+  return { nx:0, ny:1, derin:alt + BR };
+}
+function yansit(b, n){
+  b.x += n.nx * n.derin;
+  b.y += n.ny * n.derin;
+  var vn = b.vx*n.nx + b.vy*n.ny;
+  if(vn < 0){ b.vx -= 2*vn*n.nx; b.vy -= 2*vn*n.ny; }
+}
+/* Hızı sabit tut: sekmeler hız kaybettirirse atışlar yavaşlar ve
+   tur uzar. Yön değişir, büyüklük değişmez. */
+function hiziSabitle(b){
+  var s = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
+  if(s < 1e-6){ b.vx = 0; b.vy = SPD; return; }
+  b.vx = b.vx/s*SPD; b.vy = b.vy/s*SPD;
+}
+/* ═══ KART KURALLARI TEK YERDE ═══
+   Yirmi kartın tamamı iki soruya iniyor: bu çarpışma topun kaç canını
+   götürür, ve kaça hasar verir. Kuralları çarpışma kodunun içine
+   serpiştirmek yerine burada topluyoruz — yoksa kartlar birbirini
+   sessizce eziyor.                                                     */
+/* buzEmer: bu çarpışmayı buz zırhı emebilir mi?
+   Yalnız DUVAR ve ÇELİK. Her çarpışmayı emmesine izin verdiğimde kart
+   ölüydü: top ortalama 2-3 çarpışma yapıp yere iniyor, ilk 2'si buza
+   giderse hiç hasar vermiyor (ölçümde x4'te bile toplam 0 hasar).
+   Kartın kendi metnindeki niyet "hasar almadan dar alanlara sokmak";
+   duvar ve çelik zaten hasar vermeyen çarpışmalar, onları emmek gerçek
+   bir kazanç. */
+function buzEmer(h){ return !h || h.tur === CELIK; }
+function canBedeli(S, b, duvarMi, deldi, h){
+  var K = S.K;
+  if(K.hayalet && duvarMi) return 0;     /* Hayalet Top: duvar can yemez */
+  if(b.buz > 0 && buzEmer(h)) return 0;  /* Buzul Zırh: duvar/çelik bedava */
+  if(deldi) return 0;                    /* Delici Uç: delmek can yemez */
+  if(K.agir) return 1 + K.agir;          /* Ağır Metal: sert vurur, çok yer */
+  return 1;
+}
+function hasarMiktari(S, b, h){
+  var K = S.K;
+  var d = 1;
+  if(K.agir) d = 1 + K.agir;             /* Ağır Metal */
+  if(K.kamikaze) d = 5;                  /* Kamikaze: tek atımlık ama sert */
+  if(K.inatci && b.can <= 1 && d < 3) d = 3;      /* İnatçı: son vuruş */
+  if(K.ritim && b.zincir >= 2 && d < 3) d = 3;    /* Ritim: 3. blok */
+  if(h && h.asit) d += K.asit;           /* Asit Damlası */
+  return d;
+}
+/* Bir hücreye hasar ver. Patlama, şimşek ve ateş de buradan geçiyor ki
+   kırılan blok sayacı her yolda doğru işlesin. */
+function hucreyeHasar(S, c, r, miktar, ev){
+  var h = al(S.g, c, r);
+  if(!h || h.tur !== RESIM || miktar <= 0) return false;
+  h.hp -= miktar; h.vur = 1;
+  h.parla = 1;                           /* vuruş parlaması */
+  S.kirilan += miktar;
+  var rx = BX + c*CELL, ry = BY + r*CELL;
+  if(h.hp <= 0){
+    S.g[r*COLS + c] = null;
+    if(S.g.yara) S.g.yara[r*COLS + c] = h.renk;    /* restoratör için */
+    S.yokEdilen++;
+    ev.push(["kir", rx + CELL/2, ry + CELL/2, h.renk]);
+    return true;
+  }
+  ev.push(["cat", rx + CELL/2, ry + CELL/2, h.renk]);
+  return false;
+}
+function komsuHasar(S, x, y, kat, ev){
+  var c0 = Math.floor((x - BX)/CELL), r0 = Math.floor((y - BY)/CELL), dc, dr;
+  for(dr=-1; dr<=1; dr++)
+    for(dc=-1; dc<=1; dc++){
+      if(!dc && !dr) continue;
+      hucreyeHasar(S, c0+dc, r0+dr, kat, ev);
+    }
+  ev.push(["patla", x, y]);
+}
+function rastgeleHucre(S){
+  var aday = [], i;
+  for(i=0;i<S.g.length;i++) if(S.g[i] && S.g[i].tur === RESIM) aday.push(i);
+  if(!aday.length) return -1;
+  return aday[Math.floor(S.rnd()*aday.length)];
+}
+function simsekCak(S, kat, ev){
+  var i = rastgeleHucre(S);
+  if(i < 0) return;
+  var c = i % COLS, r = Math.floor(i / COLS);
+  ev.push(["simsek", BX + c*CELL + CELL/2, BY + r*CELL + CELL/2]);
+  hucreyeHasar(S, c, r, kat, ev);
+}
+/* Topun ölümü ve ölüm kartları. */
+function topOldur(S, b, ev){
+  if(!b.canli) return;
+  b.canli = false;
+  S.biten++;
+  var K = S.K, i;
+  var yerde = b.y - BR > OLUM_Y;
+  if(yerde){ if(S.inenX < 0) S.inenX = b.x; }
+  else S.havadaOlen++;
+
+  if(K.patlayici) komsuHasar(S, b.x, b.y, K.patlayici, ev);
+  if(K.statik){
+    /* "hayatta kaldığı her 2 can için" -> yaptığı her 2 çarpışma */
+    var adet = Math.floor(b.vurus/2) * K.statik;
+    if(adet > 10) adet = 10;
+    for(i=0;i<adet;i++) simsekCak(S, 1, ev);
+  }
+  if(K.phoenix && b.sonC >= 0){
+    var h = al(S.g, b.sonC, b.sonR);
+    if(h && h.tur === RESIM){ h.ates = 1; ev.push(["yak", b.x, b.y]); }
+  }
+  if(K.nekro && !b.zombi && S.balls.length < 300 && S.rnd() < 0.15*K.nekro){
+    var z = topYap(S, b.x, b.y, -b.vx, -b.vy, 2);
+    z.zombi = true;
+    S.balls.push(z); S.adet++;
+    ev.push(["zombi", b.x, b.y]);
+  }
+}
+/* Son Nefes: tek canı kalan top, en yakın ZAYIF kareye çekilir. */
+function sonNefesYonel(S, b){
+  var enI = -1, enD = Infinity, enHp = Infinity, i;
+  for(i=0;i<S.g.length;i++){
+    var h = S.g[i];
+    if(!h || h.tur !== RESIM) continue;
+    var c = i % COLS, r = Math.floor(i / COLS);
+    var dx = (BX + c*CELL + CELL/2) - b.x, dy = (BY + r*CELL + CELL/2) - b.y;
+    var d = dx*dx + dy*dy;
+    if(h.hp < enHp || (h.hp === enHp && d < enD)){ enHp = h.hp; enD = d; enI = i; }
+  }
+  if(enI < 0) return;
+  var cc = enI % COLS, rr = Math.floor(enI / COLS);
+  var tx = (BX + cc*CELL + CELL/2) - b.x, ty = (BY + rr*CELL + CELL/2) - b.y;
+  var tl = Math.sqrt(tx*tx + ty*ty) || 1;
+  var hiz = Math.sqrt(b.vx*b.vx + b.vy*b.vy) || S.hiz;
+  /* yumuşak çekim: yön yavaşça hedefe döner */
+  b.vx += (tx/tl*hiz - b.vx) * 0.16;
+  b.vy += (ty/tl*hiz - b.vy) * 0.16;
+}
+function hiziKoru(S, b){
+  var h = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
+  if(h < 1e-6){ b.vx = 0; b.vy = S.hiz; return; }
+  b.vx = b.vx/h*S.hiz; b.vy = b.vy/h*S.hiz;
+}
+function topAdim(S, b, dt, ev){
+  var g = S.g, K = S.K;
+  b.x += b.vx*dt;
+  b.y += b.vy*dt;
+  b.bosSure += dt;
+
+  var carpti = false;
+
+  /* --- duvarlar --- */
+  var duvar = false;
+  if(b.x - BR < SOL){ b.x = SOL + BR; b.vx = Math.abs(b.vx); duvar = true; }
+  if(b.x + BR > SAG){ b.x = SAG - BR; b.vx = -Math.abs(b.vx); duvar = true; }
+  if(b.y - BR < TAVAN){ b.y = TAVAN + BR; b.vy = Math.abs(b.vy); duvar = true; }
+  if(duvar){
+    carpti = true;
+    b.zincir = 0;                        /* Ritim zinciri duvarda kopar */
+    var bed = canBedeli(S, b, true, false, null);
+    if(bed === 0 && b.buz > 0 && !K.hayalet) b.buz--;
+    b.can -= bed;
+    if(bed > 0) b.vurus++;
+    if(b.can <= 0){ topOldur(S, b, ev); return; }
+  }
+
+  /* --- yere indi mi --- */
+  if(b.y - BR > OLUM_Y){ topOldur(S, b, ev); return; }
+
+  /* --- bloklar --- */
+  var c0 = Math.floor((b.x - BR - BX)/CELL), c1 = Math.floor((b.x + BR - BX)/CELL);
+  var r0 = Math.floor((b.y - BR - BY)/CELL), r1 = Math.floor((b.y + BR - BY)/CELL);
+  var c, r;
+  for(r = r0; r <= r1 && b.canli; r++){
+    for(c = c0; c <= c1 && b.canli; c++){
+      var h = al(g, c, r);
+      if(!h) continue;
+      var rx = BX + c*CELL, ry = BY + r*CELL;
+      var nrm = kutuCarp(b, rx, ry, CELL, CELL);
+      if(!nrm) continue;
+
+      if(h.tur === HEDIYE){
+        g[r*COLS + c] = null;
+        S.hediye++;
+        ev.push(["hediye", rx + CELL/2, ry + CELL/2]);
+        continue;                        /* hediye sektirmez, can yemez */
+      }
+
+      carpti = true;
+      ev.push(["vurus", b.x, b.y]);
+      /* Delici Uç: ilk blokta sekme yok, can da gitmez */
+      var deldi = (K.delici > 0 && !b.delindi && h.tur === RESIM);
+      if(deldi) b.delindi = true;
+      else yansit(b, nrm);
+
+      if(h.tur === ZIP){
+        b.vx += nrm.nx*S.hiz*0.55;
+        b.vy += nrm.ny*S.hiz*0.55;
+        h.parla = 1;
+        ev.push(["zip", rx + CELL/2, ry + CELL/2]);
+        b.zincir = 0;
+      } else if(h.tur === RESIM){
+        var d = hasarMiktari(S, b, h);
+        var sonCan = b.can;
+        var asitliydi = h.asit;
+        b.sonC = c; b.sonR = r;
+        b.zincir++;
+        /* ZİNCİR: duvara değmeden üst üste kaç kareye vurdu. Beceriyi
+           görünür kılan tek sayı bu — iyi nişan uzun zincir demek. */
+        if(b.zincir > S.enZincir) S.enZincir = b.zincir;
+        /* Eşik 3'te 40 atışın 35'inde rozet çıkıyordu, yani hep;
+           medyan zincir 6, en çok 12. 4'ten başlatmak tırmanışı
+           gösteriyor ama sıradanlaştırmıyor. */
+        if(b.zincir >= 4) ev.push(["zincir", b.x, b.y, b.zincir]);
+        var yikildi = hucreyeHasar(S, c, r, d, ev);
+        if(!yikildi && K.asit){ var h2 = al(g, c, r); if(h2) h2.asit = 1; }
+        if(asitliydi && !yikildi){ var h3 = al(g, c, r); if(h3) h3.asit = 0; }
+
+        if(yikildi){
+          /* Can Çalan */
+          if(K.vampir && S.rnd() < 0.30*K.vampir && b.can < topMaxCan(K)) b.can++;
+          /* Şanslı 7: 7. ve son çarpışmada kare yıkarsa 3 kare patlar */
+          if(K.sansli7 && sonCan === 1){
+            for(var q=0;q<3;q++) simsekCak(S, 99, ev);
+          }
+          /* Çoğalan Hücre */
+          if(K.mitoz && S.balls.length < 300){
+            var yari = Math.floor(b.can/2);
+            if(yari >= 1){
+              b.can = yari;
+              var a2 = Math.atan2(b.vy, b.vx) + 0.55;
+              var yt = topYap(S, b.x, b.y, Math.cos(a2)*S.hiz, Math.sin(a2)*S.hiz, yari);
+              S.balls.push(yt); S.adet++;
+              ev.push(["bol", b.x, b.y]);
+            }
+          }
+        }
+      } else {
+        h.parla = 1;
+        ev.push(["celik", rx + CELL/2, ry + CELL/2]);
+        b.zincir = 0;
+      }
+
+      var bed2 = canBedeli(S, b, false, deldi, h);
+      if(bed2 === 0 && b.buz > 0 && !deldi && buzEmer(h)) b.buz--;
+      b.can -= bed2;
+      if(bed2 > 0) b.vurus++;
+      if(!deldi) hiziKoru(S, b);
+      if(b.can <= 0){ topOldur(S, b, ev); return; }
+    }
+  }
+
+  if(carpti) b.bosSure = 0;
+  /* Meditasyon: 1 sn temassız süzülürse can kazanır */
+  else if(K.meditasyon && b.bosSure >= 1){
+    b.bosSure = 0;
+    if(b.can < topMaxCan(K)) b.can++;
+    ev.push(["med", b.x, b.y]);
+  }
+  /* Son Nefes */
+  if(K.sonNefes && b.can <= 1) sonNefesYonel(S, b);
+}
+function stepShot(S, dt){
+  var ev = [], i, k;
+  if(S.bitti) return ev;
+  S.t += dt;
+
+  if(S.bekleyen > 0){
+    S.sonrakiAtes -= dt;
+    while(S.bekleyen > 0 && S.sonrakiAtes <= 0){
+      topEkle(S);
+      S.bekleyen--;
+      S.sonrakiAtes += ATES_ARA;
+      ev.push(["ates", S.x0, S.y0]);
+    }
+  }
+
+  /* Süre tavanı: kalan toplar aşağı çekilir. Bu olmadan tek bir top
+     yatay bir koridorda sonsuza kadar sekip turu kilitleyebilir. */
+  if(S.t > TUR_TAVAN) S.zorla = true;
+  /* KESİN sınır: zorlamalı iniş kapalı bir cepte hâlâ uzun sürebiliyor.
+     Tavanın 4 sn ötesinde kalan toplar toplanır. */
+  if(S.t > TUR_TAVAN + 4){
+    for(i=0;i<S.balls.length;i++)
+      if(S.balls[i].canli) topOldur(S, S.balls[i], ev);
+    S.bekleyen = 0;
+  }
+
+  for(i=0;i<S.balls.length;i++){
+    var b = S.balls[i];
+    if(!b.canli) continue;
+
+    if(S.zorla){
+      b.vy += 900*dt;
+      hiziKoru(S, b);
+    } else {
+      if(Math.abs(b.vy) < SIKIS_VY) b.dikeySure += dt;
+      else b.dikeySure = 0;
+      if(b.dikeySure > SIKIS_SN){
+        b.vy += (b.vy >= 0 ? 1 : -1) * S.hiz * 0.5 * dt * 4;
+        if(Math.abs(b.vy) < SIKIS_VY) b.vy = SIKIS_VY*2;
+        hiziKoru(S, b);
+      }
+    }
+
+    var hiz = Math.sqrt(b.vx*b.vx + b.vy*b.vy);
+    var n = Math.ceil(hiz*dt / SUB);
+    if(n < 1) n = 1;
+    if(n > 40) n = 40;
+    var sdt = dt/n;
+    for(k=0;k<n && b.canli;k++) topAdim(S, b, sdt, ev);
+  }
+
+  /* Geri Dönüşüm: havada ölen her 4 top -> sonraki tura kalıcı +1 top */
+  if(S.K.geriDonusum){
+    var hak = Math.floor(S.havadaOlen / 4) * S.K.geriDonusum;
+    if(hak > S.yeniTop){ S.yeniTop = hak; }
+  }
+
+  if(S.bekleyen === 0 && S.biten >= S.adet) S.bitti = true;
+  return ev;
+}
+/* Alevden Doğan: yanan kareler her TUR 1 hasar alır. */
+function atesleriIsle(g){
+  var i, yikilan = 0;
+  for(i=0;i<g.length;i++){
+    var h = g[i];
+    if(!h || h.tur !== RESIM || !h.ates) continue;
+    h.hp--; h.vur = 1;
+    if(h.hp <= 0){ g[i] = null; yikilan++; }
+  }
+  return yikilan;
+}
+/* Nişan önizlemesi: duvardan bir sekme. */
+function nisanYolu(x0, y0, aci, uzunluk){
+  var vx = Math.cos(aci), vy = Math.sin(aci);
+  var yol = [[x0, y0]];
+  var x = x0, y = y0, kalan = uzunluk, sekti = 0, adim;
+  while(kalan > 0 && sekti < 2){
+    var tx = Infinity, ty = Infinity;
+    if(vx > 1e-6) tx = (SAG - BR - x)/vx;
+    else if(vx < -1e-6) tx = (SOL + BR - x)/vx;
+    if(vy < -1e-6) ty = (TAVAN + BR - y)/vy;
+    var t = Math.min(tx, ty, kalan);
+    x += vx*t; y += vy*t; kalan -= t;
+    yol.push([x, y]);
+    if(t === tx && tx < ty){ vx = -vx; sekti++; }
+    else if(t === ty){ vy = -vy; sekti++; }
+    else break;
+  }
+  return yol;
+}
+/* <<<FIZIK SONU>>> */
+
+/* ═══════════════════ TABLOLAR ═══════════════════ */
+/* Bu diziler ELLE yazılmadı: prototypes/tablo-ornekle.html
+   gerçek tabloları (Wikimedia, kamu malı) ızgara çözünürlüğünde
+   örnekleyip k-ortalama ile paletlerini çıkarıyor. Elle yazdığım
+   piksel sanatında blok sayısı arttı ama kalite artmadı; bu veri
+   tablonun kendisinden geliyor. Oyunun ağ bağımlılığı yok —
+   veri burada gömülü. Yeniden üretmek için o aracı aç.        */
+var TABLOLAR = [
+  {
+    ad: "Mona Lisa", yazar: "Leonardo da Vinci",
+    pal: { a:"#11091e", b:"#221424", c:"#35232a", d:"#483028", e:"#5d3e2d", f:"#50523d", g:"#754f29", h:"#7f6035", i:"#606f48", j:"#986d34", k:"#7a8150", l:"#8a915d", m:"#b68c41", n:"#9fa168", o:"#cea54e", p:"#e6c266" },
+    sert: "abcdef",
+    px: [
+      "iiiiiiiiiiiiiiiiiiiiii",
+      "kkkkkkkkkkkkkkkkkkkkkk",
+      "lklkllkkkkiikklkklllll",
+      "llllllllhggdbellllllll",
+      "lnnnnnnkmpohcbflnnnnnn",
+      "kllnnnnemoomebciklnnnn",
+      "fikiilldjmjjgbbfiinnll",
+      "fffffffdooooebbfiiklkk",
+      "dfffffdcjmjjdbbdfffiff",
+      "defffffcdmjgcbbdffffff",
+      "ddfffiicccgeecbcfffffi",
+      "fffgefeccgmmmedbdfhhhf",
+      "eeggeddcjpppogdccgkjhi",
+      "eegjgdbgopppogghdcehkk",
+      "egghgccjopppmgdcabbeeh",
+      "dghhccdeghhhdbcdbbbdee",
+      "dgggccccdeedbbcddcbcee",
+      "fhhdcccccddcbbcdbbccee",
+      "eedcddbbcdcbbbbbbbbcce",
+      "eccdccbbccbbbbabbbbccf",
+      "dcdeeeeecbbbaaabbabbcd",
+      "dcceeemmmjdbaaaabbbbcc",
+      "cbbbccgjmmjhddddbacbbc",
+      "bbbbagjjhjjeedddcaabbd",
+      "bbbbbejgdeedbbbbaaabbc",
+      "bbbbbbdccccbaaaaaaabbb",
+      "baaaabbabaaaaaaaaaaaab",
+      "aaaabbaabaaaaaaaaaaaaa"
+    ]
+  },
+  {
+    ad: "Ayçiçekleri", yazar: "Vincent van Gogh",
+    pal: { a:"#796c36", b:"#897221", c:"#987c18", d:"#998227", e:"#85893b", f:"#a69537", g:"#ae991b", h:"#baa423", i:"#b5a84a", j:"#c0b560", k:"#d0c462", l:"#d4cd78", m:"#e4d97d", n:"#f0e688" },
+    sert: "abcde",
+    px: [
+      "mmmmmmllllkifillllllll",
+      "nnmmmlllllibbbflllllll",
+      "nnnmmmkiijfbdbbkllllll",
+      "nnnnmldbbffbbbbkllllmm",
+      "nnmnmfbbbcjbbbfjllllmm",
+      "mmkjlfbbbckjdficflllmm",
+      "khgfejbbcddjikeccjllkm",
+      "kgbaekjbbbccfgfbciifgi",
+      "mfaabimibbddbdaacdddbf",
+      "nkffjmlldbcbbbeedfdbdj",
+      "nlmkmiefijebbbejfijjim",
+      "nnmkkhccdifeaeijihhlkm",
+      "nnnhgggdbdfjddiigfgknn",
+      "nnnkfbbgbdcccccdgdhknn",
+      "nnnnmibccccdcbccghhmnn",
+      "nnnnnmigccbbcbbdiikmnn",
+      "nnnnmkfffcbbcbcimmmmnn",
+      "nnnmmkikdccccbdlmlmmnn",
+      "nnnkllmjcbbbcfjiijlmnn",
+      "nnnifjmigcccffeeegimmn",
+      "nnnjijmkgghgfdeddhkmmn",
+      "nnnmjjmjgghifdgffkmmmm",
+      "kklmlkljffhiihijllllll",
+      "hhhhhhhgjjiiijighhghhh",
+      "hhhhhhggijjkkjighggghh",
+      "hhhhgggggjjjjjgggggggg",
+      "hhggggggggiiifgggggghg",
+      "gggggggggggggggggggggg"
+    ]
+  },
+  {
+    ad: "Çığlık", yazar: "Edvard Munch",
+    pal: { a:"#494342", b:"#564c49", c:"#55565b", d:"#68554a", e:"#686059", f:"#a2563d", g:"#925e47", h:"#7c6754", i:"#7c6f60", j:"#aa6641", k:"#a16a50", l:"#91765a", m:"#a57859", n:"#b0774f" },
+    sert: "abcde",
+    px: [
+      "mmmllkkmmllkkklkkkmmmk",
+      "jffggkllllmllmmkkmmkkk",
+      "jjkkkjjjkkkkkknnnnjjmk",
+      "ffffggffffffjjjjnkjfjk",
+      "jklkggfffjknnnmnnnnjkg",
+      "jjjjnnnnjjnnmmkjfjjjkg",
+      "fffffffkkmkjffjjjjjggg",
+      "jjggjjjjjjjjjgddbccbdg",
+      "ldbbbbdddgddbbbbccccdg",
+      "iiihhhhiiiheeeeceecedg",
+      "dbellllllliedcaaccccck",
+      "dbelllllllliecaacccebk",
+      "ddddceeeecccccabcciick",
+      "hddddeccccceccbeeiiibk",
+      "hdddddecccelhcceeiiebk",
+      "hhhdbdbecdhlldeeiiiick",
+      "hhhdaadbddhhheeehiiiek",
+      "lhheabadbdehhceehiiiik",
+      "lhhhdbbbdbdedddeiiiiik",
+      "lhhehdbbdbbbabdeeiiiik",
+      "lhhehhbddbaaaadgeiilig",
+      "lhhhhheabbabaaabghhihg",
+      "lhhhehhdaaababdabhgheg",
+      "lhhhiehhbabbaahdbbdkhg",
+      "lhhhhihidabbbbagebadgg",
+      "lhheiihieabadbbbgddabg",
+      "lhhehihieabaddebaghddg",
+      "mhhilliildieblheddhhhg"
+    ]
+  },
+  {
+    ad: "Yıldızlı Gece", yazar: "Vincent van Gogh",
+    pal: { a:"#1f2320", b:"#2c333b", c:"#37424c", d:"#314271", e:"#3f5585", f:"#485863", g:"#50698d", h:"#5e7999", i:"#6d7f84", j:"#6f899f", k:"#878c5c", l:"#819692", m:"#b9ac4a", n:"#9eaa9d", o:"#adb47f" },
+    sert: "abcde",
+    px: [
+      "beiddfdiedgeddedeeegeg",
+      "cgkedfdiigedeieeeehlli",
+      "dehdcddeefedgkgdegloon",
+      "deedbdddddddeiedejomon",
+      "geedfkdegggeeeeeejomon",
+      "geeefkegiiihhegihjommo",
+      "hgdddehhigghghglhhommn",
+      "higgfhjjeegghggjhglool",
+      "hhjhchhiehhgheeggghjjj",
+      "jhhgajgighhhjheggghhgh",
+      "ljjfagdehhghjgggghhhgl",
+      "ghjcaedgjhggghhhhghjnn",
+      "ihicacghjhhgghgghglnnn",
+      "iglfafjnnghhggjhhhnnnn",
+      "gghcaflonggeeghhglnjfc",
+      "fgebacinnhggggljlnlfbc",
+      "iigbacgnliiillllljicbb",
+      "illbabfiliiiigfggcbege",
+      "ihjbaabihgggeddbddeghg",
+      "ighcaabbedddddddeeehhe",
+      "ceecaaaabcddddddffffff",
+      "bbbaaaaabbcffefcffdfff",
+      "bbbaaaaabcccbcdcbcfgff",
+      "cccaaaaaabbccbbcfbcccc",
+      "cbcaaaaaababcaaabccbcc",
+      "bbbaaaaaaabcbbbbcccccc",
+      "bbcaaaaaaababbcccccfab",
+      "bcccaaaaaabcbbccccbbbc"
+    ]
+  },
+  {
+    ad: "İnci Küpeli Kız", yazar: "Johannes Vermeer",
+    pal: { a:"#050413", b:"#342823", c:"#363b49", d:"#655545", e:"#567091", f:"#826c51", g:"#937f69", h:"#7d98b8", i:"#b5915c", j:"#999a93", k:"#c2a27f", l:"#a6b6cd", m:"#d3b39d", n:"#e1c7bb" },
+    sert: "abcde",
+    px: [
+      "aaaaaaaaaaaaaaaaaaaaaa",
+      "aaaaaaaaaaaaaaaaaaaaaa",
+      "aaaaaaaaaaaaaaaaaaaaaa",
+      "aaaaaaaaaaaabddaaaaaaa",
+      "aaaaaaaaaaadkkmgaaaaaa",
+      "aaaaaaaaaehhhjkgbaaaaa",
+      "aaaaaaaahllhhefddaaaaa",
+      "aaaaaaadllhhheccfbaaaa",
+      "aaaaaaagnlheecccgbaaaa",
+      "aaaaaaamnnkcbcccfbaaaa",
+      "aaaaaaagmkkdbbbcfdaaaa",
+      "aaaaaaankmdfbbbbddbaaa",
+      "aaaaaabngmmgdbbadfbaaa",
+      "aaaaaaamdkkddbbadgdaaa",
+      "aaaaaaafgkgddbaadifbaa",
+      "aaaaaaackggfdfabdigcaa",
+      "aaaaaaaagfffgjjfdkgcaa",
+      "aaaaaaaaaadnnfbbbkgdaa",
+      "aaaaaaaaaamkicbbbkgdba",
+      "aaaaaaaaabkifbbbbkggda",
+      "aaaaaaaaadiiibbbajjjga",
+      "aaaaaaaaafgiidbbajgbba",
+      "aaaaaaaaagiigfbbbccaaa",
+      "aaaaaaaabiifffbbbbaaaa",
+      "aaaaaaaafiffdfbbbbaaaa",
+      "aaaaaaabifffdfbbbbaaaa",
+      "aaaaaaafifffdfbbbbaaaa",
+      "aaaaaaagifddddbbbbaaaa"
+    ]
+  },
+  {
+    ad: "Büyük Dalga", yazar: "Katsushika Hokusai",
+    pal: { a:"#315270", b:"#4d6980", c:"#708089", d:"#7b8e99", e:"#8e999b", f:"#a3a8a4", g:"#b4bdb8", h:"#d4c8ae", i:"#ced3c7", j:"#e5e3d2", k:"#f5e4c1", l:"#f7efda" },
+    sert: "abcd",
+    px: [
+      "hhkkkkkkkkkkkkkkkkkkkk",
+      "hhkkkkkkkkkkkkkkkkkkkk",
+      "hhkkkkkjjkkkkkklkkkkkk",
+      "hhkkkjlliikklllllkkkkk",
+      "hhkkjlljiijkllllllkkkk",
+      "hhkjjligfggkllllllkkkk",
+      "fhhilidbciikllllkkkkkk",
+      "hghjldaaagiiilllkkkkkk",
+      "hhhllaaaadiijllllkkkkk",
+      "hhjllgbbaggjilllllkljk",
+      "bgjiljcbbjiiilllllllll",
+      "gjigjiicclljillllllllj",
+      "igeggfggclljjlllllllll",
+      "ggceidbdcllllllllllllj",
+      "gdedggbbbllllllllljjli",
+      "edbccfabbijjjjjjjkihle",
+      "igbbbablfehiiiihhfdijc",
+      "giebbbgllcfffffeedelfb",
+      "edffcbljlfcccffcceigae",
+      "eacfdlljljgcciiceijdej",
+      "hbdijligijjebccchgeigj",
+      "kjllijgjiggigegigiidid",
+      "igijijjjfefbdlljjgcicb",
+      "kgiejijigcefbfgidbdjfb",
+      "gcbcgiifjadedbdbbdjfdc",
+      "cbafdgjcfdbffhfeejcaaa",
+      "bbaaaggebibbggfhfbbfji",
+      "baaaadefcbhecdijigiiii"
+    ]
+  }
+];
+
+/* ═══════════════════ KARTLAR ═══════════════════
+   Etkilerin kendisi fizik bloğunda; burada yalnız adı, simgesi ve
+   oyuncuya gösterilen açıklaması var. Simgeler BMP aralığından
+   seçildi: yeni emojiler bazı cihazlarda tofu kutusu çiziliyor. */
+var KART_LISTE = [
+  { k:"sacilma", ad:"Saçılma", en:"Scatter", ikon:"✳",
+    ac:"Namludan +2 top çıkar ve açılar saçılır. Karşılığında topların canı 1 azalır." },
+  { tek:true, k:"delici", nadir:2, ad:"Delici Uç", en:"Piercing", ikon:"➤",
+    ac:"Top ilk kareyi delip geçer, sekmez ve bu can yemez. Topların canı 2 azalır." },
+  { k:"patlayici", nadir:1, ad:"Patlayıcı Son", en:"Explosive Finale", ikon:"✸",
+    ac:"Top son canını harcayıp yok olurken patlar, komşu karelere 1 hasar verir." },
+  { k:"titanyum", nadir:1, ad:"Titanyum Alaşım", en:"Titanium Alloy", ikon:"⬢",
+    ac:"Topların canı +3 artar. Ama ağırlaştıkları için sekme hızları ciddi düşer." },
+  { tek:true, k:"mitoz", nadir:1, ad:"Çoğalan Hücre", en:"Mitosis", ikon:"◍",
+    ac:"Bir kareyi kırıp yok eden top, canı yarıya inerek 2 ayrı topa bölünür." },
+  { k:"statik", nadir:1, ad:"Statik Yük", en:"Static Charge", ikon:"↯",
+    ac:"Top yok olurken, yaptığı her 2 çarpışma için rastgele bir kareye şimşek çakar." },
+  { k:"agir", nadir:2, ad:"Ağır Metal", en:"Heavy Metal", ikon:"■",
+    ac:"Vuruşlar 1 yerine 2 hasar verir, ama her çarpışma topun 2 canını götürür." },
+  { tek:true, k:"meditasyon", ad:"Meditasyon", en:"Meditation", ikon:"◯",
+    ac:"Top havada 1 saniye hiçbir şeye çarpmazsa +1 can geri kazanır." },
+  { tek:true, k:"inatci", ad:"İnatçı", en:"Stubborn", ikon:"✦",
+    ac:"Bir topun son canı kaldığında yapacağı o vuruş 1 yerine 3 hasar verir." },
+  { tek:true, k:"phoenix", ad:"Alevden Doğan", en:"Phoenix Spark", ikon:"▲",
+    ac:"Yok olan top son vurduğu kareyi ateşe verir; yanan kare her tur 1 hasar alır." },
+  { k:"buzul", ad:"Buzul Zırh", en:"Frost Armor", ikon:"✻",
+    ac:"İlk 2 duvar/çelik çarpışması topun canından yemez. Topu hasar almadan dar alanlara sokar." },
+  { tek:true, k:"kamikaze", nadir:1, ad:"Kamikaze", en:"Sniper", ikon:"◆",
+    ac:"Topların canı 1'e iner, tek atımlık olurlar. Ama o tek vuruş 5 hasar verir." },
+  { tek:true, k:"hayalet", ad:"Hayalet Top", en:"Phantom", ikon:"◌",
+    ac:"Duvarlara çarpmak topun canından sayılmaz. Can yalnızca karelerde gider." },
+  { k:"vampir", ad:"Can Çalan", en:"Vampiric", ikon:"✚",
+    ac:"Top bir kareyi yok ettiğinde %30 ihtimalle +1 can kazanır." },
+  { tek:true, k:"sonNefes", ad:"Son Nefes", en:"Last Breath", ikon:"➘",
+    ac:"Son canı kalan top, en yakın ve en zayıf kareye mıknatıs gibi çekilir." },
+  { k:"geriDonusum", ad:"Geri Dönüşüm", en:"Recycling", ikon:"↻",
+    ac:"Havada canı biten her 4 top için, sonraki atışlara kalıcı +1 top eklenir." },
+  { k:"asit", nadir:2, ad:"Asit Damlası", en:"Acid Drop", ikon:"⧫",
+    ac:"Vurulan kareye asit bulaşır; oraya vuran sonraki top 1 fazla hasar verir." },
+  { k:"nekro", ad:"Nekromansi", en:"Necromancy", ikon:"†",
+    ac:"Canı biten top %15 ihtimalle 2 canlı bir zombi top olarak dirilir." },
+  { tek:true, k:"ritim", ad:"Ritim Bozukluğu", en:"Combo Breaker", ikon:"≡",
+    ac:"Top hiçbir duvara değmeden 3 kareye çarparsa, 3. vuruşu 3 hasar verir." },
+  { tek:true, k:"sansli7", nadir:2, ad:"Şanslı 7", en:"Lucky 7", ikon:"7",
+    ac:"Can tam 7'ye sabitlenir. Son çarpışmada kare yıkarsan rastgele 3 kare patlar." }
+];
+
+/* ═══════════════════ GÖRSEL VARLIKLAR ═══════════════════
+   Gemini ile üretildi, tarayıcıda küçültülüp çerçeve ve topta siyah
+   alfaya çevrildi (arka plan saf siyah olduğu için parlaklıktan alfa
+   türetmek temiz sonuç veriyor). Ham çıktı 1.8 MB'ti, burada 44 KB.
+   GÖMÜLÜ: oyunun ağ bağımlılığı yok. Yüklenemezse çizim eski vektör
+   yoluna düşüyor — oyun asla varlığa bağımlı değil. */
+var VARLIK = {
+  duvar: "data:image/jpeg;base64,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",
+  top: "data:image/png;base64,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"
+};
+/* FIRLATICI ALETLERİ — her tabloya bir tane. Tek bir görselde altı
+   alet üretilip eşit altı dilime bölündü, siyah alfaya çevrildi ve
+   her biri kendi içeriğine kırpıldı (hepsi 96 px yüksekliğe
+   normalize edildi ki oyunda aynı boyda dursunlar). */
+var FIRLATICI = [
+  "data:image/webp;base64,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",
+  "data:image/webp;base64,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",
+  "data:image/webp;base64,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",
+  "data:image/webp;base64,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",
+  "data:image/webp;base64,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",
+  "data:image/webp;base64,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"
+];
+var FIRLATICI_AD = ["Rönesans topu", "Sapan", "Dövme demir", "Pirinç teleskop",
+                    "Delft porseleni", "Bambu fırlatıcı"];
+var IMG = {}, IMGF = [], duvarDeseni = null;
+function varlikYukle(){
+  for(var fi=0; fi<FIRLATICI.length; fi++){
+    (function(i){
+      var im = new Image();
+      im.onload = function(){ IMGF[i] = im; };
+      im.src = FIRLATICI[i];
+    })(fi);
+  }
+  for(var k in VARLIK){
+    (function(ad){
+      var im = new Image();
+      im.onload = function(){ IMG[ad] = im; };
+      im.src = VARLIK[ad];
+    })(k);
+  }
+}
+function hazir(ad){ return IMG[ad] && IMG[ad].complete && IMG[ad].naturalWidth; }
+
+/* ═══════════════════ OYUN ═══════════════════ */
+var LW = 380, LH = 700;
+var LS_BEST = "dbg.tablo.rekor";
+function el(id){ return document.getElementById(id); }
+
+var cv, ctx, raf = null, lastTs = 0, scale = 1, tms = 0;
+var g = null, S = null, tabloNo = 0, tur = 1, toplar = 20;
+var nisanX = BX + COLS*CELL/2, aci = -Math.PI/2;
+var nisan = null, durum = "nisan";   /* nisan | atis | ara | bitti */
+var paused = false, hizli = false, parca = [], sarsinti = 0;
+var KART = bosKartlar(), kirilanToplam = 0, kartBorcu = 0, kartVerilen = 0, kartYenile = 2;
+var enIyiAtis = 0, enIyiZincir = 0;   /* tablo başına en iyi atış */
+/* Yeteneklerin görselleri. Her biri {tip, x, y, t, sure, ...}; loop'ta
+   yaşlanır, draw'da çizilir. */
+var efekt = [];
+function efektEkle(tip, x, y, ek){
+  var e = { tip:tip, x:x, y:y, t:0, sure:ek && ek.sure || 0.4 };
+  if(ek) for(var k in ek) if(k !== "sure") e[k] = ek[k];
+  efekt.push(e);
+  if(efekt.length > 160) efekt.splice(0, efekt.length - 160);
+}
+
+function rekor(){ try{ return parseInt(localStorage.getItem(LS_BEST), 10) || 0; }catch(e){ return 0; } }
+function rekorYaz(v){ try{ if(v > rekor()) localStorage.setItem(LS_BEST, String(v)); }catch(e){} }
+
+function tabloBasla(no, devirTop){
+  tabloNo = no % TABLOLAR.length;
+  var T = TABLOLAR[tabloNo];
+  g = mkBoard();
+  /* Dayanıklılık ölçümle seçildi: HP 2'de bot 8/8 kazanıyor ve oyun
+     5 turda bitiyor (çok kolay), HP 3'te 7/8 ve 8 tur, HP 5'te hiç
+     kazanılmıyor. Sonraki tablolar sertleşir ama oyuncu topları
+     DEVREDER — yoksa HP 4-5 kazanılamaz. */
+  /* T.sert / sertHp artik kullanilmiyor: blok cani palet sirasindan
+     geliyor. Eski argumanlari birakmak yeni imzada T.sert'i rnd
+     yerine geciriyordu ve rnd() patlardi. */
+  tabloYerlestir(g, T.px, T.pal, blokHp(no));
+  tur = 1;
+  toplar = devirTop ? Math.max(20, devirTop) : 20;
+  /* KARTLAR HER TABLODA SIFIRLANIR. Tablolar arası taşındığında güç
+     sonsuza kadar birikiyordu; her tablo kendi destesini sıfırdan
+     kuruyor. Toplar devredilmeye devam ediyor — o ilerleme hissi
+     kalsın diye. */
+  KART = bosKartlar();
+  kirilanToplam = 0; kartVerilen = 0; kartBorcu = 0; kartYenile = 2;
+  enIyiAtis = 0; enIyiZincir = 0;
+  nisanX = BX + COLS*CELL/2;
+  durum = "nisan"; S = null; parca = [];
+  el("hAd").textContent = T.ad;
+  el("hYazar").textContent = T.yazar;
+  renderHud();
+}
+function yeniOyun(){ tabloBasla(0); hideOverlay(); showIntro(); }
+
+function atesle(a){
+  aci = a;
+  S = mkShot(g, nisanX, aci, toplar, KART, Math.random);
+  durum = "atis";
+  renderHud();
+}
+function turBitti(){
+  var T = TABLOLAR[tabloNo];
+
+  /* ATIŞ ÖZETİ: kaç blok, en uzun zincir, rekor kırıldı mı.
+     Ölçümde iyi nişan atış başına %58 daha verimli ama oyuncu bunu
+     hiç göremiyordu; bu özet o farkı hissedilir kılıyor. */
+  var yik = S.yokEdilen || 0, zin = S.enZincir || 0;
+  var rekor = yik > enIyiAtis;
+  if(rekor) enIyiAtis = yik;
+  if(zin > enIyiZincir) enIyiZincir = zin;
+  var ozet = yik + " blok" + (zin >= 4 ? "  ·  zincir ×" + zin : "");
+  popAt(BX + COLS*CELL/2, YER - 52, rekor && yik > 0 ? "gold" : "ok",
+        (rekor && yik > 0 ? "★ " : "") + ozet);
+  if(rekor && yik > 0 && yik >= 8) sarsinti = 0.14;
+
+  toplar += S.hediye + (S.yeniTop || 0);       /* Geri Dönüşüm dahil */
+  if(S.inenX >= 0) nisanX = Math.max(SOL + BR + 2, Math.min(SAG - BR - 2, S.inenX));
+  if(S.hediye) popAt(nisanX, YER - 20, "gold", "+" + S.hediye + " top");
+  if(S.yeniTop) popAt(nisanX, YER - 40, "ok", "+" + S.yeniTop + " geri dönüşüm");
+
+  /* Alevden Doğan: yanan kareler her tur hasar alır */
+  var yanan = atesleriIsle(g);
+
+  /* RESTORATÖR: tablo kendini onarır. Gerçek tehdit bu. */
+  var onarilan = restoreEt(g, restoreAdet(g, tur, REST_BASLA, REST_TAVAN), Math.random);
+  if(onarilan.length){
+    popAt(BX + COLS*CELL/2, BY + 18, "bad", "restorasyon +" + onarilan.length);
+    for(var oi=0; oi<onarilan.length; oi++){
+      var oc = onarilan[oi] % COLS, orr = Math.floor(onarilan[oi] / COLS);
+      efektEkle("halka", BX + oc*CELL + CELL/2, BY + orr*CELL + CELL/2,
+                { renk:"222,90,78", r:16, sure:0.5 });
+    }
+  }
+
+  /* KART SAYACI: kırılan her KART_ESIK blok bir kart seçimi kazandırır */
+  kirilanToplam += (S.yokEdilen || 0) + yanan;
+  var hakEdilen = Math.floor(kirilanToplam / KART_ESIK);
+  if(hakEdilen > kartVerilen){
+    kartBorcu += hakEdilen - kartVerilen;
+    kartVerilen = hakEdilen;
+  }
+
+  if(resimKaldi(g) === 0){
+    rekorYaz(tabloNo + 1);
+    durum = "bitti";
+    setTimeout(function(){ showKazandi(); }, 420);
+    return;
+  }
+  /* tablo iner, üstten yeni engeller girer */
+  var tasti = indir(g);
+  engelSatiri(g, tur, Math.random);
+  tur++;
+  if(tasti || enAltDolu(g) >= ROWS-1){
+    durum = "bitti";
+    setTimeout(function(){ showKaybettin(); }, 420);
+    return;
+  }
+  durum = "nisan"; S = null;
+  renderHud();
+  if(kartBorcu > 0) showKart();
+}
+
+/* ---------- girdi ---------- */
+function pt(ev){
+  var r = cv.getBoundingClientRect();
+  var t = (ev.touches && ev.touches[0]) || ev;
+  return { x:(t.clientX - r.left)/(r.width/LW), y:(t.clientY - r.top)/(r.height/LH) };
+}
+function aciHesapla(p){
+  var dx = p.x - nisanX, dy = p.y - (YER + 12);
+  var a = Math.atan2(dy, dx);
+  /* yukarı doğru, yataya 12° kala sınırla */
+  var enAz = -Math.PI + 0.21, enCok = -0.21;
+  if(a > 0) a = (p.x < nisanX) ? enAz : enCok;
+  if(a < enAz) a = enAz;
+  if(a > enCok) a = enCok;
+  return a;
+}
+function onDown(ev){
+  ev.preventDefault();
+  if(paused || durum !== "nisan") return;
+  nisan = aciHesapla(pt(ev));
+}
+function onMove(ev){
+  if(paused || durum !== "nisan" || nisan === null) return;
+  ev.preventDefault();
+  nisan = aciHesapla(pt(ev));
+}
+function onUp(){
+  if(durum !== "nisan" || nisan === null) return;
+  var a = nisan; nisan = null;
+  atesle(a);
+}
+
+/* ---------- döngü ---------- */
+function loop(ts){
+  raf = requestAnimationFrame(loop);
+  if(!lastTs) lastTs = ts;
+  var dt = Math.min(0.026, (ts - lastTs)/1000);
+  lastTs = ts; tms = ts;
+
+  if(!paused && durum === "atis" && S){
+    var kez = hizli ? 3 : 1, i, k;
+    for(i=0;i<kez;i++){
+      var ev = stepShot(S, dt);
+      for(k=0;k<ev.length;k++) onEvent(ev[k]);
+      if(S.bitti) break;
+    }
+    if(S.bitti){ durum = "ara"; setTimeout(turBitti, 180); }
+    renderHud();
+  }
+  for(var j=parca.length-1;j>=0;j--){
+    var q = parca[j];
+    q.life -= dt; q.vy += 900*dt;
+    q.x += q.vx*dt; q.y += q.vy*dt; q.r += q.dr*dt;
+    if(q.life <= 0) parca.splice(j, 1);
+  }
+  /* TOP İZİ: her karede konum kaydediliyor, çizimde soluklaşan bir
+     kuyruk oluyor. Sunum verisi, fiziğe dokunmuyor. */
+  if(S && !paused && durum === "atis"){
+    for(j=0;j<S.balls.length;j++){
+      var bz = S.balls[j];
+      if(!bz.canli){ bz.iz = null; continue; }
+      if(!bz.iz) bz.iz = [];
+      bz.iz.push(bz.x, bz.y);
+      if(bz.iz.length > 16) bz.iz.splice(0, bz.iz.length - 16);
+    }
+  }
+  for(j=efekt.length-1;j>=0;j--){
+    efekt[j].t += dt;
+    if(efekt[j].t >= efekt[j].sure) efekt.splice(j, 1);
+  }
+  /* hücre vuruş parlamalarını söndür */
+  if(g) for(j=0;j<g.length;j++) if(g[j] && g[j].parla > 0){
+    g[j].parla -= dt*3.4;
+    if(g[j].parla < 0) g[j].parla = 0;
+  }
+  if(sarsinti > 0) sarsinti -= dt;
+  draw();
+}
+function onEvent(e){
+  var t = e[0];
+  if(t === "kir"){
+    patlat(e[1], e[2], e[3], 8);
+    efektEkle("kir", e[1], e[2], { renk:e[3], sure:0.34 });
+  }
+  else if(t === "cat"){ patlat(e[1], e[2], e[3], 2); }
+  else if(t === "vurus"){ efektEkle("vurus", e[1], e[2], { sure:0.20 }); }
+  else if(t === "hediye"){
+    popAt(e[1], e[2], "gold", "+1");
+    patlat(e[1], e[2], "#E8B84B", 6);
+    efektEkle("halka", e[1], e[2], { renk:"232,184,75", r:20, sure:0.4 });
+  }
+  else if(t === "zip"){
+    patlat(e[1], e[2], "#4FC07E", 4);
+    efektEkle("halka", e[1], e[2], { renk:"79,192,126", r:22, sure:0.35 });
+  }
+  else if(t === "celik"){ patlat(e[1], e[2], "#9AA8B6", 2); }
+  else if(t === "zincir"){                      /* duvarsız üst üste vuruş */
+    var z = e[3];
+    popAt(e[1], e[2] - 10, (z >= 8 ? "gold" : "ok") + " zincir", "×" + z);
+    efektEkle("halka", e[1], e[2], {
+      renk: z >= 8 ? "232,184,75" : "140,232,174", r: 10 + z*2, sure:0.34 });
+  }
+  else if(t === "patla"){                       /* Patlayıcı Son */
+    efektEkle("patlama", e[1], e[2], { sure:0.42 });
+    patlat(e[1], e[2], "#FF9C4A", 12);
+    sarsinti = 0.16;
+  }
+  else if(t === "simsek"){                      /* Statik Yük / Şanslı 7 */
+    efektEkle("simsek", e[1], e[2], { sure:0.30, kirik:simsekYolu(e[1], e[2]) });
+    patlat(e[1], e[2], "#BFE6FF", 6);
+  }
+  else if(t === "yak"){                         /* Alevden Doğan */
+    efektEkle("halka", e[1], e[2], { renk:"255,140,60", r:18, sure:0.5 });
+    patlat(e[1], e[2], "#FF8C3C", 7);
+  }
+  else if(t === "bol"){                         /* Çoğalan Hücre */
+    efektEkle("bol", e[1], e[2], { sure:0.38 });
+    patlat(e[1], e[2], "#7FE3FF", 6);
+  }
+  else if(t === "zombi"){                       /* Nekromansi */
+    efektEkle("halka", e[1], e[2], { renk:"120,220,120", r:16, sure:0.45 });
+    patlat(e[1], e[2], "#78DC78", 7);
+  }
+  else if(t === "med"){                         /* Meditasyon */
+    efektEkle("halka", e[1], e[2], { renk:"235,245,255", r:14, sure:0.5 });
+  }
+}
+/* Şimşek için kırık çizgi: tavandan hedefe. */
+function simsekYolu(x, y){
+  var yol = [[x + (Math.random()-0.5)*40, BY]], i;
+  var adim = 5;
+  for(i=1;i<adim;i++){
+    var k = i/adim;
+    yol.push([x + (yol[0][0] - x)*(1-k) + (Math.random()-0.5)*22,
+              BY + (y - BY)*k]);
+  }
+  yol.push([x, y]);
+  return yol;
+}
+function patlat(x, y, renk, n){
+  for(var i=0;i<n;i++)
+    parca.push({ x:x, y:y, vx:(Math.random()-0.5)*200, vy:(Math.random()-0.7)*220,
+                 r:2 + Math.random()*2.4, dr:-2, life:0.35 + Math.random()*0.35,
+                 renk:renk || "#DCB78E" });
+}
+
+/* ---------- HUD ---------- */
+function renderHud(){
+  el("hBall").textContent = (durum === "atis" && S)
+    ? (S.adet - S.biten) : topAdedi(KART, toplar);
+  el("hTur").textContent = tur;
+  var kalanKart = KART_ESIK - (kirilanToplam % KART_ESIK);
+  var rest = restoreAdet(g, tur, REST_BASLA, REST_TAVAN);
+  /* "can" yalnız kartlar onu DEĞİŞTİRDİĞİNDE yazılıyor: alt satır zaten
+     dolu, taban değer her turda yer kaplamasın. */
+  var mc = topMaxCan(KART);
+  el("fInfo").textContent = resimKaldi(g) + " blok" +
+    (mc !== TEMEL_CAN ? " · can " + mc : "") +
+    (enIyiAtis ? " · en iyi atış " + enIyiAtis : "") +
+    (enIyiZincir >= 4 ? " (×" + enIyiZincir + ")" : "") +
+    (rest ? " · restorasyon +" + rest : "") +
+    " · kart " + kalanKart;
+  var sahip = [], i;
+  for(i=0;i<KART_LISTE.length;i++){
+    var sy = KART[KART_LISTE[i].k];
+    if(sy) sahip.push(KART_LISTE[i].ikon + "︎" + (sy > 1 ? sy : ""));
+  }
+  el("fLeft").textContent = sahip.length ? sahip.join(" ")
+    : (FIRLATICI_AD[tabloNo % FIRLATICI_AD.length] || "DAWNBRIGHT · PROTOTİP");
+}
+
+/* ---------- çizim ---------- */
+/* Blok üstündeki sayının okunması için: açık blokta koyu, koyu blokta
+   açık mürekkep. Sabit renk seçince tablonun yarısında sayı kayboluyor. */
+var CAN_YAZ = false;             /* blok canını rakamla da yaz */
+function parlaklik(hex){
+  var r = parseInt(hex.substr(1,2),16), g2 = parseInt(hex.substr(3,2),16),
+      b = parseInt(hex.substr(5,2),16);
+  return (0.299*r + 0.587*g2 + 0.114*b)/255;
+}
+function koyulastir(hex, k){
+  var r = Math.round(parseInt(hex.substr(1,2),16)*k),
+      g2 = Math.round(parseInt(hex.substr(3,2),16)*k),
+      b = Math.round(parseInt(hex.substr(5,2),16)*k);
+  return "rgb(" + r + "," + g2 + "," + b + ")";
+}
+function aclastir(hex, k){
+  var r = parseInt(hex.substr(1,2),16), g2 = parseInt(hex.substr(3,2),16),
+      b = parseInt(hex.substr(5,2),16);
+  return "rgb(" + Math.round(r+(255-r)*k) + "," + Math.round(g2+(255-g2)*k) +
+         "," + Math.round(b+(255-b)*k) + ")";
+}
+/* Dayanıklılığı ÖNCE görsel olarak, sonra sayıyla anlatıyoruz.
+   İlk sürümde 128 bloğun hepsinde kalın beyaz bir "3" vardı ve tablo
+   hiç okunmuyordu — oyunun bütün fikri tabloyu görmek olduğu için bu
+   ölümcül. Şimdi sağlam blok koyu bir tabaka altında, kırıldıkça
+   gerçek rengi ortaya çıkıyor ve çatlıyor; sayı yalnızca soluk bir
+   ipucu.                                                              */
+function cizResim(h, x, y){
+  var renk = h.renk || "#8a8a8a";
+  /* Hücrenin TAMAMINI doldur. Önce CELL-1 boyutunda doldurup 2 px üst ve
+     2 px alt kabartma çiziyordum: 14 px hücrede bu, alanın %29'u demek
+     ve tablonun rengini eziyordu — örnekleyicinin düz renkli önizlemesi
+     oyundan çok daha iyi görünüyordu. Blok hissi artık yalnızca 1 px'lik
+     kenar çizgisinden geliyor. */
+  ctx.fillStyle = renk;
+  ctx.fillRect(x, y, CELL, CELL);
+  /* sağlamlık tabakası: hp düştükçe incelir, resim açılır */
+  /* Kademeler belirginleşsin: can bilgisi artık ağırlıklı olarak
+     buradan okunuyor. */
+  var kat = Math.max(0, Math.min(1, (h.hp - 1) / 3));
+  if(kat > 0){
+    ctx.fillStyle = "rgba(8,10,14," + (0.06 + kat*0.34).toFixed(3) + ")";
+    ctx.fillRect(x, y, CELL, CELL);
+  }
+  ctx.fillStyle = "rgba(255,255,255,.10)";
+  ctx.fillRect(x, y, CELL, 1);
+  ctx.fillStyle = "rgba(0,0,0,.22)";
+  ctx.fillRect(x, y + CELL - 1, CELL, 1);
+  ctx.fillRect(x + CELL - 1, y, 1, CELL);
+  /* hasar: çatlaklar */
+  if(h.vur){
+    ctx.strokeStyle = "rgba(255,255,255,.34)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x+3, y+CELL*0.28); ctx.lineTo(x+CELL*0.46, y+CELL*0.54);
+    ctx.lineTo(x+CELL*0.28, y+CELL-4);
+    ctx.moveTo(x+CELL-4, y+CELL*0.38); ctx.lineTo(x+CELL*0.58, y+CELL*0.6);
+    ctx.stroke();
+  }
+  /* ASİT: yeşil sızıntı */
+  if(h.asit){
+    ctx.fillStyle = "rgba(120,220,90,.30)";
+    ctx.fillRect(x, y, CELL, CELL);
+    ctx.fillStyle = "rgba(150,255,110,.75)";
+    ctx.fillRect(x + CELL*0.24, y + CELL - 4, 2, 3);
+    ctx.fillRect(x + CELL*0.62, y + CELL - 3, 2, 2);
+  }
+  /* ATEŞ: titreşen turuncu */
+  if(h.ates){
+    var alev = 0.28 + 0.22*Math.sin(tms/90 + x*0.7 + y*0.5);
+    ctx.fillStyle = "rgba(255,120,40," + alev.toFixed(3) + ")";
+    ctx.fillRect(x, y, CELL, CELL);
+    ctx.fillStyle = "rgba(255,210,90,.7)";
+    ctx.fillRect(x + CELL*0.35, y + 1, 2, 3);
+  }
+  /* VURUŞ PARLAMASI: taze vuruş beyaz parlar */
+  if(h.parla > 0){
+    ctx.fillStyle = "rgba(255,255,255," + (h.parla*0.55).toFixed(3) + ")";
+    ctx.fillRect(x, y, CELL, CELL);
+  }
+  /* Blok canı RAKAMLA değil koyuluk tabakasıyla anlatılıyor. hp>=3
+     koşuluyla açtığımda blokların üçte biri rakam taşıyordu (~200 sayı)
+     ve tabloyu boğuyordu — oyunun bütün fikri tabloyu görmek.
+     Rakamı geri istersen CAN_YAZ'ı true yap. */
+  if(CAN_YAZ && h.hp >= 3){
+    ctx.font = "600 8px Archivo, system-ui, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = parlaklik(renk)*(1-kat*0.5) > 0.45
+      ? "rgba(18,21,26,.40)" : "rgba(255,255,255,.40)";
+    ctx.fillText(String(h.hp), x + CELL/2 - 0.5, y + CELL/2);
+    ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+  }
+}
+function cizCelik(x, y){
+  ctx.fillStyle = "#6B7681";
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.fillStyle = "rgba(255,255,255,.16)";
+  ctx.fillRect(x, y, CELL, 1);
+  ctx.fillStyle = "rgba(0,0,0,.30)";
+  ctx.fillRect(x, y + CELL - 1, CELL, 1);
+  ctx.fillRect(x + CELL - 1, y, 1, CELL);
+  /* perçinler: çeliği tablodan ayıran işaret */
+  ctx.fillStyle = "rgba(255,255,255,.34)";
+  ctx.beginPath(); ctx.arc(x + 3.5, y + 3.5, 1.2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + CELL-3.5, y + CELL-3.5, 1.2, 0, Math.PI*2); ctx.fill();
+}
+function cizHediye(x, y){
+  var cx = x + CELL/2 - 0.5, cy = y + CELL/2 - 0.5;
+  ctx.fillStyle = "rgba(232,184,75,.20)";
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.strokeStyle = "#E8B84B"; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(cx, cy, CELL*0.34, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = "#E8B84B";
+  ctx.font = "800 8px Archivo, system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("+1", cx, cy + 0.5);
+  ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+}
+function cizZip(x, y){
+  ctx.fillStyle = "#24463A";
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.strokeStyle = "#4FC07E"; ctx.lineWidth = 1.8; ctx.lineCap = "round";
+  var i;
+  for(i=0;i<2;i++){
+    var yy = y + 4 + i*5;
+    ctx.beginPath();
+    ctx.moveTo(x + 3, yy + 3); ctx.lineTo(x + CELL/2, yy);
+    ctx.lineTo(x + CELL - 3, yy + 3);
+    ctx.stroke();
+  }
+}
+function cizCerceve(){
+  /* Müze çerçevesi: oynanan alanın bu bir TABLO olduğunu söylüyor.
+     Üretilen görsel çerçeve denendi ve kaldırıldı: kenarı görselin
+     %24'üydü, tahtanın yanında ise %9 yer var — resmin üstünü
+     örtüyordu. Elle çizilen ince çerçeve hiç yer kaplamıyor. */
+  var x = BX - 7, y = BY - 7, w = COLS*CELL + 13, h = ROWS*CELL + 13;
+  var gr = ctx.createLinearGradient(x, y, x + w, y + h);
+  gr.addColorStop(0, "#8A6A28"); gr.addColorStop(0.45, "#D8B25A");
+  gr.addColorStop(0.55, "#A5813A"); gr.addColorStop(1, "#6F5420");
+  ctx.strokeStyle = gr; ctx.lineWidth = 6;
+  ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+  ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1;
+  ctx.strokeRect(x + 6.5, y + 6.5, w - 13, h - 13);
+}
+function draw(){
+  if(!g) return;
+  var c, r, i;
+  ctx.save();
+  if(sarsinti > 0) ctx.translate((Math.random()-0.5)*4, (Math.random()-0.5)*3);
+
+  /* MÜZE DUVARI. Yüklenmediyse eski degradeye düşüyor. */
+  if(hazir("duvar")){
+    if(!duvarDeseni) duvarDeseni = ctx.createPattern(IMG.duvar, "repeat");
+    ctx.fillStyle = duvarDeseni;
+    ctx.fillRect(-8, -8, LW+16, LH+16);
+    /* köşeleri karartan hafif vinyet: çerçeve öne çıksın */
+    var vg = ctx.createRadialGradient(LW/2, LH*0.42, LH*0.18, LW/2, LH*0.42, LH*0.78);
+    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.62)");
+    ctx.fillStyle = vg; ctx.fillRect(-8, -8, LW+16, LH+16);
+  } else {
+    var bg = ctx.createLinearGradient(0, 0, 0, LH);
+    bg.addColorStop(0, "#171B22"); bg.addColorStop(1, "#0C0F13");
+    ctx.fillStyle = bg; ctx.fillRect(-8, -8, LW+16, LH+16);
+  }
+
+  /* tuval zemini */
+  ctx.fillStyle = "#0F1318";
+  ctx.fillRect(BX, BY, COLS*CELL, ROWS*CELL);
+  ctx.strokeStyle = "rgba(255,255,255,.035)"; ctx.lineWidth = 1;
+  for(c=1;c<COLS;c++){
+    ctx.beginPath(); ctx.moveTo(BX + c*CELL, BY);
+    ctx.lineTo(BX + c*CELL, BY + ROWS*CELL); ctx.stroke();
+  }
+  cizCerceve();
+
+  /* bloklar */
+  for(r=0;r<ROWS;r++){
+    for(c=0;c<COLS;c++){
+      var h = g[r*COLS + c];
+      if(!h) continue;
+      var x = BX + c*CELL, y = BY + r*CELL;
+      if(h.tur === RESIM) cizResim(h, x, y);
+      else if(h.tur === CELIK) cizCelik(x, y);
+      else if(h.tur === HEDIYE) cizHediye(x, y);
+      else if(h.tur === ZIP) cizZip(x, y);
+      if(h.tur !== RESIM && h.parla > 0){
+        ctx.fillStyle = "rgba(255,255,255," + (h.parla*0.5).toFixed(3) + ")";
+        ctx.fillRect(x, y, CELL, CELL);
+      }
+    }
+  }
+
+  /* kaybetme çizgisi */
+  ctx.strokeStyle = "rgba(222,90,78,.55)"; ctx.lineWidth = 2;
+  ctx.setLineDash([6, 5]);
+  ctx.beginPath(); ctx.moveTo(BX - 4, YER); ctx.lineTo(BX + COLS*CELL + 4, YER);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  /* nişan önizlemesi */
+  if(durum === "nisan"){
+    var a = (nisan !== null) ? nisan : aci;
+    var yol = nisanYolu(nisanX, ATIS_Y, a, nisan !== null ? 900 : 200);
+    ctx.strokeStyle = nisan !== null ? "rgba(232,184,75,.85)" : "rgba(232,184,75,.35)";
+    ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
+    ctx.beginPath();
+    ctx.moveTo(yol[0][0], yol[0][1]);
+    for(i=1;i<yol.length;i++) ctx.lineTo(yol[i][0], yol[i][1]);
+    ctx.stroke(); ctx.setLineDash([]);
+    if(nisan !== null && yol.length > 1){
+      var son = yol[yol.length-1];
+      ctx.fillStyle = "rgba(232,184,75,.9)";
+      ctx.beginPath(); ctx.arc(son[0], son[1], 3.2, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  /* toplar */
+  if(S){
+    var enCan = topMaxCan(KART);
+    for(i=0;i<S.balls.length;i++){
+      var b = S.balls[i];
+      if(!b.canli) continue;
+      /* Topun DURUMU görünsün: rengi canını, halkası kartını anlatır. */
+      var govde = "#FFF3D6";
+      if(b.zombi) govde = "#8FE08F";                       /* Nekromansi */
+      else if(KART.kamikaze) govde = "#FFB4A0";            /* Kamikaze */
+      else if(b.can <= 1) govde = "#FF9C93";               /* son can */
+      else if(b.can <= enCan*0.34) govde = "#FFD08A";      /* azalıyor */
+      /* İZ: soluklaşan kuyruk. Tek karelik "hayalet daire" yerine
+         gerçek bir iz, top 6 px olduğu için hareketi bu okutuyor. */
+      if(b.iz && b.iz.length >= 4){
+        ctx.globalCompositeOperation = "lighter";
+        for(var q=0;q<b.iz.length;q+=2){
+          var ff = (q/2) / (b.iz.length/2 - 1);
+          ctx.globalAlpha = 0.05 + 0.30*ff*ff;
+          ctx.fillStyle = govde;
+          ctx.beginPath();
+          ctx.arc(b.iz[q], b.iz[q+1], BR*(0.30 + 0.75*ff), 0, Math.PI*2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+      }
+      /* PARLAMA: çarpışma yarıçapı değişmeden topu belirgin yapar */
+      var gl = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, BR*3.2);
+      gl.addColorStop(0, "rgba(255,243,214,.55)");
+      gl.addColorStop(0.45, "rgba(255,243,214,.18)");
+      gl.addColorStop(1, "rgba(255,243,214,0)");
+      ctx.fillStyle = gl;
+      ctx.beginPath(); ctx.arc(b.x, b.y, BR*3.2, 0, Math.PI*2); ctx.fill();
+      if(hazir("top")){
+        /* Sprite beyaza yakın; durum rengini üstüne "multiply" ile
+           basıyoruz, böylece can/kart bilgisi sprite'ta da okunuyor. */
+        ctx.drawImage(IMG.top, b.x - BR*1.7, b.y - BR*1.7, BR*3.4, BR*3.4);
+        if(govde !== "#FFF3D6"){
+          ctx.globalCompositeOperation = "multiply";
+          ctx.globalAlpha = 0.75;
+          ctx.fillStyle = govde;
+          ctx.beginPath(); ctx.arc(b.x, b.y, BR*1.1, 0, Math.PI*2); ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = "source-over";
+        }
+      } else {
+        ctx.fillStyle = govde;
+        ctx.beginPath(); ctx.arc(b.x, b.y, BR*1.25, 0, Math.PI*2); ctx.fill();
+      }
+      if(b.buz > 0){                                        /* Buzul Zırh */
+        ctx.strokeStyle = "rgba(150,220,255,.9)"; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(b.x, b.y, BR + 1.8, 0, Math.PI*2); ctx.stroke();
+      }
+      if(KART.agir){                                        /* Ağır Metal */
+        ctx.strokeStyle = "rgba(40,46,54,.85)"; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(b.x, b.y, BR + 0.9, 0, Math.PI*2); ctx.stroke();
+      }
+      if(KART.inatci && b.can <= 1){                        /* İnatçı hazır */
+        ctx.strokeStyle = "rgba(255,120,90,.9)"; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.arc(b.x, b.y, BR + 3.2, 0, Math.PI*2); ctx.stroke();
+      }
+      if(KART.ritim && b.zincir >= 2){                      /* Ritim hazır */
+        ctx.strokeStyle = "rgba(255,215,100,.95)"; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(b.x, b.y, BR + 3.2, 0, Math.PI*2); ctx.stroke();
+      }
+    }
+  }
+
+  /* FIRLATICI */
+  ctx.fillStyle = "#2B333D";
+  ctx.fillRect(BX - 7, ATIS_Y - 3, COLS*CELL + 13, 12);
+  var alet = IMGF[tabloNo % FIRLATICI.length];
+  if(alet && alet.complete && alet.naturalWidth){
+    /* Alet YUKARI bakıyor; nişan açısı a için dönme a + PI/2 kadar.
+       Dönme ekseni aletin TABANI, yoksa nişan alırken kayıyor. */
+    var aa = (durum === "nisan" && nisan !== null) ? nisan : aci;
+    /* Aletler dar ve uzun: 46 px yukseklikte 15 px genislikte bir cubuk
+       kaliyordu ve koyu zeminde secilmiyordu. Buyutup arkasina sicak bir
+       isik koyuyoruz. */
+    var yuk = 66, gen = yuk * (alet.naturalWidth / alet.naturalHeight);
+    ctx.save();
+    ctx.translate(nisanX, ATIS_Y + 8);
+    ctx.rotate(aa + Math.PI/2);
+    var ag = ctx.createRadialGradient(0, -yuk*0.45, 0, 0, -yuk*0.45, yuk*0.62);
+    ag.addColorStop(0, "rgba(255,210,130,.30)");
+    ag.addColorStop(1, "rgba(255,190,100,0)");
+    ctx.fillStyle = ag;
+    ctx.beginPath(); ctx.arc(0, -yuk*0.45, yuk*0.62, 0, Math.PI*2); ctx.fill();
+    ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 7; ctx.shadowOffsetY = 2;
+    ctx.drawImage(alet, -gen/2, -yuk, gen, yuk);
+    ctx.restore();
+  }
+  ctx.fillStyle = "#E8B84B";
+  ctx.beginPath(); ctx.arc(nisanX, ATIS_Y + 8, 6.5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#1A1305";
+  ctx.font = "800 9px Archivo, system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  var kalan = (durum === "atis" && S) ? (S.bekleyen + canliTop()) : toplar;
+  if(kalan < 100) ctx.fillText(String(kalan), nisanX, ATIS_Y + 8.5);
+  ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+
+  /* YETENEK EFEKTLERİ */
+  for(i=0;i<efekt.length;i++) cizEfekt(efekt[i]);
+
+  /* parçacıklar */
+  for(i=0;i<parca.length;i++){
+    var q = parca[i];
+    ctx.globalAlpha = Math.max(0, Math.min(1, q.life*2.2));
+    ctx.fillStyle = q.renk;
+    ctx.fillRect(q.x - q.r/2, q.y - q.r/2, Math.max(1, q.r), Math.max(1, q.r));
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+function cizEfekt(e){
+  var k = e.t / e.sure;                  /* 0..1 ilerleme */
+  var sol = 1 - k;
+  if(e.tip === "vurus"){
+    ctx.strokeStyle = "rgba(255,243,214," + (sol*0.85).toFixed(3) + ")";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(e.x, e.y, 3 + k*9, 0, Math.PI*2); ctx.stroke();
+  }
+  else if(e.tip === "kir"){
+    ctx.strokeStyle = "rgba(255,255,255," + (sol*0.8).toFixed(3) + ")";
+    ctx.lineWidth = 2.4*sol + 0.6;
+    ctx.beginPath(); ctx.arc(e.x, e.y, 4 + k*16, 0, Math.PI*2); ctx.stroke();
+  }
+  else if(e.tip === "halka"){
+    ctx.strokeStyle = "rgba(" + e.renk + "," + (sol*0.9).toFixed(3) + ")";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath(); ctx.arc(e.x, e.y, 4 + k*(e.r || 18), 0, Math.PI*2); ctx.stroke();
+  }
+  else if(e.tip === "patlama"){
+    var r = 6 + k*34;
+    var gr = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
+    gr.addColorStop(0, "rgba(255,220,140," + (sol*0.55).toFixed(3) + ")");
+    gr.addColorStop(0.6, "rgba(255,140,60," + (sol*0.35).toFixed(3) + ")");
+    gr.addColorStop(1, "rgba(255,100,40,0)");
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,190,110," + (sol*0.9).toFixed(3) + ")";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(e.x, e.y, r*0.8, 0, Math.PI*2); ctx.stroke();
+  }
+  else if(e.tip === "simsek"){
+    if(!e.kirik) return;
+    ctx.strokeStyle = "rgba(200,235,255," + (sol*0.95).toFixed(3) + ")";
+    ctx.lineWidth = 2.6*sol + 0.8;
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(e.kirik[0][0], e.kirik[0][1]);
+    for(var q=1;q<e.kirik.length;q++) ctx.lineTo(e.kirik[q][0], e.kirik[q][1]);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255," + (sol*0.6).toFixed(3) + ")";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  else if(e.tip === "bol"){
+    ctx.strokeStyle = "rgba(127,227,255," + (sol*0.9).toFixed(3) + ")";
+    ctx.lineWidth = 2;
+    var ay = 10 + k*16;
+    ctx.beginPath(); ctx.arc(e.x - ay*0.5, e.y, ay*0.55, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(e.x + ay*0.5, e.y, ay*0.55, 0, Math.PI*2); ctx.stroke();
+  }
+}
+function canliTop(){
+  if(!S) return 0;
+  var n = 0, i;
+  for(i=0;i<S.balls.length;i++) if(S.balls[i].canli) n++;
+  return n;
+}
+function fitCanvas(){
+  var box = el("stage");
+  var availW = box.clientWidth || LW;
+  var cabH = el("cab").offsetHeight, cvH = cv.offsetHeight;
+  var chrome = (cabH > 0 && cvH > 0) ? (cabH - cvH) : 150;
+  var availH = (window.innerHeight || 760) - chrome - 18;
+  if(availH < 300) availH = 300;
+  scale = Math.min(availW / LW, availH / LH);
+  var dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(LW*scale*dpr);
+  cv.height = Math.round(LH*scale*dpr);
+  cv.style.width = Math.round(LW*scale) + "px";
+  cv.style.height = Math.round(LH*scale) + "px";
+  ctx.setTransform(scale*dpr, 0, 0, scale*dpr, 0, 0);
+}
+
+/* ---------- efektler ---------- */
+function popAt(x, y, kind, txt){
+  var p = document.createElement("div");
+  p.className = "pop " + kind; p.textContent = txt;
+  p.style.left = (x/LW*100) + "%"; p.style.top = (y/LH*100) + "%";
+  el("fx").appendChild(p);
+  setTimeout(function(){ if(p.parentNode) p.parentNode.removeChild(p); }, 820);
+}
+
+/* ---------- overlay ---------- */
+function hideOverlay(){
+  var o = el("ovNode");
+  if(o && o.parentNode) o.parentNode.removeChild(o);
+  paused = false; lastTs = 0;
+}
+function overlay(html, cls){
+  hideOverlay();
+  var d = document.createElement("div");
+  d.className = "ov " + (cls || ""); d.id = "ovNode"; d.innerHTML = html;
+  el("cab").appendChild(d);
+  paused = true;
+  return d;
+}
+function legendHTML(){
+  return '<div class="legend">' +
+    '<div class="lrow"><span class="lart">🎯</span>' +
+      '<p><b>Parmağını sürükleyerek nişan al, bırak.</b> 20 top duvarlardan seke seke tabloyu kırar.</p></div>' +
+    '<div class="lrow"><span class="lart">🖼️</span>' +
+      '<p>Bloktaki sayı kaç vuruş dayanacağını gösterir. <b>Bütün tabloyu kır</b>, sıradaki tabloya geç.</p></div>' +
+    '<div class="lrow"><span class="lart">⬇️</span>' +
+      '<p>Her atıştan sonra <b>tablo bir satır iner</b> ve üstten yeni engeller girer. Kırmızı çizgiye değerse kaybedersin — bu yüzden <b>alt satırları</b> temizle.</p></div>' +
+    '<div class="lrow"><span class="lart">⚙️</span>' +
+      '<p>Gri <b>çelik</b> kırılmaz, sadece sektirir. Yeşil <b>zıplatıcı</b> topu savurur. Altın <b>+1</b> topunu artırır.</p></div>' +
+    '<div class="lrow"><span class="lart">≡</span>' +
+      '<p>Bir top duvara değmeden üst üste karelere vurursa <b>zincir</b> sayılır ve ekranda ×3, ×4… ' +
+      'diye görünür. Uzun zincir iyi nişan demek: ölçümde iyi nişan, rastgeleye göre atış başına ' +
+      '<b>%58</b> daha çok blok kırıyor.</p></div>' +
+    '<div class="lrow"><span class="lart">✚</span>' +
+      '<p>Her topun <b>canı</b> var: her çarpışma 1 can götürür, canı biten top yok olur. Alt yazıda güncel can gösterilir.</p></div>' +
+    '<div class="lrow"><span class="lart">✳</span>' +
+      '<p>Her <b>' + KART_ESIK + ' blok</b> kırdığında 4 kart arasından birini seçersin. Kartlar kalıcıdır ve üst üste binebilir.</p></div>' +
+    '</div>';
+}
+function showIntro(){
+  var T = TABLOLAR[tabloNo];
+  var d = overlay('<div class="big">🖼️</div><h2>Tablo Kırma</h2>' +
+    '<p class="sub">Sıradaki tablo: <b>' + T.ad + '</b> — ' + T.yazar + '</p>' +
+    legendHTML() +
+    '<div class="row"><button class="go" data-a="start">▶ Başla</button></div>', "scroll");
+  d.addEventListener("click", function(e){
+    if(e.target.getAttribute && e.target.getAttribute("data-a") === "start") hideOverlay();
+  });
+}
+function showHelp(){
+  var d = overlay('<h2>Nasıl oynanır</h2>' + legendHTML() +
+    '<div class="row"><button class="go" data-a="close">Anladım</button></div>', "scroll");
+  d.addEventListener("click", function(e){
+    if(e.target.getAttribute && e.target.getAttribute("data-a") === "close") hideOverlay();
+  });
+}
+/* KART SEÇİMİ: 4 rastgele karttan biri. Kartlar kalıcı ve yığılabilir;
+   aynı kartı tekrar alırsan etkisi katlanır. */
+function showKart(){
+  /* Tek seçimlik kartlar bir kez alındıktan sonra havuzdan çıkar:
+     üst üste alındıklarında hiçbir şey değişmeyen kartlar bunlar
+     (canı sabitleyenler, ikili kurallar, sabit hasar yazanlar) ve
+     Çoğalan Hücre — o yığıldığında top sayısı katlanarak patlıyor. */
+  /* NADİRLİK: ölçülen tek-kart hasarına göre üç kademe. Ağır Metal 826
+     ile Saçılma 217 arasında 4 kat fark var; hepsini eşit olasılıkla
+     dağıtmak o farkı tesadüfe bırakıyordu. */
+  var havuz = [], secilen = [], i, j;
+  for(i=0;i<KART_LISTE.length;i++){
+    var kk = KART_LISTE[i];
+    if(kk.tek && KART[kk.k]) continue;
+    var agirlik = kk.nadir === 2 ? 0.18 : (kk.nadir === 1 ? 0.45 : 1);
+    havuz.push({ c:kk, a:agirlik });
+  }
+  if(!havuz.length){ kartBorcu = 0; return; }
+  for(i=0;i<4 && havuz.length;i++){
+    var toplamA = 0;
+    for(j=0;j<havuz.length;j++) toplamA += havuz[j].a;
+    var hedef = Math.random()*toplamA, birikim = 0, sec = havuz.length-1;
+    for(j=0;j<havuz.length;j++){
+      birikim += havuz[j].a;
+      if(hedef <= birikim){ sec = j; break; }
+    }
+    secilen.push(havuz.splice(sec, 1)[0].c);
+  }
+
+  var html = '<h2>Kart seç</h2><p class="sub">' +
+    (kartBorcu > 1 ? kartBorcu + ' kart hakkın var — birini seç. ' : '') +
+    'Seçtiğin kart bu tablo boyunca kalır.</p><div class="kartlar">';
+  for(i=0;i<secilen.length;i++){
+    var c = secilen[i], sy = KART[c.k] || 0;
+    var nd = c.nadir || 0;
+    html += '<button class="kart' + (nd ? ' n' + nd : '') + '" data-kart="' + c.k + '">' +
+      '<span class="ki">' + c.ikon + '︎</span>' +
+      '<span class="gov">' +
+        '<b>' + c.ad + '</b>' +
+        '<span class="ust"><small>' + c.en + '</small>' +
+          (nd === 2 ? '<span class="nd nd2">efsane</span>' : '') +
+          (nd === 1 ? '<span class="nd nd1">nadir</span>' : '') +
+          (c.tek ? '<span class="rozet">tek seçimlik</span>' : '') +
+          (sy ? '<span class="kat">×' + (sy+1) + '</span>' : '') +
+        '</span>' +
+        '<p>' + c.ac + '</p>' +
+      '</span></button>';
+  }
+  html += '</div>';
+  /* Kart başına bir yeniden dağıtma: dört kötü kart gelince oyuncunun
+     elinde bir şey olsun. */
+  if(kartYenile > 0)
+    html += '<div class="row yeniden"><button data-a="yenile">⟳ Yeniden dağıt (' +
+            kartYenile + ')</button></div>';
+  var d = overlay(html, "scroll");
+  d.addEventListener("click", function(e){
+    if(e.target.getAttribute && e.target.getAttribute("data-a") === "yenile"){
+      if(kartYenile > 0){ kartYenile--; hideOverlay(); showKart(); }
+      return;
+    }
+    var t = e.target;
+    while(t && t !== d && !(t.getAttribute && t.getAttribute("data-kart"))) t = t.parentNode;
+    if(!t || t === d) return;
+    var k = t.getAttribute("data-kart");
+    KART[k] = (KART[k] || 0) + 1;
+    kartBorcu--;
+    hideOverlay();
+    renderHud();
+    if(kartBorcu > 0) setTimeout(showKart, 140);
+  });
+}
+function showKazandi(){
+  var T = TABLOLAR[tabloNo];
+  var sira = TABLOLAR[(tabloNo + 1) % TABLOLAR.length];
+  var d = overlay('<div class="big">🏆</div><h2>Tablo yok edildi</h2>' +
+    '<div class="num">' + T.ad + '</div>' +
+    '<p class="sub">' + tur + ' atışta bitti · elinde ' + toplar + ' top kaldı' +
+    '<br>Kartlar sıfırlanır, toplar devreder.' +
+    '<br>Sıradaki: <b>' + sira.ad + '</b></p>' +
+    '<div class="row"><button class="go" data-a="next">▶ Sıradaki tablo</button></div>');
+  d.addEventListener("click", function(e){
+    if(e.target.getAttribute && e.target.getAttribute("data-a") === "next"){
+      tabloBasla(tabloNo + 1, toplar + 5); hideOverlay();
+    }
+  });
+}
+function showKaybettin(){
+  var d = overlay('<div class="big">💥</div><h2>Tablo çizgiyi geçti</h2>' +
+    '<p class="sub">' + resimKaldi(g) + ' blok kalmıştı · ' + tur + ' atış' +
+    '<br>Alt satırları önce temizlemek zaman kazandırır.</p>' +
+    '<div class="row"><button class="go" data-a="again">↻ Tekrar</button></div>');
+  d.addEventListener("click", function(e){
+    if(e.target.getAttribute && e.target.getAttribute("data-a") === "again"){
+      tabloBasla(0); hideOverlay();
+    }
+  });
+}
+
+/* ---------- bağla ---------- */
+cv = el("cv"); ctx = cv.getContext("2d");
+cv.addEventListener("pointerdown", onDown);
+cv.addEventListener("pointermove", onMove);
+window.addEventListener("pointerup", onUp);
+window.addEventListener("pointercancel", function(){ nisan = null; });
+cv.addEventListener("touchstart", onDown, { passive:false });
+cv.addEventListener("touchmove", onMove, { passive:false });
+
+/* Kalıcı anahtar. Önce yalnız atış sırasında etkindi ve oyunun çoğu
+   zamanında soluk görünüyordu — bozuk sanılır. */
+el("bFast").addEventListener("click", function(){
+  hizli = !hizli;
+  el("bFast").textContent = hizli ? "» Hızlı: açık" : "» Hızlandır";
+});
+el("bNew").addEventListener("click", function(){
+  tabloBasla(0); hideOverlay();      /* tabloBasla kartları da sıfırlar */
+});
+el("bHelp").addEventListener("click", showHelp);
+window.addEventListener("resize", function(){ fitCanvas(); fitCanvas(); draw(); });
+
+/* URL'de #2 varsa o tablodan basla. İnceleme kolaylığı: bir tabloyu
+   görmek için öncekini bitirmek gerekmiyor. */
+var hashNo = parseInt((location.hash || "").replace("#", ""), 10);
+varlikYukle();
+tabloBasla((hashNo >= 1 && hashNo <= TABLOLAR.length) ? hashNo - 1 : 0);
+/* #kart: kart ekranini hemen ac (inceleme kolayligi, 200 blok kirmayi
+   beklemeden). */
+if((location.hash || "").indexOf("kart") >= 0) kartBorcu = 3;
+fitCanvas(); fitCanvas();
+showIntro();
+raf = requestAnimationFrame(loop);
+if(kartBorcu > 0) setTimeout(function(){ hideOverlay(); showKart(); }, 60);
+
+var bt = el("boot");
+if(bt && bt.parentNode) bt.parentNode.removeChild(bt);
+})();
+</script>
