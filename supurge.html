@@ -1,0 +1,2035 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1B1714">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Süpürge">
+<title>Süpürge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&display=swap">
+<style>
+:root{
+  --bg:#1B1714; --panel:rgba(30,25,21,.82); --line:rgba(255,236,214,.14);
+  --ink:#FFF6EC; --ink-soft:#D9C8B6; --ink-dim:#9C8B7A;
+  --vurgu:#FF7A59; --vurgu-dk:#2A0F07; --altin:#FFC94A; --ok:#6BD69A;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
+  font-family:Archivo,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none}
+#stage{position:fixed;inset:0;touch-action:none;cursor:grab}
+#stage:active{cursor:grabbing}
+#stage canvas{display:block;width:100%;height:100%}
+
+.hud{position:fixed;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 10px) 12px 0;
+  display:flex;gap:8px;align-items:flex-start;pointer-events:none;z-index:5}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 10px;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);line-height:1.05}
+.pill small{display:block;font-size:8.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim)}
+.pill b{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums}
+.pill .u{font-size:11px;color:var(--ink-dim)}
+.prog{flex:1;min-width:0}
+.bar{height:7px;border-radius:5px;background:rgba(255,255,255,.1);margin-top:5px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,var(--vurgu),var(--altin));
+  transition:width .18s ease-out}
+.pill.r{text-align:right}
+.pill.warn b{color:#FF6B6B}
+.pill.warn{animation:warnP .5s ease-in-out infinite alternate}
+@keyframes warnP{to{border-color:rgba(255,107,107,.7)}}
+/* çekişme barı: soldan mavi (sen), sağdan kırmızı (robot) */
+.tugHead{display:flex;justify-content:space-between;align-items:baseline;gap:6px;line-height:1}
+.tugHead .me{color:#7DBDFF;font-size:9px;font-weight:800;letter-spacing:.1em}
+.tugHead .bot{color:#FF7B7B;font-size:9px;font-weight:800;letter-spacing:.1em}
+.tugHead b{font-size:15px;letter-spacing:0}
+.tugHead small{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);font-weight:600}
+/* dövüş oyunu barı: iki taraf çizgilerle birbirine akar, kesişimde parlayan çarpışma ışığı + kıvılcım */
+.tug{position:relative;height:15px;margin-top:5px}
+.tugIn{position:absolute;inset:0;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.1);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -2px 4px rgba(0,0,0,.35)}
+.tug i{position:absolute;top:0;bottom:0;display:flex;align-items:center;font-style:normal;font-size:9.5px;font-weight:800;
+  color:rgba(255,255,255,.95);transition:filter .15s;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.tug .b{left:0;width:50%;padding-left:6px;background-image:repeating-linear-gradient(115deg,rgba(255,255,255,.2) 0 5px,transparent 5px 13px),
+  linear-gradient(180deg,rgba(255,255,255,.35),transparent 45%),linear-gradient(90deg,#1F56B8,#4FA3FF);
+  background-size:28px 100%,100% 100%,100% 100%;animation:stripeB .55s linear infinite}
+.tug .r{right:0;width:50%;justify-content:flex-end;padding-right:6px;background-image:repeating-linear-gradient(65deg,rgba(255,255,255,.2) 0 5px,transparent 5px 13px),
+  linear-gradient(180deg,rgba(255,255,255,.35),transparent 45%),linear-gradient(270deg,#A8141E,#FF5A5A);
+  background-size:28px 100%,100% 100%,100% 100%;animation:stripeR .55s linear infinite}
+@keyframes stripeB{to{background-position:28px 0,0 0,0 0}}
+@keyframes stripeR{to{background-position:-28px 0,0 0,0 0}}
+.tug .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;margin-left:-.5px;background:rgba(255,255,255,.35);z-index:2}
+.tug.fb .b,.tug.fr .r{filter:brightness(1.5) saturate(1.2)}
+.clash{position:absolute;top:50%;left:50%;width:34px;height:34px;margin:-17px 0 0 -17px;pointer-events:none;z-index:3}
+.clash::before{content:'';position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle,#fff 0 14%,rgba(255,236,170,.95) 24%,rgba(255,190,80,.45) 46%,transparent 68%);
+  animation:clashPulse .16s ease-in-out infinite alternate}
+.clash b{position:absolute;left:50%;top:6px;bottom:6px;width:3px;margin-left:-1.5px;border-radius:2px;background:#fff;
+  box-shadow:0 0 6px #fff,-5px 0 12px #4FA3FF,5px 0 12px #FF5A5A}
+.clash.hit::before{animation:clashHit .32s ease-out}
+@keyframes clashPulse{from{transform:scale(.8);opacity:.8}to{transform:scale(1.1);opacity:1}}
+@keyframes clashHit{0%{transform:scale(2.3);opacity:1}100%{transform:scale(1);opacity:.9}}
+.spark{position:absolute;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#fff;pointer-events:none;z-index:4;
+  box-shadow:0 0 6px 1px var(--c);animation:sparkFly .5s cubic-bezier(.2,.7,.4,1) forwards}
+@keyframes sparkFly{to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+.tug.lead .tugIn::after{content:'';position:absolute;inset:0;background:#fff;animation:leadFlash .45s ease-out forwards}
+@keyframes leadFlash{from{opacity:.85}to{opacity:0}}
+.count{position:fixed;inset:0;display:grid;place-items:center;z-index:15;pointer-events:none}
+.count span{font-size:110px;font-weight:800;color:var(--ink);text-shadow:0 8px 40px rgba(0,0,0,.6);animation:cnt .9s ease-out forwards}
+.count span.go2{font-size:64px;color:var(--altin)}
+@keyframes cnt{0%{transform:scale(1.8);opacity:0}25%{transform:scale(1);opacity:1}100%{transform:scale(.85);opacity:0}}
+.stats .me b{color:#7DBDFF}.stats .bot b{color:#FF7B7B}
+.pop.steal{color:#7DBDFF}.pop.rob{color:#FF7B7B}
+.btn-ic{pointer-events:auto;appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  width:40px;height:40px;border-radius:12px;font-size:17px;cursor:pointer;display:grid;place-items:center}
+
+/* başlık seçici — başparmak erişiminde */
+.heads{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 12px);transform:translateX(-50%);
+  display:flex;gap:8px;z-index:6;padding:6px;border-radius:18px;background:var(--panel);border:1px solid var(--line);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.hd{appearance:none;border:1.5px solid transparent;background:rgba(255,255,255,.04);color:var(--ink-soft);
+  width:70px;height:58px;border-radius:13px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:3px;font:inherit;font-size:10.5px;font-weight:800;letter-spacing:.04em;padding:0}
+.hd svg{width:34px;height:22px;fill:currentColor}
+.hd .k{font-size:8.5px;opacity:.5;font-weight:600}
+.hd.on{border-color:var(--vurgu);background:rgba(255,122,89,.16);color:var(--ink)}
+.hd:active{transform:scale(.95)}
+
+.fx{position:fixed;inset:0;pointer-events:none;z-index:6;overflow:hidden}
+.pop{position:absolute;font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,.6);white-space:nowrap;
+  transform:translate(-50%,-50%);animation:popUp .8s ease-out forwards;color:var(--altin)}
+@keyframes popUp{0%{transform:translate(-50%,-30%) scale(.5);opacity:0}
+  20%{transform:translate(-50%,-70%) scale(1.2);opacity:1}
+  100%{transform:translate(-50%,-160%) scale(1);opacity:0}}
+.arrow{position:absolute;left:0;top:0;width:0;height:0;border-left:16px solid var(--altin);
+  border-top:9px solid transparent;border-bottom:9px solid transparent;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6));
+  animation:arw .7s ease-in-out infinite alternate}
+@keyframes arw{from{opacity:.55}to{opacity:1}}
+.hint{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 90px);transform:translateX(-50%);
+  font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--ink);background:var(--panel);text-align:center;
+  border:1px solid var(--line);padding:8px 14px;border-radius:20px;pointer-events:none;z-index:5;
+  transition:opacity .4s;max-width:88vw}
+
+.ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:24px;z-index:20;background:radial-gradient(circle at 50% 40%,rgba(40,30,24,.9),rgba(16,12,10,.97))}
+#ovWin{background:radial-gradient(circle at 50% 42%,rgba(30,22,17,.78),rgba(16,12,10,.5) 75%)}
+.ov h1{font-size:44px;margin:0 0 2px;font-weight:800;letter-spacing:-.02em}
+.ov h2{font-size:32px;margin:0 0 4px;font-weight:800}
+.ov p{margin:4px 0;color:var(--ink-soft);font-size:14px;max-width:320px;line-height:1.4}
+.ov .sub{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim);font-weight:600}
+.go{appearance:none;border:0;background:var(--vurgu);color:var(--vurgu-dk);font:inherit;font-weight:800;
+  font-size:17px;padding:14px 34px;border-radius:14px;margin-top:18px;cursor:pointer;
+  box-shadow:0 8px 24px rgba(255,122,89,.35)}
+.go:active{transform:scale(.97)}
+.go.alt{background:transparent;color:var(--ink-soft);box-shadow:none;border:1px solid var(--line);font-size:14px;padding:10px 22px;margin-top:10px}
+.stars{font-size:46px;letter-spacing:6px;margin:10px 0 6px}
+.stars span{display:inline-block;color:rgba(255,255,255,.14);transform:scale(.4);transition:transform .35s cubic-bezier(.3,1.8,.5,1),color .2s}
+.stars span.on{color:var(--altin);transform:scale(1)}
+.stats{display:flex;gap:10px;margin-top:6px}
+.stats div{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:8px 14px;min-width:84px}
+.stats small{display:block;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);font-weight:600}
+.stats b{font-size:20px}
+.err{color:#FF9C93}
+[hidden]{display:none!important}
+</style>
+
+<div id="stage"></div>
+
+<div class="hud" id="hud" hidden>
+  <div class="pill" id="tmPill"><small id="lvName">Bölüm 1</small><b id="tm">90</b><span class="u"> sn</span></div>
+  <div class="pill prog">
+    <div class="tugHead"><span class="me">SEN <b id="scMe">0</b></span><small id="leftTxt">0 çöp</small><span class="bot"><b id="scBot">0</b> ROBOT</span></div>
+    <div class="tug" id="tug"><div class="tugIn"><i class="b" id="tugB">50%</i><i class="r" id="tugR">50%</i></div>
+      <span class="mid"></span><span class="clash" id="clash"><b></b></span></div></div>
+  <div class="pill r"><small>Toz</small><b id="dustP">0</b><span class="u">%</span></div>
+  <button class="btn-ic" id="btnRe" title="Yeniden başlat" aria-label="Yeniden başlat">↻</button>
+</div>
+<div class="fx" id="fx"></div>
+<div class="hint" id="hint" hidden></div>
+<div class="count" id="count" hidden></div>
+<div class="heads" id="heads" hidden>
+  <button class="hd on" data-h="wide" aria-label="Geniş başlık"><svg viewBox="0 0 40 24"><rect x="3" y="8" width="34" height="9" rx="3"/></svg>Geniş<span class="k">1</span></button>
+  <button class="hd" data-h="tri" aria-label="Üçgen başlık"><svg viewBox="0 0 40 24"><path d="M20 1.5 L33 22 L7 22Z"/></svg>Üçgen<span class="k">2</span></button>
+  <button class="hd" data-h="slot" aria-label="Yarık başlık"><svg viewBox="0 0 40 24"><path d="M17.5 1 H22.5 L24 23 H16Z"/></svg>Yarık<span class="k">3</span></button>
+</div>
+
+<div class="ov" id="ovStart">
+  <div class="sub">Dawnbright · prototip</div>
+  <h1>Süpürge</h1>
+  <p>90 saniye. Kırmızı robot süpürgeden daha çok çöp topla!</p>
+  <p style="font-size:12px;color:var(--ink-dim)">Ağır olanlar direnir, ağzı üstlerinde tut. Köşeler için ▲ Üçgen, dar aralıklar için ▮ Yarık başlık.</p>
+  <button class="go" id="btnStart">Başla</button>
+  <p class="err" id="errMsg" hidden></p>
+</div>
+
+<div class="ov" id="ovWin" hidden>
+  <div class="sub" id="winLv">Bölüm 1</div>
+  <h2 id="winTitle">Kazandın!</h2>
+  <div class="stars" id="stars"><span>★</span><span>★</span><span>★</span></div>
+  <div class="stats">
+    <div class="me"><small>Sen</small><b id="wMe">0</b></div>
+    <div class="bot"><small>Robot</small><b id="wBot">0</b></div>
+    <div><small>Toz</small><b id="wDust">0%</b></div>
+  </div>
+  <p style="font-size:12px;color:var(--ink-dim);margin-top:12px" id="starHelp"></p>
+  <button class="go" id="btnNext">Sonraki bölüm</button>
+  <button class="go alt" id="btnAgain">Tekrar oyna</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* ============================================================
+   SÜPÜRGE — tatmin prototipi
+   Ayarlar: CFG · başlıklar: HEADS · çöp tipleri: TYPES · bölümler: LEVELS
+   ============================================================ */
+const CFG = {
+  nozzle:  { followK:14, accel:22, maxSpeed:8.5, turnRate:8, reverseAngle:2.1, dragSens:1.15, keySpeed:6, swapTime:0.28 },
+  suction: { strength:30, minForceK:1.6, maxItemSpeed:11, airDrag:2.2, floorDrag:7.5, yank:3.2, swirl:0.35,
+             wedgeReach:0.17 },        // sıkışmış çöpe ağız çizgisinin bu kadar yaklaşması gerekir
+  hose:    { segs:24, segLen:0.3, iters:8, beads:120, r:0.1, neckY:0.32, pulseSpeed:1.15, pulseW:0.03, skipNear:3 },
+  canister:{ r:0.5, share:0.12, h:0.62 },
+  bag:     { minScale:0.45, maxScale:1.0, wrinkle:0.2, stiffness:38, damping:6.5 },
+  dust:    { texPerUnit:26, gridCell:0.2, alpha:0.52, starPct:40, stampStep:0.07 },
+  props:   { massBase:1.2, massPerR:5, friction:3.2, bounce:0.35, kick:1.1, slow:0.1, tilt:0.07, clonkV:1.2 },  // itilebilen saksı/kova
+  match:   { time:90, warnAt:10, countdown:3, dominate:0.65, bagShare:0.6 },
+  // TODO: bölüme göre robotun hız/zekâ artışı — şimdilik tek standart ayar
+  robot:   { r:0.36, speed:2.6, turnRate:3.4, mouthZ:0.16, suctionR:0.8, strength:17, capture:0.26, back:0.35,
+             retarget:0.9, backup:0.35, giveUp:6, blacklist:12, playerAvoid:1.6, color:0xE5484D },
+  grid:    { cell:0.5 },
+  sleep:   { speed:0.03, time:0.3 },
+  combo:   { window:0.42 },
+  room:    { wallH:0.5, wallT:0.22, underH:0.3 },   // underH: koltuk altı boşluğu (ağız ve hortum girer, gövde girmez)
+  cam:     { fov:34, pitchDeg:66, margin:0.95, viewW:5.4, viewD:8.8, follow:4.5, arrowsAt:10 },
+  gravity: 22,
+};
+
+/* Başlıklar — yerel eksen: x sağ, z ileri. foot: taban çokgeni (toz izi + "altında" testi),
+   mouth: emiş çizgisi [ax,az,bx,bz], probes: çarpışma daireleri [x,z,r], rear: boyun bağlantısı z'si.
+   radius/strength: emiş alanı; back: arkadaki emiş oranı; cone: öne odaklanma (0 = her yöne);
+   funnel: çöpleri ağız ortasına toplama; cap: yutulma mesafesi çarpanı */
+const HEADS = {
+  wide: { name:'Geniş', foot:[[-0.68,-0.21],[0.68,-0.21],[0.68,0.21],[-0.68,0.21]], mouth:[-0.48,0.04,0.48,0.04],
+          probes:[[-0.44,0,0.36],[0,0,0.36],[0.44,0,0.36]], rear:-0.21, color:0xFF7A59,   // kalın tampon: duvar dibine giremez
+          radius:1.5, strength:1.0, back:0.55, cone:0, funnel:0.55, cap:1.0, speed:1.0, turn:1.0 },
+  tri:  { name:'Üçgen', foot:[[0,0.62],[0.46,-0.16],[-0.46,-0.16]], mouth:[0,0.2,0,0.5],
+          probes:[[0,0.54,0.07],[-0.2,0.24,0.12],[0.2,0.24,0.12],[-0.3,-0.04,0.13],[0.3,-0.04,0.13],[0,0.08,0.15]],
+          rear:-0.16, color:0x4FC3A1, radius:1.25, strength:1.15, back:0.5, cone:0.2, funnel:0.3, cap:0.9, speed:1.0, turn:1.1 },
+  slot: { name:'Yarık', foot:[[-0.13,-0.2],[0.13,-0.2],[0.1,0.74],[-0.1,0.74]], mouth:[0,0.5,0,0.72],
+          probes:[[0,-0.08,0.14],[0,0.2,0.13],[0,0.46,0.12],[0,0.65,0.1]], rear:-0.2, color:0x6C8CFF,
+          radius:2.0, strength:1.55, back:0.2, cone:0.55, funnel:0, cap:0.8, speed:0.9, turn:0.65 },
+};
+
+/* Çöp tipleri. r: çarpışma yarıçapı, h: yükseklik (dinlenme y = h/2), mass: ağırlık,
+   grip: tam emişte kopma süresi (sn, 0 = anında), lift: havalanma, capture: yutulma mesafesi,
+   dur: yutulma animasyonu, drag: yer sürtünmesi (varsayılan CFG), big: ağız altına sığmaz */
+const LEGO = [0xD9342B, 0x2F6FD6, 0xF2C21B, 0x2BA84A, 0xF5F5F5, 0xF57F20, 0x1E1E1E];
+const TYPES = {
+  crumb: { r:0.065,h:0.085,mass:0.10,grip:0,   lift:0.18,capture:0.28,dur:0.09,roll:true, snd:'crumb', colors:[0xE8A24A,0xD98B35,0xF2C06B,0xC4742A] },
+  cereal:{ r:0.07, h:0.04, mass:0.12,grip:0,   lift:0.22,capture:0.28,dur:0.09,           snd:'crumb', colors:[0xE8A33B,0xD9534F,0x9B5DE5,0xF4C542,0x4CAF50] },
+  popcorn:{r:0.08, h:0.12, mass:0.08,grip:0,   lift:0.35,capture:0.30,dur:0.10,roll:true, snd:'pop',   colors:[0xFFF4D6,0xF7E3A1,0xFFFBEA] },
+  dust:  { r:0.13, h:0.16, mass:0.14,grip:0,   lift:0.28,capture:0.30,dur:0.12,roll:true, snd:'dust',  colors:[0xA9A29A,0x8F8880,0xBDB6AD] },
+  leaf:  { r:0.17, h:0.03, mass:0.22,grip:0,   lift:0.55,capture:0.30,dur:0.14,flutter:1, snd:'leaf',  colors:[0xE0892E,0xC9562B,0xE8B33C,0x9A6B2A,0x7A8F3A] },
+  twig:  { r:0.2,  h:0.05, mass:0.35,grip:0.08,lift:0.2, capture:0.32,dur:0.15,           snd:'twig',  colors:[0x6B4A2E,0x8A6440,0x5A3D24] },
+  pebble:{ r:0.075,h:0.09, mass:0.5, grip:0.12,lift:0.1, capture:0.28,dur:0.12,roll:true, snd:'pebble',colors:[0x9A958E,0x7D7872,0xB5AFA6,0x8C7F70] },
+  paper: { r:0.15, h:0.28, mass:0.55,grip:0.12,lift:0.22,capture:0.32,dur:0.15,roll:true, snd:'paper', colors:[0xF4F1EA,0xE9E4D8,0xDCE6EE] },
+  scrap: { r:0.14, h:0.02, mass:0.2, grip:0.02,lift:0.45,capture:0.30,dur:0.13,flutter:0.7,snd:'wrap', colors:[0xFFE66D,0xFF8FB1,0xF4F1EA,0x9BE7FF] },
+  wrap:  { r:0.15, h:0.04, mass:0.30,grip:0.05,lift:0.40,capture:0.30,dur:0.13,flutter:0.6,snd:'wrap', colors:[0xE84A6F,0x3FA9F5,0xF5D33F,0x7C4DFF] },
+  cap:   { r:0.09, h:0.045,mass:0.85,grip:0.28,lift:0.12,capture:0.28,dur:0.14,           snd:'cap',   colors:[0xD9342B,0x2F6FD6,0x2BA84A,0xF2B21B] },
+  coin:  { r:0.07, h:0.012,mass:0.8, grip:0.35,lift:0.1, capture:0.26,dur:0.14,           snd:'coin',  colors:[0xD4AF37,0xC0C0C0,0xB87333] },
+  button:{ r:0.065,h:0.02, mass:0.5, grip:0.15,lift:0.14,capture:0.26,dur:0.12,           snd:'cap',   colors:[0x8B5A2B,0x2E2E2E,0xE8E0D0,0xC2185B,0x1565C0] },
+  marble:{ r:0.06, h:0.12, mass:0.6, grip:0,   lift:0.08,capture:0.26,dur:0.12,roll:true,drag:1.1, snd:'marble',colors:[0x2E86DE,0xE74C3C,0x27AE60,0xF1C40F,0x8E44AD] },
+  lego1: { r:0.06, h:0.12, mass:0.5, grip:0.25,lift:0.12,capture:0.28,dur:0.13,           snd:'lego',  colors:LEGO },
+  lego2: { r:0.09, h:0.12, mass:0.75,grip:0.32,lift:0.12,capture:0.29,dur:0.14,           snd:'lego',  colors:LEGO },
+  lego4: { r:0.11, h:0.12, mass:0.95,grip:0.4, lift:0.12,capture:0.30,dur:0.15,           snd:'lego',  colors:LEGO },
+  lego8: { r:0.17, h:0.12, mass:1.3, grip:0.5, lift:0.1, capture:0.32,dur:0.17,           snd:'lego',  colors:LEGO },
+  plate: { r:0.14, h:0.05, mass:0.6, grip:0.35,lift:0.12,capture:0.30,dur:0.14,           snd:'lego',  colors:LEGO },
+  legoR: { r:0.09, h:0.12, mass:0.7, grip:0.3, lift:0.12,capture:0.29,dur:0.14,           snd:'lego',  colors:LEGO },
+  sock:  { r:0.22, h:0.1,  mass:1.2, grip:0.3, lift:0.2, capture:0.34,dur:0.42,           snd:'sock',  colors:[0xF2F2F2,0x9E9E9E,0xE57373,0x64B5F6,0xFFD54F] },
+  bottle:{ r:0.28, h:0.24, mass:2.0, grip:0.5, lift:0.08,capture:0.36,dur:0.26,big:true,  snd:'bottle',colors:[0xA8D8EA,0xB8E0C8,0xE8EEF2] },
+  can:   { r:0.21, h:0.2,  mass:2.3, grip:0.55,lift:0.08,capture:0.34,dur:0.24,big:true,  snd:'can',   colors:[0xC8202B,0x2E8B57,0x3A6FD8,0xC0C6CC] },
+};
+const LEGOS = ['lego1', 'lego2', 'lego2', 'lego4', 'lego4', 'lego8', 'plate', 'legoR'];
+
+/* Bölümler. Oda merkezli: x ∈ [-W/2,W/2], z ∈ [-D/2,D/2]; +z ekranın altı, başlangıç altta.
+   spawn: [tip | tip dizisi, adet, cx, cz, yarıçap]
+   wedge: [tip, x, z] — duvar dibine/köşeye sıkışmış çöp (koordinat duvara verilir, çarpışma içeri iter).
+   Oda köşelerine otomatik sıkışmış çöp eklenir. obs.k: couch/armchair/ctable/chair/bench/table altına ağız girer */
+const LEVELS = [
+  { name:'Salon', floor:'wood', W:11, D:18, seed:11, robot:[3.2,-3.6],
+    rug:{ x:-1.2, z:-4.6, r:3.0, c:'#B8574A' },
+    obs:[ {k:'couch', x:-1.5, z:-7.7, w:4.2, d:1.4, c:0x3C8C8A},
+          {k:'armchair', x:3.6, z:-6.4, w:1.5, d:1.4, c:0xC77D4A},
+          {k:'ctable', x:-1.3, z:-4.4, w:2.4, d:1.2, h:0.45, c:0x8B5E3C},
+          {k:'tv', x:-5.05, z:0.5, w:0.8, d:3.2, h:0.5, c:0x3A3330},
+          {k:'shelf', x:5.15, z:2.0, w:0.7, d:2.6, h:1.6, c:0xA0764E},
+          {k:'pot', x:4.95, z:-8.45, r:0.42, c:0xC9683E}, {k:'pot', x:-4.9, z:-4.6, r:0.4, c:0xE7D9C4},
+          {k:'pot', x:4.9, z:7.2, r:0.38, c:0x5A7F4E}, {k:'pot', x:-4.85, z:4.6, r:0.42, c:0xC9683E} ],
+    spawn:[ ['crumb',40,-1.3,-4.4,0.8], ['popcorn',34,1.4,-2.2,0.9], ['cereal',36,-2.6,2.4,0.8], [LEGOS,44,2.4,4.2,1.3],
+            ['dust',8,-1.5,-7.7,1.9], ['coin',8,-1.0,-7.9,1.6], ['dust',4,3.6,-6.4,0.6], ['sock',1,3.7,-6.2,0.2],
+            ['button',8,0.4,0.8,3.2], ['marble',10,3.4,-1.2,1.0], ['paper',8,0,0,6], ['scrap',10,-3.0,-1.2,2.2],
+            ['wrap',10,1.0,-5.5,2.0], ['cap',6,3.0,6.2,1.5], ['sock',1,-3.2,5.6,0.2], ['can',2,-3.8,-2.8,0.8],
+            ['crumb',30,0.6,6.0,1.3] ],
+    wedge:[ ['dust',5.5,-7.6], ['coin',-5.5,3.4], ['lego2',5.5,5.0], ['dust',-5.5,-6.4], ['crumb',1.4,-9],
+            ['button',2.5,9], ['dust',-5.5,6.2], ['cap',5.5,-3.0] ] },
+  { name:'Mutfak', floor:'tile', W:11, D:17, seed:23, robot:[-3.6,-5.8],
+    obs:[ {k:'counter', x:-1.0, z:-7.9, w:9.0, d:1.2, h:0.95, c:0xE9E2D6},
+          {k:'fridge', x:4.62, z:-7.8, w:1.4, d:1.4, h:2.0, c:0xF4F6F8},
+          {k:'island', x:2.8, z:3.5, w:1.2, d:2.6, h:0.95, c:0xD9CFC0},
+          {k:'table', x:0, z:-1.5, w:3.0, d:1.8, h:0.9},
+          {k:'chair', x:-0.8, z:-2.85, rot:'n'}, {k:'chair', x:0.8, z:-2.85, rot:'n'},
+          {k:'chair', x:-0.8, z:-0.15, rot:'s'}, {k:'chair', x:0.8, z:-0.15, rot:'s'},
+          {k:'bin', x:-4.95, z:5.4, r:0.38, c:0x9AA0A6}, {k:'pot', x:4.9, z:4.6, r:0.4, c:0x5A7F4E} ],
+    spawn:[ ['crumb',50,0,-1.5,1.3], ['cereal',42,-2.8,2.8,1.1], ['crumb',40,-2.5,-6.6,1.2], [LEGOS,18,-3.6,5.6,1.0],
+            ['wrap',14,0,3,4], ['cap',10,2.0,-5.8,1.2], ['coin',6,0,6,3], ['can',4,-3.2,-3.8,1.8], ['bottle',3,3.0,6.8,1.2],
+            ['paper',8,1,1,5], ['scrap',8,-1,4,3], ['dust',6,4.4,-5.8,0.6], ['button',4,-4.5,0.5,1],
+            ['popcorn',16,2.8,0.3,0.9], ['marble',6,-1.5,7,1], ['crumb',3,5.41,-7.7,0.3] ],
+    wedge:[ ['crumb',3.72,-8.2], ['cap',3.72,-7.8], ['coin',3.72,-8.5], ['dust',-5.5,-3], ['lego1',5.5,0.5],
+            ['crumb',-2,8.5], ['button',5.5,6.8] ] },
+  { name:'Balkon', floor:'deck', W:12, D:19, seed:37, robot:[-1.0,-6.6],
+    obs:[ {k:'bench', x:-3.2, z:-8.7, w:3.0, d:1.0, h:0.5, c:0x8B6B4A},
+          {k:'planter', x:5.0, z:-2.5, w:0.9, d:5.0, h:0.55, c:0x7A5A3C},
+          {k:'pot', x:5.4, z:-8.9, r:0.5, c:0xC9683E}, {k:'pot', x:-5.4, z:6.8, r:0.45, c:0xD8C7A8},
+          {k:'pot', x:1.2, z:1.0, r:0.45, c:0xC9683E}, {k:'pot', x:-1.8, z:-3.0, r:0.35, c:0xB85A34},
+          {k:'pot', x:5.3, z:5.6, r:0.4, c:0x5A7F4E},
+          {k:'ctable', x:-3.4, z:3.4, w:1.3, d:1.3, h:0.7, c:0xE8E2D8},
+          {k:'chair', x:-4.6, z:3.4, rot:'w'}, {k:'chair', x:-2.2, z:3.4, rot:'e'} ],
+    spawn:[ ['leaf',90,0,0,7.2], ['leaf',30,4.2,-7.8,1.6], ['leaf',20,-4.8,6.6,1.5], ['leaf',14,5.75,-2.5,2.4],
+            ['twig',16,0,-2,6], ['pebble',30,1.2,2.4,1.3], ['pebble',16,-1.8,-3.8,0.9], ['crumb',30,-3.4,3.4,1.1],
+            ['can',4,2,4,5], ['bottle',3,-2,-6,3], ['cap',8,-3.2,-8.6,1.4], ['wrap',10,0,0,6], ['paper',6,2.5,-5,2],
+            ['sock',1,-3,-8.6,0.3], ['coin',4,-3.2,-8.7,1.2], ['dust',4,-4.5,-4,1] ],
+    wedge:[ ['leaf',-6,-6], ['pebble',6,8], ['dust',-6,0], ['cap',0,-9.5], ['coin',6,2.5], ['dust',-6,5] ] },
+];
+
+/* ---------------- SES (tamamen prosedürel WebAudio) ---------------- */
+const SFX = (() => {
+  let ctx = null, master = null, noiseBuf = null, motor = null, lastGulp = [];
+  const PENT = [0, 2, 4, 7, 9];
+  function init() {
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ctx = new AC();
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 5;
+    master = ctx.createGain(); master.gain.value = 0.85; master.connect(comp); comp.connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    buildMotor();
+  }
+  function filt(type, f, q) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
+  function gain(v) { const g = ctx.createGain(); g.gain.value = v; return g; }
+  function buildMotor() {
+    const g = gain(0); g.connect(master);
+    const n = ctx.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+    const bp = filt('bandpass', 800, 0.8), ng = gain(0.2); n.connect(bp); bp.connect(ng); ng.connect(g);
+    const lp = filt('lowpass', 170, 0.7), lg = gain(0.45); n.connect(lp); lp.connect(lg); lg.connect(g);
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 92;
+    const olp = filt('lowpass', 480, 0.7), og = gain(0.045); o.connect(olp); olp.connect(og); og.connect(g);
+    const w = ctx.createOscillator(); w.type = 'sine'; w.frequency.value = 1500;
+    const wg = gain(0.01); w.connect(wg); wg.connect(g);
+    n.start(); o.start(); w.start();
+    motor = { g, bp, o, w, wg };
+  }
+  /* speed: ağız hızı, strain: takılan ağır çöp yükü (motor zorlanır, perde düşer), load: emilen çöp yoğunluğu, pitch: başlık */
+  function setMotor(on, speed, strain, load, pitch) {
+    if (!motor) return; const t = ctx.currentTime;
+    motor.g.gain.setTargetAtTime(on ? 0.5 : 0, t, on ? 0.18 : 0.3);
+    motor.bp.frequency.setTargetAtTime((760 + speed * 55 + load * 240 - strain * 330) * pitch, t, 0.05);
+    motor.o.frequency.setTargetAtTime(92 + speed * 3.5 - strain * 24, t, 0.05);
+    motor.w.frequency.setTargetAtTime((1500 + speed * 40 + load * 140 - strain * 560) * pitch, t, 0.04);
+    motor.wg.gain.setTargetAtTime(0.01 + load * 0.012 + strain * 0.01, t, 0.08);
+  }
+  function burst(t0, dur, f, q, g, type, f1) {
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+    const fl = filt(type || 'bandpass', f, q), gg = ctx.createGain();
+    if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + Math.min(0.02, dur * 0.3));
+    gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    s.connect(fl); fl.connect(gg); gg.connect(master); s.start(t0, Math.random() * 1.6); s.stop(t0 + dur + 0.03);
+  }
+  function tone(t0, dur, f0, f1, g, type) {
+    const o = ctx.createOscillator(); o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    const gg = ctx.createGain(); gg.gain.setValueAtTime(0.0001, t0);
+    gg.gain.exponentialRampToValueAtTime(g, t0 + 0.005); gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gg); gg.connect(master); o.start(t0); o.stop(t0 + dur + 0.03);
+  }
+  function rattle(t0, n, f, g) {
+    let dt = 0.02;
+    for (let i = 0; i < n; i++) {
+      const tt = t0 + dt, k = 1 - (i / n) * 0.75;
+      tone(tt, 0.028, f * (1 + Math.random() * 0.4), f * 0.85, g * k, 'triangle');
+      burst(tt, 0.014, f * 1.5, 3, g * 0.55 * k);
+      dt += 0.016 + i * 0.013;          // tüpte yukarı tırmanırken tıkırtılar seyrekleşir
+    }
+  }
+  /* combo ilerledikçe pentatonik gam yukarı çıkar */
+  function ratio(c) { c = Math.min(c, 11); return Math.pow(2, (PENT[c % 5] + 12 * Math.floor(c / 5)) / 12); }
+  function gulp(kind, combo) {
+    if (!ctx) return; const t = ctx.currentTime;
+    lastGulp = lastGulp.filter(x => t - x < 0.06); if (lastGulp.length >= 3) return; lastGulp.push(t);
+    const p = ratio(combo), pn = Math.pow(p, 0.4);
+    tone(t, 0.075, 250 * p, 780 * p, 0.09, 'sine');
+    switch (kind) {
+      case 'crumb': burst(t, 0.05, 3000 * pn, 1.2, 0.15); break;
+      case 'pop':   burst(t, 0.07, 1700 * pn, 1, 0.16); break;
+      case 'dust':  burst(t, 0.1, 1300 * pn, 0.7, 0.22); break;
+      case 'leaf':  for (let i = 0; i < 6; i++) burst(t + i * 0.014 + Math.random() * 0.006, 0.02, 3600 + Math.random() * 1600, 2, 0.12); break;
+      case 'wrap':  for (let i = 0; i < 8; i++) burst(t + i * 0.012 + Math.random() * 0.006, 0.018, 5200 + Math.random() * 2000, 3, 0.1); break;
+      case 'twig':  for (let i = 0; i < 3; i++) burst(t + i * 0.03, 0.025, 2200 + Math.random() * 900, 2.5, 0.2, 'highpass'); break;
+      case 'paper': burst(t, 0.14, 900 * pn, 0.6, 0.16);
+                    for (let i = 0; i < 7; i++) burst(t + 0.01 + i * 0.018, 0.02, 2400 + Math.random() * 1200, 1.5, 0.11); break;
+      case 'pebble':rattle(t, 5, 1150 * pn, 0.15); break;
+      case 'cap':   rattle(t, 5, 2900 * pn, 0.13); break;
+      case 'lego':  rattle(t, 6, 2100 * pn, 0.15); break;
+      case 'coin':  tone(t, 0.4, 2100 * pn, 2090 * pn, 0.07); tone(t, 0.3, 5300, 5280, 0.035); rattle(t + 0.03, 3, 3000, 0.08); break;
+      case 'marble':tone(t, 0.18, 3100 * pn, 3000 * pn, 0.08); tone(t + 0.05, 0.16, 4400, 4300, 0.05); rattle(t + 0.06, 4, 2600, 0.1); break;
+      case 'sock':  burst(t, 0.42, 350, 1.4, 0.26, 'bandpass', 2600); tone(t + 0.3, 0.1, 300, 900, 0.1); break;
+      case 'bottle':burst(t, 0.18, 700, 0.8, 0.25, 'lowpass'); tone(t, 0.2, 320, 170, 0.1, 'triangle');
+                    for (let i = 0; i < 6; i++) burst(t + i * 0.022, 0.025, 1200 + Math.random() * 1000, 1.5, 0.14); break;
+      case 'can':   tone(t, 0.16, 190, 70, 0.34); tone(t, 0.4, 620, 612, 0.08, 'triangle');
+                    tone(t, 0.32, 1480, 1470, 0.05); tone(t, 0.26, 2330, 2320, 0.035); rattle(t + 0.06, 5, 1500, 0.14); break;
+    }
+  }
+  function tick(v) { if (!ctx) return; const t = ctx.currentTime; tone(t, 0.02, 1700 + Math.random() * 1500, 1400, 0.05 * v, 'triangle'); }
+  function yank(m) { if (!ctx) return; const t = ctx.currentTime; burst(t, 0.13, 520, 0.7, 0.2 + 0.08 * m, 'lowpass'); tone(t, 0.12, 440, 110, 0.12); }
+  function thud(a) { if (!ctx) return; const t = ctx.currentTime; tone(t, 0.13, 90, 45, Math.min(0.2, 0.05 + 0.07 * a)); burst(t, 0.12, 380, 0.8, 0.05 + 0.05 * a, 'lowpass'); }
+  function click() { if (!ctx) return; const t = ctx.currentTime; tone(t, 0.03, 1800, 1100, 0.1, 'square'); tone(t + 0.06, 0.035, 2600, 1500, 0.09, 'square'); burst(t + 0.06, 0.03, 4000, 2, 0.08); }
+  function win() {
+    if (!ctx) return; const t = ctx.currentTime;
+    [0, 4, 7, 12, 16].forEach((s, i) => tone(t + i * 0.09, 0.35, 523 * Math.pow(2, s / 12), 523 * Math.pow(2, s / 12), 0.12, 'triangle'));
+  }
+  function lose() {
+    if (!ctx) return; const t = ctx.currentTime;
+    [7, 4, 0, -5].forEach((s, i) => tone(t + i * 0.16, 0.3, 392 * Math.pow(2, s / 12), 392 * Math.pow(2, s / 12) * 0.97, 0.1, 'square'));
+  }
+  /* robot sesleri: v = uzaklığa göre ses (0..1) */
+  function robotGulp(v) { if (!ctx || v < 0.05) return; const t = ctx.currentTime;
+    tone(t, 0.05, 900, 1400, 0.05 * v, 'square'); burst(t, 0.06, 2200, 1.2, 0.08 * v); }
+  function angry() { if (!ctx) return; const t = ctx.currentTime;
+    tone(t, 0.08, 700, 520, 0.07, 'square'); tone(t + 0.1, 0.12, 560, 330, 0.07, 'square'); }
+  function bump(v) { if (!ctx || v < 0.05) return; tone(ctx.currentTime, 0.08, 160, 80, 0.1 * v); }
+  function clonk(v) { if (!ctx) return; const t = ctx.currentTime;   // seramik/metal "tok"
+    tone(t, 0.14, 420, 380, 0.12 * v, 'triangle'); tone(t, 0.09, 1250, 1180, 0.05 * v); burst(t, 0.08, 700, 0.8, 0.1 * v, 'lowpass'); }
+  function beep(hi) { if (!ctx) return; const f = hi ? 1320 : 880; tone(ctx.currentTime, hi ? 0.35 : 0.14, f, f, 0.12, 'square'); }
+  return { init, setMotor, gulp, tick, yank, thud, click, win, lose, robotGulp, angry, bump, beep, clonk };
+})();
+let lastBuzz = 0;   // kırıntı kümesinde her yutuşta titretme: 45 ms'de bir yeter
+const buzz = ms => {
+  const t = performance.now(); if (t - lastBuzz < 45) return; lastBuzz = t;
+  const ua = navigator.userActivation; if (!navigator.vibrate || (ua && !ua.hasBeenActive)) return;
+  try { navigator.vibrate(ms); } catch (e) {}
+};
+
+/* ---------------- SAHNE ---------------- */
+if (!window.THREE) {
+  const e = document.getElementById('errMsg'); e.hidden = false;
+  e.textContent = '3D kütüphanesi yüklenemedi. İnternet bağlantısını kontrol et.';
+  throw new Error('three.js yok');
+}
+const V3 = THREE.Vector3, PI = Math.PI, TAU = PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const wrapA = a => { while (a > PI) a -= TAU; while (a < -PI) a += TAU; return a; };
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+/* dışbükey çokgen içinde mi (her iki sarım yönü) */
+function inPoly(poly, x, z) {
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const c = (b[0] - a[0]) * (z - a[1]) - (b[1] - a[1]) * (x - a[0]);
+    if (c !== 0) { const s = c > 0 ? 1 : -1; if (!sign) sign = s; else if (s !== sign) return false; }
+  }
+  return true;
+}
+for (const k in HEADS) {   // türetilmiş başlık değerleri
+  const H = HEADS[k], m = H.mouth;
+  H.key = k; H.reach = Math.max(...H.foot.map(p => Math.hypot(p[0], p[1])));
+  H.mx = (m[0] + m[2]) / 2; H.mz = (m[1] + m[3]) / 2; H.ux = m[2] - m[0]; H.uz = m[3] - m[1];
+  H.len2 = Math.max(1e-6, H.ux * H.ux + H.uz * H.uz);
+  // emiş tabanı: tabanın %75'i. Açılı dönen başlığın taban köşesi duvar dibini süpürmesin
+  const cx = H.foot.reduce((a, p) => a + p[0], 0) / H.foot.length, cz = H.foot.reduce((a, p) => a + p[1], 0) / H.foot.length;
+  H.suck = H.foot.map(p => [cx + (p[0] - cx) * 0.75, cz + (p[1] - cz) * 0.75]);
+}
+
+const stageEl = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x1B1714);
+stageEl.appendChild(renderer.domElement);
+const MAX_ANISO = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(CFG.cam.fov, 1, 0.1, 120);
+scene.add(new THREE.HemisphereLight(0xFFF3E2, 0x5A4636, 0.62));
+const sun = new THREE.DirectionalLight(0xFFF0D8, 0.72);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
+scene.add(sun); scene.add(sun.target);
+
+function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function canvasTex(c) { const t = new THREE.CanvasTexture(c); t.anisotropy = MAX_ANISO; return t; }
+function radialTex(inner, outer) {
+  const s = 128, c = makeCanvas(s, s), g = c.getContext('2d'), gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  gr.addColorStop(0, inner); gr.addColorStop(1, outer); g.fillStyle = gr; g.fillRect(0, 0, s, s); return new THREE.CanvasTexture(c);
+}
+
+function floorTexture(style, W, D, rnd) {
+  const tw = 1024, th = Math.round(1024 * D / W), c = makeCanvas(tw, th), g = c.getContext('2d');
+  const ppu = tw / W;   // piksel / birim
+  const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16);
+    const f = v => clamp(Math.round(v * k), 0, 255); return `rgb(${f(n >> 16)},${f(n >> 8 & 255)},${f(n & 255)})`; };
+  if (style === 'wood') {
+    const pw = 0.5 * ppu;
+    for (let x = 0; x < tw; x += pw) {
+      let y = -rnd() * 3 * ppu;
+      while (y < th) {
+        const len = (1.6 + rnd() * 2.2) * ppu;
+        g.fillStyle = shade('#C8925A', 0.86 + rnd() * 0.22); g.fillRect(x, y, pw, len);
+        g.globalAlpha = 0.09; g.strokeStyle = '#5A3A1E'; g.lineWidth = 1;
+        for (let k = 0; k < 7; k++) { const gx = x + rnd() * pw; g.beginPath(); g.moveTo(gx, y);
+          g.bezierCurveTo(gx + (rnd() - .5) * 8, y + len * .3, gx + (rnd() - .5) * 8, y + len * .7, gx + (rnd() - .5) * 4, y + len); g.stroke(); }
+        g.globalAlpha = 1; g.fillStyle = 'rgba(60,35,15,.55)'; g.fillRect(x, y, pw, 2); y += len;
+      }
+      g.fillStyle = 'rgba(60,35,15,.6)'; g.fillRect(x, 0, 2, th);
+    }
+  } else if (style === 'tile') {
+    const ts = 0.7 * ppu;
+    for (let y = 0, r = 0; y < th; y += ts, r++) for (let x = 0, q = 0; x < tw; x += ts, q++) {
+      g.fillStyle = shade((r + q) % 2 ? '#EDE6DA' : '#C9BFAF', 0.96 + rnd() * 0.06); g.fillRect(x, y, ts, ts);
+    }
+    g.fillStyle = 'rgba(120,108,92,.55)';
+    for (let y = 0; y < th; y += ts) g.fillRect(0, y - 1, tw, 2);
+    for (let x = 0; x < tw; x += ts) g.fillRect(x - 1, 0, 2, th);
+  } else {
+    const bw = 0.42 * ppu;
+    for (let y = 0; y < th; y += bw) {
+      g.fillStyle = shade('#9C7B5B', 0.85 + rnd() * 0.25); g.fillRect(0, y, tw, bw);
+      g.globalAlpha = 0.08; g.strokeStyle = '#3A2816';
+      for (let k = 0; k < 6; k++) { const gy = y + rnd() * bw; g.beginPath(); g.moveTo(0, gy); g.lineTo(tw, gy + (rnd() - .5) * 6); g.stroke(); }
+      g.globalAlpha = 1; g.fillStyle = 'rgba(30,20,10,.75)'; g.fillRect(0, y, tw, 3);
+      g.fillStyle = 'rgba(40,40,40,.5)';
+      for (let x = 0.3 * ppu; x < tw; x += 1.2 * ppu) { g.fillRect(x, y + 5, 3, 3); g.fillRect(x, y + bw - 8, 3, 3); }
+    }
+  }
+  for (let i = 0; i < 12000; i++) { g.fillStyle = rnd() < .5 ? 'rgba(0,0,0,.05)' : 'rgba(255,255,255,.05)';
+    g.fillRect(rnd() * tw, rnd() * th, 1.5, 1.5); }
+  return canvasTex(c);
+}
+
+function rugTexture(col) {
+  const s = 256, c = makeCanvas(s, s), g = c.getContext('2d');
+  g.fillStyle = col; g.beginPath(); g.arc(s / 2, s / 2, s / 2, 0, TAU); g.fill();
+  g.strokeStyle = 'rgba(255,230,200,.55)'; g.lineWidth = 6;
+  [0.86, 0.62, 0.36].forEach(k => { g.beginPath(); g.arc(s / 2, s / 2, s / 2 * k, 0, TAU); g.stroke(); });
+  g.fillStyle = 'rgba(255,230,200,.35)';
+  for (let a = 0; a < TAU; a += TAU / 16) { g.beginPath(); g.arc(s / 2 + Math.cos(a) * s * .37, s / 2 + Math.sin(a) * s * .37, 7, 0, TAU); g.fill(); }
+  return canvasTex(c);
+}
+
+/* ---------------- TOZ KATMANI: başlık geçtikçe kendi şeklinde silinir ---------------- */
+const Dust = {
+  cv: null, g: null, tex: null, mesh: null, W: 0, D: 0, sx: 1, sy: 1,
+  cols: 0, rows: 0, grid: null, total: 0, clean: 0, dirty: false,
+  build(L, rnd, colliders) {
+    this.W = L.W; this.D = L.D;
+    const tw = Math.round(L.W * CFG.dust.texPerUnit), th = Math.round(L.D * CFG.dust.texPerUnit);
+    this.cv = makeCanvas(tw, th); this.g = this.cv.getContext('2d'); const g = this.g;
+    this.sx = tw / L.W; this.sy = th / L.D;
+    g.fillStyle = `rgba(104,94,82,${CFG.dust.alpha})`; g.fillRect(0, 0, tw, th);
+    for (let i = 0; i < 16; i++) {   // lekeli, düzensiz kirlilik
+      const x = rnd() * tw, y = rnd() * th, r = (0.15 + rnd() * 0.25) * tw;
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, 'rgba(95,82,68,.28)'); gr.addColorStop(1, 'rgba(95,82,68,0)'); g.fillStyle = gr; g.fillRect(0, 0, tw, th);
+    }
+    // duvar dibi ve köşeler daha kirli: geniş başlığın ulaşamadığı yerler göze batsın
+    const band = 0.45 * this.sx;
+    [[0, 0, band, 0], [tw, 0, tw - band, 0], [0, 0, 0, band], [0, th, 0, th - band]].forEach(([x0, y0, x1, y1]) => {
+      const gr = g.createLinearGradient(x0, y0, x1, y1);
+      gr.addColorStop(0, 'rgba(80,70,58,.45)'); gr.addColorStop(1, 'rgba(80,70,58,0)'); g.fillStyle = gr; g.fillRect(0, 0, tw, th);
+    });
+    for (const [cx, cy] of [[0, 0], [tw, 0], [0, th], [tw, th]]) {
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, 0.9 * this.sx);
+      gr.addColorStop(0, 'rgba(70,60,50,.55)'); gr.addColorStop(1, 'rgba(70,60,50,0)'); g.fillStyle = gr; g.fillRect(0, 0, tw, th);
+    }
+    for (let i = 0; i < tw * th / 40; i++) { g.fillStyle = rnd() < .6 ? 'rgba(70,60,50,.35)' : 'rgba(210,200,185,.3)';
+      g.fillRect(rnd() * tw, rnd() * th, 1 + rnd() * 1.4, 1 + rnd() * 1.4); }
+    g.strokeStyle = 'rgba(190,180,170,.4)'; g.lineWidth = 0.8;
+    for (let i = 0; i < L.W * L.D * 1.5; i++) { const x = rnd() * tw, y = rnd() * th; g.beginPath(); g.moveTo(x, y);
+      g.quadraticCurveTo(x + (rnd() - .5) * 12, y + (rnd() - .5) * 12, x + (rnd() - .5) * 16, y + (rnd() - .5) * 16); g.stroke(); }
+    this.tex = canvasTex(this.cv);
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(L.W, L.D),
+      new THREE.MeshLambertMaterial({ map: this.tex, transparent: true, depthWrite: false }));
+    this.mesh.rotation.x = -PI / 2; this.mesh.position.y = 0.004; this.mesh.receiveShadow = true; this.mesh.renderOrder = 1;
+    // ilerleme ızgarası — katı engellerin altı sayılmaz (koltuk altı sayılır)
+    const cs = CFG.dust.gridCell;
+    this.cols = Math.ceil(L.W / cs); this.rows = Math.ceil(L.D / cs);
+    this.grid = new Uint8Array(this.cols * this.rows); this.total = 0; this.clean = 0;
+    for (let r = 0; r < this.rows; r++) for (let c = 0; c < this.cols; c++) {
+      const x = -L.W / 2 + (c + .5) * cs, z = -L.D / 2 + (r + .5) * cs;
+      const blocked = colliders.some(o => !o.tall && !o.dyn && (o.t === 'box'
+        ? Math.abs(x - o.x) < o.hw + 0.1 && Math.abs(z - o.z) < o.hd + 0.1
+        : Math.hypot(x - o.x, z - o.z) < o.r + 0.1));
+      if (blocked) this.grid[r * this.cols + c] = 2; else this.total++;
+    }
+    return this.mesh;
+  },
+  stamp(x, z, yaw, H) {
+    const g = this.g, poly = H.foot;
+    g.globalCompositeOperation = 'destination-out';
+    g.setTransform(this.sx, 0, 0, this.sy, (x + this.W / 2) * this.sx, (z + this.D / 2) * this.sy);
+    g.rotate(-yaw);
+    g.beginPath(); poly.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath();
+    g.globalAlpha = 0.5; g.lineWidth = 0.08; g.stroke(); g.globalAlpha = 1; g.fill();
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over';
+    this.dirty = true;
+    const cs = CFG.dust.gridCell, cy = Math.cos(yaw), sy = Math.sin(yaw), R = H.reach + cs;
+    const c0 = Math.max(0, Math.floor((x - R + this.W / 2) / cs)), c1 = Math.min(this.cols - 1, Math.floor((x + R + this.W / 2) / cs));
+    const r0 = Math.max(0, Math.floor((z - R + this.D / 2) / cs)), r1 = Math.min(this.rows - 1, Math.floor((z + R + this.D / 2) / cs));
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      const i = r * this.cols + c; if (this.grid[i]) continue;
+      const dx = -this.W / 2 + (c + .5) * cs - x, dz = -this.D / 2 + (r + .5) * cs - z;
+      if (inPoly(poly, dx * cy - dz * sy, dx * sy + dz * cy)) { this.grid[i] = 1; this.clean++; }
+    }
+  },
+  flush() { if (this.dirty) { this.tex.needsUpdate = true; this.dirty = false; } },
+  pct() { return this.total ? Math.round(this.clean / this.total * 100) : 100; },
+};
+
+/* ---------------- ODA + ENGELLER ---------------- */
+/* colliders: {t:'cyl'|'box', x, z, r | hw,hd, tall} — tall: sadece yüksek gövdeleri (elektrikli süpürge gövdesi) durdurur,
+   ağız, hortum ve çöpler altından geçer. fades: ağız altına girince yarı saydamlaşan mobilyalar */
+const World = { group: null, colliders: [], fades: [], props: [], W: 11, D: 18 };
+const std = (color, o) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.75, metalness: 0 }, o || {}));
+const fadeMat = (color, o) => std(color, Object.assign({ transparent: true }, o || {}));
+const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+function addMesh(parent, geo, mat, x, y, z, cast = true, recv = true) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = recv; parent.add(m); return m;
+}
+function disposeTree(o) {
+  o.traverse(n => { if (n.geometry) n.geometry.dispose();
+    if (n.material) [].concat(n.material).forEach(m => { if (m.map) m.map.dispose(); m.dispose(); }); });
+}
+function addLegs(G, col, x, z, w, d, h, r, inset, mat) {
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const lx = x + sx * (w / 2 - inset), lz = z + sz * (d / 2 - inset);
+    addMesh(G, new THREE.CylinderGeometry(r, r * 0.8, h, 10), mat, lx, h / 2, lz);
+    col.push({ t: 'cyl', x: lx, z: lz, r: r + 0.03 });
+  }
+}
+function underObstacle(col, o, w, d, mats) {
+  col.push({ t: 'box', x: o.x, z: o.z, hw: w / 2, hd: d / 2, tall: true });
+  World.fades.push({ x: o.x, z: o.z, hw: w / 2 + 0.2, hd: d / 2 + 0.2, mats, op: 1 });
+}
+const plantM = () => [std(0x4E9A4A, { roughness: .8 }), std(0x3E7F3C, { roughness: .8 }), std(0x67B35A, { roughness: .8 })];
+
+function buildObstacle(G, o, col, rnd) {
+  const U = CFG.room.underH, wood = std(0x3B2A1E, { roughness: 0.6 });
+  switch (o.k) {
+    case 'couch': case 'armchair': {
+      const m = fadeMat(o.c, { roughness: 0.95 }), m2 = fadeMat(new THREE.Color(o.c).offsetHSL(0, 0, 0.07).getHex(), { roughness: 1 });
+      addLegs(G, col, o.x, o.z, o.w, o.d, U, 0.05, 0.15, wood);
+      addMesh(G, box(o.w, 0.3, o.d), m, o.x, U + 0.15, o.z);
+      addMesh(G, box(o.w, 0.52, 0.28), m, o.x, U + 0.56, o.z - o.d / 2 + 0.14);
+      for (const s of [-1, 1]) addMesh(G, box(0.28, 0.44, o.d), m, o.x + s * (o.w / 2 - 0.14), U + 0.3, o.z);
+      const n = o.w > 2.5 ? 3 : 1, cw = (o.w - 0.56) / n;
+      for (let i = 0; i < n; i++) addMesh(G, box(cw - 0.05, 0.13, o.d - 0.36), m2, o.x - o.w / 2 + 0.28 + cw * (i + .5), U + 0.36, o.z + 0.13);
+      underObstacle(col, o, o.w, o.d, [m, m2]); break;
+    }
+    case 'ctable': {
+      const m = fadeMat(o.c, { roughness: 0.5 });
+      addLegs(G, col, o.x, o.z, o.w, o.d, o.h, 0.04, 0.1, wood);
+      addMesh(G, box(o.w, 0.06, o.d), m, o.x, o.h, o.z);
+      underObstacle(col, o, o.w, o.d, [m]); break;
+    }
+    case 'chair': {
+      const m = fadeMat(0x9B6B43, { roughness: 0.6 }), s = 0.6;
+      addLegs(G, col, o.x, o.z, s, s, 0.45, 0.03, 0.06, wood);
+      addMesh(G, box(s, 0.05, s), m, o.x, 0.47, o.z);
+      const bx = { n: [0, -1], s: [0, 1], w: [-1, 0], e: [1, 0] }[o.rot || 'n'];
+      addMesh(G, bx[0] ? box(0.05, 0.5, s) : box(s, 0.5, 0.05), m, o.x + bx[0] * (s / 2 - 0.03), 0.74, o.z + bx[1] * (s / 2 - 0.03));
+      underObstacle(col, { x: o.x, z: o.z }, s, s, [m]); break;
+    }
+    case 'bench': {
+      const m = fadeMat(o.c, { roughness: 0.85 });
+      addLegs(G, col, o.x, o.z, o.w, o.d, o.h, 0.05, 0.15, wood);
+      for (let i = 0; i < 4; i++) addMesh(G, box(o.w, 0.06, o.d / 4 - 0.04), m, o.x, o.h, o.z - o.d / 2 + o.d / 8 + i * o.d / 4);
+      underObstacle(col, o, o.w, o.d, [m]); break;
+    }
+    case 'table': {
+      const legM = std(0x3A3A3A, { metalness: 0.6, roughness: 0.35 });
+      addLegs(G, col, o.x, o.z, o.w, o.d, o.h, 0.045, 0.12, legM);
+      const glass = addMesh(G, box(o.w, 0.04, o.d), new THREE.MeshStandardMaterial({ color: 0xBFE3E8, transparent: true,
+        opacity: 0.2, roughness: 0.05, metalness: 0.1, depthWrite: false }), o.x, o.h, o.z, false, false);
+      glass.renderOrder = 5;
+      col.push({ t: 'box', x: o.x, z: o.z, hw: o.w / 2, hd: o.d / 2, tall: true }); break;
+    }
+    case 'tv': {
+      addMesh(G, box(o.w, o.h, o.d), std(o.c, { roughness: 0.6 }), o.x, o.h / 2, o.z);
+      addMesh(G, box(0.07, 1.1, o.d * 0.85), std(0x111418, { roughness: 0.25, metalness: 0.4 }), o.x, o.h + 0.56, o.z);
+      col.push({ t: 'box', x: o.x, z: o.z, hw: o.w / 2, hd: o.d / 2 }); break;
+    }
+    case 'shelf': {
+      addMesh(G, box(o.w, o.h, o.d), std(o.c, { roughness: 0.7 }), o.x, o.h / 2, o.z);
+      const fx = o.x - o.w / 2 - 0.04;
+      for (const y of [0.1, 0.62, 1.14]) {
+        let z = o.z - o.d / 2 + 0.08;
+        while (z < o.z + o.d / 2 - 0.12) {
+          const bw = 0.07 + rnd() * 0.07, bh = 0.3 + rnd() * 0.14;
+          addMesh(G, box(0.1, bh, bw), std(new THREE.Color().setHSL(rnd(), 0.45, 0.45).getHex(), { roughness: 0.8 }), fx, y + bh / 2, z + bw / 2, false);
+          z += bw + 0.01;
+        }
+      }
+      col.push({ t: 'box', x: o.x - 0.05, z: o.z, hw: o.w / 2 + 0.05, hd: o.d / 2 }); break;
+    }
+    case 'counter': case 'island': {
+      addMesh(G, box(o.w, o.h, o.d), std(o.c), o.x, o.h / 2, o.z);
+      addMesh(G, box(o.w + 0.06, 0.06, o.d + 0.08), std(0x6B5B4E, { roughness: 0.4 }), o.x, o.h + 0.03, o.z + (o.k === 'counter' ? 0.04 : 0));
+      if (o.k === 'counter') for (let x = -o.w / 2 + 0.9; x < o.w / 2; x += 0.9)
+        addMesh(G, box(0.02, o.h * 0.8, 0.01), std(0xB9AE9E), o.x + x, o.h * 0.45, o.z + o.d / 2 + 0.005, false);
+      col.push({ t: 'box', x: o.x, z: o.z + (o.k === 'counter' ? 0.02 : 0), hw: o.w / 2 + 0.03, hd: o.d / 2 + 0.04 }); break;
+    }
+    case 'fridge': {
+      addMesh(G, box(o.w, o.h, o.d), std(o.c, { roughness: 0.3 }), o.x, o.h / 2, o.z);
+      addMesh(G, box(o.w * 0.98, 0.02, 0.01), std(0x9AA3AB), o.x, o.h * 0.66, o.z + o.d / 2 + 0.005, false);
+      addMesh(G, box(0.04, 0.5, 0.05), std(0x9AA3AB, { metalness: 0.6 }), o.x - o.w / 2 + 0.15, o.h * 0.45, o.z + o.d / 2 + 0.03, false);
+      col.push({ t: 'box', x: o.x, z: o.z, hw: o.w / 2, hd: o.d / 2 + 0.05 }); break;
+    }
+    case 'planter': {
+      addMesh(G, box(o.w, o.h, o.d), std(o.c, { roughness: 0.85 }), o.x, o.h / 2, o.z);
+      addMesh(G, box(o.w - 0.1, 0.02, o.d - 0.1), std(0x3B2A1E, { roughness: 1 }), o.x, o.h + 0.01, o.z, false);
+      const pm = plantM();
+      for (let z = o.z - o.d / 2 + 0.35; z < o.z + o.d / 2 - 0.2; z += 0.45)
+        addMesh(G, new THREE.IcosahedronGeometry(0.2 + rnd() * 0.12, 0), pm[Math.floor(rnd() * 3)], o.x + (rnd() - .5) * 0.3, o.h + 0.2 + rnd() * 0.15, z);
+      col.push({ t: 'box', x: o.x, z: o.z, hw: o.w / 2, hd: o.d / 2 }); break;
+    }
+    case 'bin': case 'pot': {   // itilebilen eşya: kendi grubunda, çarpışma dairesi onunla birlikte hareket eder
+      const P = new THREE.Group(); P.position.set(o.x, 0, o.z); G.add(P);
+      const tilt = new THREE.Group(); P.add(tilt);
+      if (o.k === 'bin') {
+        addMesh(tilt, new THREE.CylinderGeometry(o.r, o.r * 0.88, 0.7, 20, 1, true), std(o.c, { roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide }), 0, 0.35, 0);
+        addMesh(tilt, new THREE.CircleGeometry(o.r * 0.95, 20), std(0x222222), 0, 0.45, 0, false).rotation.x = -PI / 2;
+      } else {
+        const h = o.r * 1.4;
+        addMesh(tilt, new THREE.CylinderGeometry(o.r, o.r * 0.78, h, 22), std(o.c, { roughness: 0.8 }), 0, h / 2, 0);
+        addMesh(tilt, new THREE.CylinderGeometry(o.r * 1.07, o.r * 1.07, 0.08, 22), std(new THREE.Color(o.c).offsetHSL(0, 0, -0.05).getHex()), 0, h, 0);
+        const pm = plantM();
+        for (let i = 0; i < 6; i++) {
+          const a = rnd() * TAU, d = rnd() * o.r * 0.55, s = o.r * (0.45 + rnd() * 0.35);
+          addMesh(tilt, new THREE.IcosahedronGeometry(s, 0), pm[i % 3], Math.cos(a) * d, h + s * 0.7 + rnd() * 0.25, Math.sin(a) * d);
+        }
+      }
+      const r = o.r * 1.04, pr = { g: P, tilt, x: o.x, z: o.z, vx: 0, vz: 0, r, mass: CFG.props.massBase + r * CFG.props.massPerR,
+        tx: 0, tz: 0, tvx: 0, tvz: 0, knockT: 0 };
+      pr.c = { t: 'cyl', x: o.x, z: o.z, r, dyn: true, prop: pr };
+      col.push(pr.c); World.props.push(pr); break;
+    }
+  }
+}
+
+function buildRoom(L, rnd) {
+  if (World.group) { scene.remove(World.group); disposeTree(World.group); }
+  const G = new THREE.Group(); World.group = G; World.W = L.W; World.D = L.D; World.colliders = []; World.fades = []; World.props = [];
+  const floor = addMesh(G, new THREE.PlaneGeometry(L.W, L.D),
+    new THREE.MeshStandardMaterial({ map: floorTexture(L.floor, L.W, L.D, rnd), roughness: 0.62 }), 0, 0, 0, false, true);
+  floor.rotation.x = -PI / 2;
+  const out = addMesh(G, new THREE.PlaneGeometry(120, 120), std(0x2A211B, { roughness: 1 }), 0, -0.02, 0, false, true);
+  out.rotation.x = -PI / 2;
+  if (L.rug) {
+    const rg = addMesh(G, new THREE.CircleGeometry(L.rug.r, 48), new THREE.MeshStandardMaterial({ map: rugTexture(L.rug.c), roughness: 1 }),
+      L.rug.x, 0.002, L.rug.z, false, true);
+    rg.rotation.x = -PI / 2;
+  }
+  const t = CFG.room.wallT, h = CFG.room.wallH, wm = std(0xEADFCF, { roughness: 0.9 });
+  addMesh(G, box(L.W + 2 * t, h, t), wm, 0, h / 2, -L.D / 2 - t / 2);
+  addMesh(G, box(L.W + 2 * t, h, t), wm, 0, h / 2, L.D / 2 + t / 2);
+  addMesh(G, box(t, h, L.D), wm, -L.W / 2 - t / 2, h / 2, 0);
+  addMesh(G, box(t, h, L.D), wm, L.W / 2 + t / 2, h / 2, 0);
+  for (const o of L.obs) buildObstacle(G, o, World.colliders, rnd);
+  G.add(Dust.build(L, rnd, World.colliders));
+  scene.add(G);
+  sun.position.set(-0.3 * L.W, 14, 0.25 * L.D); sun.target.position.set(0, 0, 0);
+  const s = Math.max(L.W, L.D) / 2 + 1.5, sc = sun.shadow.camera;
+  sc.left = -s; sc.right = s; sc.top = s; sc.bottom = -s; sc.near = 1; sc.far = 40; sc.updateProjectionMatrix();
+}
+
+/* Daireyi oda sınırı + engellerin dışına it. tall: yüksek gövde mi (koltuk altına giremez). */
+const _push = { x: 0, z: 0, hit: false };
+function resolveCircle(x, z, r, tall, skip) {
+  let nx = x, nz = z; _push.hit = false;
+  const hw = World.W / 2 - r, hd = World.D / 2 - r;
+  if (nx < -hw) { nx = -hw; _push.hit = true; } else if (nx > hw) { nx = hw; _push.hit = true; }
+  if (nz < -hd) { nz = -hd; _push.hit = true; } else if (nz > hd) { nz = hd; _push.hit = true; }
+  for (const o of World.colliders) {
+    if ((o.tall && !tall) || o === skip) continue;
+    if (o.t === 'cyl') {
+      const dx = nx - o.x, dz = nz - o.z, d = Math.hypot(dx, dz), m = o.r + r;
+      if (d < m) { const k = d > 1e-5 ? m / d : 0; nx = o.x + (k ? dx * k : m); nz = o.z + dz * k; _push.hit = true; }
+    } else {
+      const cx = clamp(nx, o.x - o.hw, o.x + o.hw), cz = clamp(nz, o.z - o.hd, o.z + o.hd);
+      const dx = nx - cx, dz = nz - cz, d2 = dx * dx + dz * dz;
+      if (d2 < r * r) {
+        _push.hit = true;
+        if (d2 > 1e-8) { const d = Math.sqrt(d2), k = r / d; nx = cx + dx * k; nz = cz + dz * k; }
+        else { // merkez kutunun içinde: en kısa eksenden çık
+          const ex = o.hw + r - Math.abs(nx - o.x), ez = o.hd + r - Math.abs(nz - o.z);
+          if (ex < ez) nx += Math.sign(nx - o.x || 1) * ex; else nz += Math.sign(nz - o.z || 1) * ez;
+        }
+      }
+    }
+  }
+  // hareket sonrası duvar sınırını tekrar uygula (engel itmesi dışarı taşımasın)
+  nx = clamp(nx, -hw, hw); nz = clamp(nz, -hd, hd);
+  _push.x = nx - x; _push.z = nz - z;
+  return _push;
+}
+/* ---------------- İTİLEBİLEN EŞYALAR (saksı, çöp kovası) ----------------
+   (cx,cz,r) dairesi bir eşyaya girdiyse eşyayı dışarı it, itenin hızını tekme olarak aktar. İtildiyse true */
+function kickProps(cx, cz, r, vx, vz) {
+  let pushed = false; const P = CFG.props;
+  for (const pr of World.props) {
+    const dx = pr.x - cx, dz = pr.z - cz, d = Math.hypot(dx, dz), m = pr.r + r;
+    if (d >= m || d < 1e-5) continue;
+    const nx = dx / d, nz = dz / d;
+    pr.x += nx * (m - d); pr.z += nz * (m - d);
+    const vn = vx * nx + vz * nz;
+    if (vn > 0) {   // ağır eşya daha az hızlanır
+      const want = vn * P.kick / (0.6 + pr.mass * 0.25), pv = pr.vx * nx + pr.vz * nz;
+      if (want > pv) { pr.vx += nx * (want - pv); pr.vz += nz * (want - pv); }
+      if (vn > P.clonkV && pr.knockT <= 0) { SFX.clonk(Math.min(1, vn / 6)); pr.knockT = 0.25; pr.tvx += nx * vn * 0.5; pr.tvz += nz * vn * 0.5; }
+    }
+    const p = resolveCircle(pr.x, pr.z, pr.r, true, pr.c); pr.x += p.x; pr.z += p.z;   // koltuk altına giremez
+    pr.c.x = pr.x; pr.c.z = pr.z; pushed = true;
+  }
+  return pushed;
+}
+function updateProps(dt) {
+  const P = CFG.props;
+  for (const pr of World.props) {
+    pr.knockT -= dt;
+    const fr = Math.exp(-P.friction * dt); pr.vx *= fr; pr.vz *= fr;
+    if (Math.abs(pr.vx) + Math.abs(pr.vz) < 1e-3) continue;
+    pr.x += pr.vx * dt; pr.z += pr.vz * dt;
+    const p = resolveCircle(pr.x, pr.z, pr.r, true, pr.c);
+    if (p.hit) {   // duvara / başka eşyaya çarpıp seker
+      const pl = Math.hypot(p.x, p.z);
+      if (pl > 1e-6) {
+        const nx = p.x / pl, nz = p.z / pl, vn = pr.vx * nx + pr.vz * nz;
+        if (vn < 0) {
+          if (-vn > P.clonkV && pr.knockT <= 0) { SFX.clonk(Math.min(1, -vn / 5)); pr.knockT = 0.25; pr.tvx -= nx * vn * 0.5; pr.tvz -= nz * vn * 0.5; }
+          for (const o of World.props) if (o !== pr && Math.hypot(o.x - pr.x, o.z - pr.z) < o.r + pr.r + 0.02) {   // eşya eşyaya: momentum aktar
+            o.vx -= nx * vn * 0.6; o.vz -= nz * vn * 0.6;
+          }
+          pr.vx -= (1 + P.bounce) * vn * nx; pr.vz -= (1 + P.bounce) * vn * nz;
+        }
+      }
+      pr.x += p.x; pr.z += p.z;
+    }
+    pr.c.x = pr.x; pr.c.z = pr.z;
+  }
+}
+function renderProps(dt) {   // itilince sallanır: taban üstünde yaylı eğilme
+  const P = CFG.props;
+  for (const pr of World.props) {
+    pr.tvx += (-pr.tx * 90 - pr.tvx * 7) * dt; pr.tx += pr.tvx * dt;
+    pr.tvz += (-pr.tz * 90 - pr.tvz * 7) * dt; pr.tz += pr.tvz * dt;
+    const lx = clamp(pr.tx * 0.12 + pr.vx * P.tilt * 0.4, -0.35, 0.35), lz = clamp(pr.tz * 0.12 + pr.vz * P.tilt * 0.4, -0.35, 0.35);
+    pr.g.position.set(pr.x, 0, pr.z); pr.tilt.rotation.set(lz, 0, -lx);
+  }
+}
+function updateFades(dt) {
+  for (const f of World.fades) {
+    const inside = Math.abs(Noz.x - f.x) < f.hw && Math.abs(Noz.z - f.z) < f.hd;
+    const op = lerp(f.op, inside ? 0.22 : 1, 1 - Math.exp(-10 * dt));
+    if (Math.abs(op - f.op) < 1e-4) continue;
+    f.op = op; f.mats.forEach(m => { m.opacity = op; m.depthWrite = op > 0.97; });
+  }
+}
+
+/* ---------------- SÜPÜRGE AĞZI: üç başlık ---------------- */
+const Noz = { g: null, heads: {}, H: HEADS.wide, x: 0, z: 0, vx: 0, vz: 0, yaw: PI, tx: 0, tz: 0,
+  speed: 0, bump: 0, bumpV: 0, sx: 0, sz: 0, syaw: PI, strain: 0, load: 0, shake: 0, swapT: 1, pendingHead: null };
+/* (x, z) çokgenini yere yatık prizmaya çevir: y ∈ [y0, y0+h] */
+function flatPrism(poly, h, y0) {
+  const s = new THREE.Shape(); poly.forEach((p, i) => i ? s.lineTo(p[0], -p[1]) : s.moveTo(p[0], -p[1]));
+  const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 1 });
+  g.rotateX(-PI / 2); g.translate(0, y0, 0); return g;
+}
+const insetPoly = (poly, k) => { const cx = poly.reduce((a, p) => a + p[0], 0) / poly.length, cz = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+  return poly.map(p => [cx + (p[0] - cx) * k, cz + (p[1] - cz) * k]); };
+function buildHead(H) {
+  const g = new THREE.Group(), dark = std(0x2E2A27, { roughness: 0.7 }), rub = std(0x161414, { roughness: 0.95 });
+  const body = std(H.color, { roughness: 0.42 });
+  addMesh(g, flatPrism(H.foot, 0.09, 0.02), dark, 0, 0, 0);                         // şasi
+  addMesh(g, flatPrism(insetPoly(H.foot, 0.82), 0.06, 0.11), body, 0, 0, 0);       // üst kabuk
+  const led = new THREE.MeshBasicMaterial({ color: 0x7FF3FF });
+  if (H.key === 'wide') {
+    // kalın lastik tampon: duvar dibine girmesini engelleyen şey görünür olsun
+    for (const s of [-1, 1]) addMesh(g, box(1.5, 0.08, 0.1), rub, 0, 0.06, s * 0.29);
+    for (const s of [-1, 1]) addMesh(g, box(0.1, 0.11, 0.68), rub, s * 0.76, 0.065, 0);
+    addMesh(g, box(0.9, 0.022, 0.035), led, 0, 0.2, 0.1, false, false);
+  } else if (H.key === 'tri') {
+    addMesh(g, new THREE.SphereGeometry(0.05, 10, 8), rub, 0, 0.07, 0.58);          // lastik uç
+    addMesh(g, box(0.035, 0.022, 0.28), led, 0, 0.2, 0.22, false, false);
+  } else {
+    addMesh(g, box(0.22, 0.1, 0.05), rub, 0, 0.07, 0.73);                           // ağız ucu
+    addMesh(g, box(0.03, 0.022, 0.5), led, 0, 0.2, 0.3, false, false);
+  }
+  // boyun: başlıktan hortum bağlantısına eğik boru
+  const j = new V3(0, 0.2, H.rear + 0.06), a = new V3(0, CFG.hose.neckY, H.rear - 0.24), mid = j.clone().add(a).multiplyScalar(0.5);
+  addMesh(g, new THREE.SphereGeometry(0.085, 12, 10), dark, j.x, j.y, j.z);
+  const neck = addMesh(g, new THREE.CylinderGeometry(0.07, 0.075, j.distanceTo(a), 12), body, mid.x, mid.y, mid.z);
+  neck.rotation.x = Math.atan2(a.z - j.z, a.y - j.y);
+  // emiş alanı: yere düşen yumuşak ışık
+  const glowM = new THREE.MeshBasicMaterial({ map: radialTex('rgba(255,245,225,.9)', 'rgba(255,245,225,0)'), transparent: true,
+    opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending });
+  const R = H.radius * 1.5, glow = new THREE.Mesh(new THREE.PlaneGeometry(R, R * (1 + H.cone)), glowM);
+  glow.rotation.x = -PI / 2; glow.position.set(0, 0.008, H.mz + H.cone * R * 0.4); glow.renderOrder = 2; g.add(glow);
+  g.userData = { led, glowM, attach: a };
+  return g;
+}
+function buildNozzle() {
+  Noz.g = new THREE.Group(); scene.add(Noz.g);
+  for (const k in HEADS) { const h = buildHead(HEADS[k]); h.visible = k === 'wide'; Noz.g.add(h); Noz.heads[k] = h; }
+}
+function setHead(k) {
+  if (!HEADS[k] || Noz.H.key === k || Noz.swapT < 1) return;
+  Noz.pendingHead = k; Noz.swapT = 0; SFX.click(); buzz(10);
+  document.querySelectorAll('.hd').forEach(b => b.classList.toggle('on', b.dataset.h === k));
+}
+const _loc = { x: 0, z: 0 };
+function toWorld(lx, lz, out) {   // başlık yerel → dünya
+  const c = Math.cos(Noz.yaw), s = Math.sin(Noz.yaw);
+  out.x = Noz.x + lx * c + lz * s; out.z = Noz.z - lx * s + lz * c; return out;
+}
+function nozzleAttachWorld(out) { const a = Noz.heads[Noz.H.key].userData.attach; return toWorld(a.x, a.z, out); }
+
+/* ---------------- ELEKTRİKLİ SÜPÜRGE GÖVDESİ + ŞİŞEN TORBA ---------------- */
+const Can = { g: null, wob: 0, wobV: 0 };
+const Bag = { mesh: null, base: null, noise: null, fill: 0, vel: 0, target: 0, drawn: -1 };
+function buildCanister() {
+  const g = new THREE.Group(), body = std(0xFF7A59, { roughness: 0.4 }), dark = std(0x2E2A27, { roughness: 0.7 });
+  const R = CFG.canister.r;
+  const b = addMesh(g, new THREE.SphereGeometry(R, 24, 16), body, 0, 0.26, 0.12); b.scale.set(1, 0.55, 1.05);
+  for (const s of [-1, 1]) { const w = addMesh(g, new THREE.CylinderGeometry(0.14, 0.14, 0.07, 18), dark, s * 0.46, 0.14, -0.05); w.rotation.z = PI / 2; }
+  const port = addMesh(g, new THREE.CylinderGeometry(0.1, 0.1, 0.16, 12), dark, 0, 0.27, R * 1.12); port.rotation.x = PI / 2;
+  addMesh(g, new THREE.TorusGeometry(0.24, 0.035, 8, 24), dark, 0, 0.42, -0.1).rotation.x = PI / 2;   // torba kelepçesi
+  // kumaş torba: buruşuk ve sönük başlar, çöp geldikçe şişip gerilir
+  const bg = new THREE.SphereGeometry(0.34, 24, 18);
+  Bag.base = Float32Array.from(bg.attributes.position.array);
+  const p = bg.attributes.position; Bag.noise = new Float32Array(p.count);
+  for (let i = 0; i < p.count; i++) {   // konuma bağlı gürültü: dikişte çatlak olmasın
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    Bag.noise[i] = 0.75 * Math.sin(x * 11.3 + y * 4.1) * Math.cos(z * 9.7 - y * 6.2) + 0.3 * Math.sin((x - z) * 17.3 + y * 12.9) - 0.25;
+  }
+  Bag.mesh = addMesh(g, bg, std(0xD8CCB6, { roughness: 1 }), 0, 0.62, -0.12);
+  Can.g = g; scene.add(g);
+}
+function updateBag(dt) {
+  const B = CFG.bag;
+  Bag.vel += ((Bag.target - Bag.fill) * B.stiffness - Bag.vel * B.damping) * dt; Bag.fill += Bag.vel * dt;
+  const f = clamp(Bag.fill, 0, 1.12), w = Can.wob;
+  const key = Math.round(f * 400) + Math.round(w * 200) * 1000;
+  if (key === Bag.drawn) return; Bag.drawn = key;
+  const s = lerp(B.minScale, B.maxScale, Math.min(f, 1)) * (1 + Math.max(0, f - 1) * 0.6);
+  const wr = B.wrinkle * (1 - Math.min(1, f)), p = Bag.mesh.geometry.attributes.position, a = p.array, base = Bag.base;
+  for (let i = 0; i < p.count; i++) {
+    const k = s * (1 + wr * Bag.noise[i]), y = base[i * 3 + 1];
+    a[i * 3] = base[i * 3] * k * (1 - w * 0.08); a[i * 3 + 1] = y * k * (0.6 + 0.26 * Math.min(1, f) + w * 0.12);   // boşken sarkık, dolunca dik
+    a[i * 3 + 2] = base[i * 3 + 2] * k * 1.1 * (1 - w * 0.08);
+  }
+  p.needsUpdate = true; Bag.mesh.geometry.computeVertexNormals();
+  Bag.mesh.position.y = 0.4 + s * 0.3;
+}
+
+/* ---------------- GÖVDELİ HORTUM ----------------
+   verlet ip; oda + katı engeller, ağız başlığı, gövde ve kendisiyle çarpışır, çöpleri iter */
+const Hose = { N: 0, px: null, pz: null, ox: null, oz: null, pulses: [], beads: null };
+function buildHose() {
+  const H = CFG.hose; Hose.N = H.segs;
+  Hose.px = new Float32Array(H.segs); Hose.pz = new Float32Array(H.segs);
+  Hose.ox = new Float32Array(H.segs); Hose.oz = new Float32Array(H.segs);
+  Hose.beads = new THREE.InstancedMesh(new THREE.SphereGeometry(H.r, 10, 8), std(0x4A4F57, { roughness: 0.55 }), H.beads);
+  Hose.beads.instanceMatrix.setUsage(THREE.DynamicDrawUsage); Hose.beads.castShadow = true; Hose.beads.frustumCulled = false;
+  scene.add(Hose.beads);
+}
+function resetHose() {
+  // ağzın arkasından geriye, duvara yaklaşınca yana dönen L şeklinde ser
+  const a = nozzleAttachWorld({}), c = Math.cos(Noz.yaw), s = Math.sin(Noz.yaw);
+  const back = Math.max(0.3, World.D / 2 - 0.8 - a.z);
+  for (let i = 0; i < Hose.N; i++) {
+    const d = i * CFG.hose.segLen * 0.75, d1 = Math.min(d, back), d2 = d - d1;
+    let x = a.x - s * d1 + c * d2, z = a.z - c * d1 + s * d2;
+    const p = resolveCircle(x, z, i === Hose.N - 1 ? CFG.canister.r : 0.12, i === Hose.N - 1); x += p.x; z += p.z;
+    Hose.px[i] = Hose.ox[i] = x; Hose.pz[i] = Hose.oz[i] = z;
+  }
+  Hose.pulses.length = 0;
+}
+const _att = { x: 0, z: 0 }, _pw = { x: 0, z: 0 };
+/* noktayı başlığın çarpışma dairelerinin dışına it */
+function pushOutOfHead(x, z, r, out) {
+  const H = Noz.H, c = Math.cos(Noz.yaw), s = Math.sin(Noz.yaw);
+  out.x = x; out.z = z; out.hit = false;
+  for (const [lx, lz, pr] of H.probes) {
+    const cx = Noz.x + lx * c + lz * s, cz = Noz.z - lx * s + lz * c;
+    const dx = out.x - cx, dz = out.z - cz, d = Math.hypot(dx, dz), m = pr + r;
+    if (d < m) { const k = d > 1e-5 ? m / d : 0; out.x = cx + (k ? dx * k : m); out.z = cz + dz * k; out.hit = true; }
+  }
+  return out;
+}
+function updateHose(dt) {
+  const N = Hose.N, L = CFG.hose.segLen, px = Hose.px, pz = Hose.pz, ox = Hose.ox, oz = Hose.oz;
+  const hr = CFG.hose.r, CR = CFG.canister.r, skip = CFG.hose.skipNear;
+  const damp = Math.pow(0.02, dt);   // zemin sürtünmesi
+  for (let i = 1; i < N; i++) {
+    const vx = (px[i] - ox[i]) * damp, vz = (pz[i] - oz[i]) * damp;
+    ox[i] = px[i]; oz[i] = pz[i]; px[i] += vx; pz[i] += vz;
+  }
+  nozzleAttachWorld(_att);
+  const wc = CFG.canister.share, minSelf = hr * 2, cx0 = () => px[N - 1], cz0 = () => pz[N - 1];
+  for (let it = 0; it < CFG.hose.iters; it++) {
+    px[0] = _att.x; pz[0] = _att.z;
+    for (let i = 0; i < N - 1; i++) {
+      const dx = px[i + 1] - px[i], dz = pz[i + 1] - pz[i], d = Math.hypot(dx, dz);
+      if (d <= L || d < 1e-6) continue;          // sadece gerilme: hortum gevşeyince kıvrılır
+      const wi = i === 0 ? 0 : 1, wj = i + 1 === N - 1 ? wc : 1, k = (d - L) / d / (wi + wj);
+      px[i] += dx * k * wi; pz[i] += dz * k * wi; px[i + 1] -= dx * k * wj; pz[i + 1] -= dz * k * wj;
+    }
+    // kendi kendinin içinden geçmesin
+    for (let i = 1; i < N - 1; i++) for (let j = i + 3; j < N - 1; j++) {
+      const dx = px[j] - px[i], dz = pz[j] - pz[i], d2 = dx * dx + dz * dz;
+      if (d2 >= minSelf * minSelf || d2 < 1e-10) continue;
+      const d = Math.sqrt(d2), k = (minSelf - d) / d * 0.5;
+      px[i] -= dx * k; pz[i] -= dz * k; px[j] += dx * k; pz[j] += dz * k;
+    }
+    for (let i = 1; i < N; i++) {   // çarpışma düzeltmesi hıza dönüşmesin (verlet'te ox'u da kaydır)
+      const last = i === N - 1, r = last ? CR : hr;
+      let x = px[i], z = pz[i];
+      if (i >= skip || last) { pushOutOfHead(x, z, r, _pw); x = _pw.x; z = _pw.z; }
+      if (!last && i < N - 3) {   // gövdenin içinden geçmesin
+        const dx = x - cx0(), dz = z - cz0(), d = Math.hypot(dx, dz), m = CR + hr;
+        if (d < m && d > 1e-5) { x = cx0() + dx / d * m; z = cz0() + dz / d * m; }
+      }
+      if (!last) {   // robot hortumu iter
+        const dx = x - Robot.x, dz = z - Robot.z, d = Math.hypot(dx, dz), m = CFG.robot.r + hr;
+        if (d < m && d > 1e-5) { x = Robot.x + dx / d * m; z = Robot.z + dz / d * m; }
+      }
+      const p = resolveCircle(x, z, r, last); x += p.x; z += p.z;   // son söz duvarların: odadan taşmasın
+      ox[i] += x - px[i]; oz[i] += z - pz[i]; px[i] = x; pz[i] = z;
+    }
+  }
+  px[0] = _att.x; pz[0] = _att.z;
+  for (let i = Hose.pulses.length - 1; i >= 0; i--) {
+    const p = Hose.pulses[i]; p.s += CFG.hose.pulseSpeed * dt;
+    if (p.s >= 1) {   // darbe torbaya ulaştı: torba şişer, gövde zıplar
+      Hose.pulses.splice(i, 1); Can.wobV += 5 * p.a; SFX.thud(p.a);
+      Bag.target += p.m / (Items.totalMass * CFG.match.bagShare); Bag.vel += 1.5 * p.a;   // robotla paylaşınca da dolabilsin
+    }
+  }
+}
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new V3(), _p = new V3();
+function renderHose() {
+  const N = Hose.N, B = CFG.hose.beads, px = Hose.px, pz = Hose.pz, H = CFG.hose;
+  const lastSeg = N - 1;
+  for (let b = 0; b < B; b++) {
+    const u = b / (B - 1), f = u * lastSeg, i = Math.min(lastSeg - 1, Math.floor(f)), t = f - i;
+    const i0 = Math.max(0, i - 1), i2 = i + 1, i3 = Math.min(lastSeg, i + 2);
+    const t2 = t * t, t3 = t2 * t;   // Catmull-Rom
+    const cr = (a, b1, c, d) => 0.5 * ((2 * b1) + (-a + c) * t + (2 * a - 5 * b1 + 4 * c - d) * t2 + (-a + 3 * b1 - 3 * c + d) * t3);
+    const x = cr(px[i0], px[i], px[i2], px[i3]), z = cr(pz[i0], pz[i], pz[i2], pz[i3]);
+    let y = H.r;
+    if (u < 0.08) y = lerp(H.neckY, H.r, u / 0.08);
+    else if (u > 0.95) y = lerp(H.r, 0.27, (u - 0.95) / 0.05);
+    let bump = 0; for (const p of Hose.pulses) { const q = (u - p.s) / H.pulseW; bump += p.a * Math.exp(-q * q); }
+    bump = Math.min(bump, 0.9);
+    const sc = (b % 2 ? 0.86 : 1) * (1 + bump);
+    _p.set(x, y + bump * H.r * 0.5, z); _s.set(sc, sc, sc); _q.identity();
+    Hose.beads.setMatrixAt(b, _m4.compose(_p, _q, _s));
+  }
+  Hose.beads.instanceMatrix.needsUpdate = true;
+  // gövde: son noktada, hortuma bakar; darbe gelince zıplar
+  const lx = px[N - 1], lz = pz[N - 1];
+  Can.g.position.set(lx, 0, lz);
+  Can.g.rotation.y = Math.atan2(px[N - 2] - lx, pz[N - 2] - lz);
+  const s = 1 + Can.wob * 0.1; Can.g.scale.set(1 / Math.sqrt(s), s, 1 / Math.sqrt(s));
+}
+
+/* ---------------- RAKİP ROBOT SÜPÜRGE ----------------
+   En yoğun çöp kümesine gider, önündeki küçük alandan emer. Yuvarlak olduğu için köşeye ve dar aralığa
+   giremez (sıkışmış çöpleri hedeflemez), koltuk altına girer. Duvara, ağız başlığına, hortuma ya da
+   gövdeye çarpınca geri çekilip döner. Yaklaşamadığı hedefi bir süre kara listeye alır. */
+const ROBOT_FOOT = { foot: [], reach: 0.3 };
+for (let i = 0; i < 10; i++) { const a = i / 10 * TAU; ROBOT_FOOT.foot.push([Math.cos(a) * 0.3, Math.sin(a) * 0.3]); }
+const Robot = { g: null, body: null, brushes: [], eyeM: null, x: 0, z: 0, yaw: 0, v: 0, mode: 'drive', modeT: 0, turnTo: 0,
+  target: null, targetT: 0, targetD: 1e9, retargetT: 0, black: new Map(), bumpT: 0, bumps: 0, lastGain: 0, count: 0,
+  sx: 0, sz: 0, bump: 0, bumpV: 0, angryT: 0, spin: 0, mx: 0, mz: 0 };
+function buildRobot() {
+  const R = CFG.robot, g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const shell = std(R.color, { roughness: 0.35 }), dark = std(0x1E1E22, { roughness: 0.6 }), light = std(0xF2F2F2, { roughness: 0.3 });
+  addMesh(body, new THREE.CylinderGeometry(R.r, R.r * 0.97, 0.1, 32), shell, 0, 0.07, 0);
+  addMesh(body, new THREE.CylinderGeometry(R.r * 0.78, R.r * 0.78, 0.02, 32), dark, 0, 0.13, -0.02);
+  addMesh(body, new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), light, 0, 0.145, -0.04);
+  const bumper = addMesh(body, new THREE.TorusGeometry(R.r + 0.004, 0.026, 6, 24, PI), dark, 0, 0.065, 0); bumper.rotation.x = PI / 2;
+  Robot.eyeM = new THREE.MeshBasicMaterial({ color: 0x7FF3FF });
+  addMesh(body, box(0.14, 0.022, 0.035), Robot.eyeM, 0, 0.13, R.r * 0.7, false, false);
+  const bm = std(0x3A3A3A, { roughness: 0.9 });
+  for (const s of [-1, 1]) {   // dönen yan fırçalar
+    const br = new THREE.Group(); br.position.set(s * 0.24, 0.02, 0.24); body.add(br);
+    for (let k = 0; k < 3; k++) { const b = addMesh(br, box(0.17, 0.008, 0.012), bm, 0.085, 0, 0, false, false);
+      const piv = new THREE.Group(); piv.rotation.y = k * TAU / 3; piv.add(b); br.add(piv); }
+    Robot.brushes.push(br);
+  }
+  Robot.g = g; Robot.body = body; scene.add(g);
+}
+function resetRobot(L) {
+  const B = Robot, p = resolveCircle(L.robot[0], L.robot[1], CFG.robot.r, false);
+  B.x = B.sx = L.robot[0] + p.x; B.z = B.sz = L.robot[1] + p.z; B.yaw = 0; B.v = 0; B.mode = 'drive';
+  B.target = null; B.retargetT = 0; B.black.clear(); B.count = 0; B.bump = B.bumpV = 0; B.angryT = 0; B.bumps = 0; B.lastGain = 0; B.trap = 0; B.escape = 0;
+  B.path = null; B.pathFor = null; B.repath = 0;
+  B.mx = B.x; B.mz = B.z + CFG.robot.mouthZ;
+}
+const robotVol = () => 1 / (1 + Math.hypot(Robot.x - Noz.x, Robot.z - Noz.z) * 0.35);
+/* gezinme ızgarası: robot gövdesinin sığdığı hücreler (sabit engeller). Hedefe BFS + ip çekme ile yol */
+const Nav = { cs: 0.25, cols: 1, rows: 1, block: null, prev: null, queue: null };
+function buildNav() {
+  const cs = Nav.cs; Nav.cols = Math.ceil(World.W / cs); Nav.rows = Math.ceil(World.D / cs);
+  const n = Nav.cols * Nav.rows; Nav.block = new Uint8Array(n); Nav.prev = new Int32Array(n); Nav.queue = new Int32Array(n);
+  const all = World.colliders; World.colliders = all.filter(o => !o.dyn);   // itilebilen eşyalar yer değiştirir: yola katma
+  for (let i = 0; i < n; i++) {
+    const p = resolveCircle(navX(i), navZ(i), CFG.robot.r * 0.92, false);
+    if (Math.abs(p.x) + Math.abs(p.z) > 1e-3) Nav.block[i] = 1;
+  }
+  World.colliders = all;
+}
+const navX = i => -World.W / 2 + (i % Nav.cols + 0.5) * Nav.cs;
+const navZ = i => -World.D / 2 + (Math.floor(i / Nav.cols) + 0.5) * Nav.cs;
+const navCell = (x, z) => clamp(Math.floor((x + World.W / 2) / Nav.cs), 0, Nav.cols - 1) + clamp(Math.floor((z + World.D / 2) / Nav.cs), 0, Nav.rows - 1) * Nav.cols;
+function navLine(ax, az, bx, bz) {
+  const n = Math.ceil(Math.hypot(bx - ax, bz - az) / 0.1);
+  for (let k = 1; k <= n; k++) if (Nav.block[navCell(lerp(ax, bx, k / n), lerp(az, bz, k / n))]) return false;
+  return true;
+}
+const NAV_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+function navPath(sx, sz, tx, tz, reach) {
+  const { cols, rows, block, prev, queue } = Nav; prev.fill(-1);
+  const s = navCell(sx, sz); let head = 0, tail = 0, goal = -1; queue[tail++] = s; prev[s] = s;
+  while (head < tail) {
+    const i = queue[head++];
+    if (Math.hypot(navX(i) - tx, navZ(i) - tz) <= reach) { goal = i; break; }
+    const c = i % cols, r = (i - c) / cols;
+    for (const [dc, dr] of NAV_DIRS) {
+      const nc = c + dc, nr = r + dr; if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const j = nr * cols + nc; if (prev[j] !== -1 || block[j]) continue;
+      if (dc && dr && (block[r * cols + nc] || block[nr * cols + c])) continue;   // köşe kesme yok
+      prev[j] = i; queue[tail++] = j;
+    }
+  }
+  if (goal < 0) return null;
+  const cells = []; for (let i = goal; i !== s; i = prev[i]) cells.push(i); cells.reverse();
+  const pts = []; let ax = sx, az = sz, k = 0;
+  while (k < cells.length) {   // ip çekme: görebildiği en uzak hücreye düz git
+    let far = k; for (let m = k + 1; m < cells.length && navLine(ax, az, navX(cells[m]), navZ(cells[m])); m++) far = m;
+    ax = navX(cells[far]); az = navZ(cells[far]); pts.push([ax, az]); k = far + 1;
+  }
+  pts.push([tx, tz]); return pts;
+}
+function robotPickTarget(now) {
+  const R = CFG.robot, L = Items.list, cols = Grid.cols, head = Grid.head, next = Grid.next;
+  for (let tries = 0; tries < 4; tries++) {
+    let best = null, bs = 0;
+    for (const it of L) {
+      if (it.st >= 2 || it.wedge || (Robot.black.get(it) || 0) > now) continue;
+      const d = Math.hypot(it.x - Robot.x, it.z - Robot.z);
+      let dens = 0; const c0 = gcx(it.x), r0 = gcz(it.z);   // çevresindeki çöp yoğunluğu
+      for (let r = Math.max(0, r0 - 1); r <= Math.min(Grid.rows - 1, r0 + 1); r++)
+        for (let c = Math.max(0, c0 - 1); c <= Math.min(cols - 1, c0 + 1); c++)
+          for (let j = head[r * cols + c]; j >= 0 && dens < 20; j = next[j]) dens++;
+      const pd = Math.hypot(it.x - Noz.x, it.z - Noz.z);
+      const s = (1 + dens * 0.5) * (pd < R.playerAvoid ? 0.3 : 1) / (d + 1.2);
+      if (s > bs) { bs = s; best = it; }
+    }
+    if (!best) return null;
+    const p = resolveCircle(best.x, best.z, R.r, false);   // gövde yeterince yaklaşabiliyor mu
+    if (Math.hypot(p.x, p.z) < R.suctionR * 0.6) return best;
+    Robot.black.set(best, now + 999);
+  }
+  return null;
+}
+const _rp = { x: 0, z: 0, hit: false };
+function updateRobot(dt, now) {
+  const R = CFG.robot, B = Robot;
+  if ((B.retargetT -= dt) <= 0 || !B.target || B.target.st >= 2) {
+    const prev = B.target; B.target = robotPickTarget(now); B.retargetT = R.retarget;
+    if (B.target !== prev) { B.targetT = 0; B.targetD = 1e9; }
+  }
+  if (B.target) {   // yaklaşamıyorsa ya da hep aynı yere çarpıyorsa o bölgeden vazgeç
+    const d = Math.hypot(B.target.x - B.x, B.target.z - B.z);
+    if (d < B.targetD - 0.3) { B.targetD = d; B.targetT = 0; } else B.targetT += dt;
+    if (B.targetT > R.giveUp || (B.bumps >= 3 && now - B.lastGain > 2.5)) {
+      const tx = B.target.x, tz = B.target.z;
+      for (const it of Items.list) if (it.st < 2 && Math.hypot(it.x - tx, it.z - tz) < 1.3) B.black.set(it, now + R.blacklist);
+      B.target = null; B.retargetT = 0; B.bumps = 0;
+    }
+  }
+  if (B.target && (B.pathFor !== B.target || (B.repath -= dt) <= 0)) {   // yol: hedef değişince ve arada bir yenile
+    B.path = navPath(B.x, B.z, B.target.x, B.target.z, 0.3); B.pathFor = B.target; B.repath = 1.2;
+    if (!B.path) { B.black.set(B.target, now + R.blacklist); B.target = null; B.retargetT = 0; }
+  }
+  let want = 0, turn = 0;
+  if (B.mode === 'backup') {
+    want = -R.speed * 0.55;
+    if ((B.modeT -= dt) <= 0) { B.mode = 'turn'; B.modeT = 0.7; B.turnTo = B.yaw + (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random()); }
+  } else if (B.mode === 'turn') {
+    turn = wrapA(B.turnTo - B.yaw);
+    if (Math.abs(turn) < 0.08 || (B.modeT -= dt) <= 0) B.mode = 'drive';
+  } else if (B.escape > 0) {
+    B.escape -= dt; turn = wrapA(Math.atan2(-B.x, -B.z) - B.yaw); want = Math.abs(turn) > 0.8 ? 0 : R.speed;
+  } else if (B.target) {   // sıradaki ara noktaya dön, açı küçülünce hızlan
+    let ax = B.target.x, az = B.target.z;
+    if (B.path) {
+      while (B.path.length > 1 && Math.hypot(B.path[0][0] - B.x, B.path[0][1] - B.z) < 0.3) B.path.shift();
+      ax = B.path[0][0]; az = B.path[0][1];
+    }
+    turn = wrapA(Math.atan2(ax - B.x, az - B.z) - B.yaw);
+    want = Math.abs(turn) > 1.1 ? 0 : R.speed * Math.pow(Math.cos(turn), 2);
+  } else want = R.speed * 0.6;
+  const mt = R.turnRate * dt; B.yaw = wrapA(B.yaw + clamp(turn, -mt, mt));
+  B.v = lerp(B.v, want, 1 - Math.exp(-8 * dt));
+  const fx = Math.sin(B.yaw), fz = Math.cos(B.yaw), ox = B.x, oz = B.z;
+  B.x += fx * B.v * dt; B.z += fz * B.v * dt;
+  kickProps(B.x, B.z, R.r, fx * B.v, fz * B.v);   // robot da saksıları iter
+  let hit = false;
+  pushOutOfHead(B.x, B.z, R.r, _rp); if (_rp.hit) { B.x = _rp.x; B.z = _rp.z; hit = true; }
+  for (let i = 2; i < Hose.N; i++) {   // gövde sert engel; hortumu itip geçer ama yavaşlar (etrafına dolanınca kapana kısılmasın)
+    const can = i === Hose.N - 1, m = R.r + (can ? CFG.canister.r : CFG.hose.r), dx = B.x - Hose.px[i], dz = B.z - Hose.pz[i], d = Math.hypot(dx, dz);
+    if (d < m && d > 1e-5) {
+      if (can) { B.x = Hose.px[i] + dx / d * m; B.z = Hose.pz[i] + dz / d * m; hit = true; }
+      else { B.x += dx / d * (m - d) * 0.3; B.z += dz / d * (m - d) * 0.3; }
+    }
+  }
+  const p = resolveCircle(B.x, B.z, R.r, false); if (p.hit) { B.x += p.x; B.z += p.z; hit = true; }
+  if (B.mode === 'drive' && hit && Math.hypot(B.x - ox, B.z - oz) < Math.abs(B.v) * dt * 0.35) {
+    if ((B.bumpT += dt) > 0.12) {
+      B.mode = 'backup'; B.modeT = R.backup; B.bumpT = 0; B.bumpV -= 3; B.bumps++; B.trap++; B.repath = 0; SFX.bump(robotVol());
+      if (B.trap >= 6) { B.trap = 0; B.escape = 1.2; }   // mobilya arasında sıkıştı: odanın ortasına kaç
+    }
+  } else B.bumpT = 0;
+  B.mx = B.x + fx * R.mouthZ; B.mz = B.z + fz * R.mouthZ;
+  const dist = Math.hypot(B.x - B.sx, B.z - B.sz);   // kendi dar izini temizler
+  if (dist > 0.04) {
+    const steps = Math.ceil(dist / CFG.dust.stampStep);
+    for (let i = 1; i <= steps; i++) Dust.stamp(lerp(B.sx, B.x, i / steps), lerp(B.sz, B.z, i / steps), B.yaw, ROBOT_FOOT);
+    B.sx = B.x; B.sz = B.z; HUD.dustDirty = true;
+  }
+  B.spin += dt * 16;
+  if (B.angryT > 0) B.angryT -= dt;
+}
+function renderRobot(dt) {
+  const B = Robot;
+  B.bumpV += (-B.bump * 220 - B.bumpV * 14) * dt; B.bump += B.bumpV * dt;
+  const b = clamp(B.bump, -0.5, 1);
+  B.g.position.set(B.x, 0, B.z); B.g.rotation.y = B.yaw; B.body.scale.set(1 + b * 0.04, 1 + b * 0.25, 1 + b * 0.04);
+  B.brushes[0].rotation.y = B.spin; B.brushes[1].rotation.y = -B.spin;
+  B.eyeM.color.setHex(B.angryT > 0 ? (Math.floor(B.angryT * 12) % 2 ? 0xFF2020 : 0x660000) : 0x7FF3FF);
+}
+
+/* ---------------- ÇÖP GEOMETRİLERİ ---------------- */
+function jitterGeo(g, amt, rnd) {   // köşeleri pozisyona göre tutarlı boz (çatlak olmasın)
+  const p = g.attributes.position, seen = new Map();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), key = `${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}`;
+    if (!seen.has(key)) seen.set(key, 1 + (rnd() - 0.5) * amt);
+    const k = seen.get(key); p.setXYZ(i, x * k, y * k, z * k);
+  }
+  g.computeVertexNormals(); return g;
+}
+function mergeGeos(list) {
+  const parts = list.map(g => g.index ? g.toNonIndexed() : g);
+  let n = 0; parts.forEach(p => n += p.attributes.position.count);
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3); let o = 0;
+  parts.forEach(p => { pos.set(p.attributes.position.array, o * 3); nor.set(p.attributes.normal.array, o * 3); o += p.attributes.position.count; });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return g;
+}
+const LU = 0.08;   // lego birimi
+function legoGeo(nx, nz, h) {
+  const parts = [box(nx * LU, h, nz * LU)];
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+    const c = new THREE.CylinderGeometry(0.024, 0.024, 0.022, 10); c.translate((i + .5) * LU - nx * LU / 2, h / 2 + 0.011, (j + .5) * LU - nz * LU / 2); parts.push(c);
+  }
+  return mergeGeos(parts);
+}
+function typeAsset(key, rnd) {
+  let g, m;
+  const flat = o => std(0xffffff, Object.assign({ flatShading: true }, o));
+  switch (key) {
+    case 'crumb': g = jitterGeo(new THREE.DodecahedronGeometry(0.062, 0), 0.5, rnd); g.scale(1, 0.7, 1); m = flat({ roughness: 0.8 }); break;
+    case 'cereal': g = new THREE.TorusGeometry(0.045, 0.021, 7, 12); g.rotateX(PI / 2); m = std(0xffffff, { roughness: 0.75 }); break;
+    case 'popcorn': g = jitterGeo(new THREE.IcosahedronGeometry(0.075, 0), 0.65, rnd); m = flat({ roughness: 0.9 }); break;
+    case 'dust': g = jitterGeo(new THREE.IcosahedronGeometry(0.095, 1), 0.5, rnd); m = flat({ roughness: 1 }); break;
+    case 'leaf': {
+      const s = new THREE.Shape(); s.moveTo(0, -0.17); s.quadraticCurveTo(0.13, -0.04, 0, 0.17); s.quadraticCurveTo(-0.13, -0.04, 0, -0.17);
+      g = new THREE.ShapeGeometry(s, 6); g.rotateX(-PI / 2);
+      const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, p.getX(i) * p.getX(i) * 1.6);
+      g.computeVertexNormals(); m = std(0xffffff, { roughness: 0.85, side: THREE.DoubleSide }); break;
+    }
+    case 'twig': {
+      const a = new THREE.CylinderGeometry(0.016, 0.024, 0.42, 5); a.rotateZ(PI / 2);
+      const b = new THREE.CylinderGeometry(0.01, 0.014, 0.14, 4); b.rotateZ(PI / 2 - 0.7); b.translate(0.06, 0.02, 0.04);
+      g = mergeGeos([a, b]); m = flat({ roughness: 0.9 }); break;
+    }
+    case 'pebble': g = jitterGeo(new THREE.DodecahedronGeometry(0.07, 0), 0.4, rnd); g.scale(1, 0.65, 1); m = flat({ roughness: 0.85 }); break;
+    case 'paper': g = jitterGeo(new THREE.IcosahedronGeometry(0.14, 1), 0.38, rnd); m = flat({ roughness: 0.9 }); break;
+    case 'scrap': {
+      g = new THREE.PlaneGeometry(0.26, 0.2, 3, 3); g.rotateX(-PI / 2);
+      const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, (rnd() - 0.5) * 0.03);
+      g.computeVertexNormals(); m = flat({ roughness: 0.9, side: THREE.DoubleSide }); break;
+    }
+    case 'wrap': {
+      g = new THREE.PlaneGeometry(0.3, 0.14, 8, 3); g.rotateX(-PI / 2);
+      const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) { const x = p.getX(i), pinch = Math.abs(x) > 0.08 ? 0.45 + (Math.abs(x) - 0.08) * 3 : 1;
+        p.setZ(i, p.getZ(i) * pinch); p.setY(i, (rnd() - 0.5) * 0.03); }
+      g.computeVertexNormals(); m = flat({ roughness: 0.3, metalness: 0.45, side: THREE.DoubleSide }); break;
+    }
+    case 'cap': g = new THREE.CylinderGeometry(0.09, 0.09, 0.045, 18); m = std(0xffffff, { roughness: 0.35, metalness: 0.2 }); break;
+    case 'coin': g = new THREE.CylinderGeometry(0.07, 0.07, 0.012, 22); m = std(0xffffff, { roughness: 0.28, metalness: 0.85 }); break;
+    case 'button': {
+      g = new THREE.CylinderGeometry(0.065, 0.06, 0.02, 16);
+      m = std(0xffffff, { roughness: 0.4 }); break;
+    }
+    case 'marble': g = new THREE.SphereGeometry(0.06, 16, 12); m = std(0xffffff, { roughness: 0.06, metalness: 0.15 }); break;
+    case 'lego1': g = legoGeo(1, 1, 0.096); m = std(0xffffff, { roughness: 0.28 }); break;
+    case 'lego2': g = legoGeo(2, 1, 0.096); m = std(0xffffff, { roughness: 0.28 }); break;
+    case 'lego4': g = legoGeo(2, 2, 0.096); m = std(0xffffff, { roughness: 0.28 }); break;
+    case 'lego8': g = legoGeo(4, 2, 0.096); m = std(0xffffff, { roughness: 0.28 }); break;
+    case 'plate': g = legoGeo(3, 2, 0.032); m = std(0xffffff, { roughness: 0.28 }); break;
+    case 'legoR': {
+      const c = new THREE.CylinderGeometry(0.08, 0.08, 0.096, 18), st = new THREE.CylinderGeometry(0.024, 0.024, 0.022, 10);
+      st.translate(0, 0.059, 0); g = mergeGeos([c, st]); m = std(0xffffff, { roughness: 0.28 }); break;
+    }
+    case 'sock': {
+      const curve = new THREE.CatmullRomCurve3([new V3(-0.2, 0, -0.05), new V3(0, 0, -0.05), new V3(0.12, 0, 0), new V3(0.15, 0, 0.12)]);
+      g = new THREE.TubeGeometry(curve, 16, 0.05, 8, false); g.scale(1, 0.7, 1);
+      m = std(0xffffff, { roughness: 1 }); break;
+    }
+    case 'bottle': {
+      const b = new THREE.CylinderGeometry(0.11, 0.11, 0.34, 16), c = new THREE.CylinderGeometry(0.035, 0.11, 0.1, 16),
+        n = new THREE.CylinderGeometry(0.035, 0.035, 0.05, 10), k = new THREE.CylinderGeometry(0.042, 0.042, 0.03, 10);
+      c.translate(0, 0.22, 0); n.translate(0, 0.295, 0); k.translate(0, 0.33, 0);
+      g = mergeGeos([b, c, n, k]); g.translate(0, -0.04, 0); g.rotateZ(PI / 2);
+      m = std(0xffffff, { roughness: 0.12, metalness: 0.05, transparent: true, opacity: 0.72 }); break;
+    }
+    case 'can': g = new THREE.CylinderGeometry(0.1, 0.1, 0.34, 18); g.rotateZ(PI / 2);
+      m = std(0xffffff, { roughness: 0.32, metalness: 0.55 }); break;
+  }
+  return { g, m };
+}
+
+/* ---------------- EFEKTLER: toz pufu, emiş akıntısı, yazı, oklar, ipucu ---------------- */
+const Fx = { puffs: [], puffTex: null, flow: null, flowPos: null, flowS: null };
+function buildFx() {
+  Fx.puffTex = radialTex('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
+  for (let i = 0; i < 40; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: Fx.puffTex, transparent: true, depthWrite: false, opacity: 0 }));
+    s.visible = false; s.renderOrder = 6; scene.add(s); Fx.puffs.push({ s, t: 1, life: 1, vx: 0, vy: 0, vz: 0, s0: 0.2 });
+  }
+  // ağza doğru spiral çizen hava zerrecikleri: emişi görünür kılar
+  const n = 70; Fx.flowPos = new Float32Array(n * 3); Fx.flowS = [];
+  for (let i = 0; i < n; i++) Fx.flowS.push({ a: Math.random() * TAU, d: Math.random(), sp: 0.6 + Math.random() * 0.8, h: Math.random() });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(Fx.flowPos, 3));
+  Fx.flow = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xFFF1DF, size: 0.045, transparent: true, opacity: 0.55,
+    depthWrite: false, map: Fx.puffTex, alphaTest: 0.01 }));
+  Fx.flow.frustumCulled = false; Fx.flow.renderOrder = 3; scene.add(Fx.flow);
+}
+function puff(x, y, z, color, n, size) {
+  for (let k = 0; k < n; k++) {
+    const p = Fx.puffs.find(q => q.t >= q.life); if (!p) return;
+    p.t = 0; p.life = 0.3 + Math.random() * 0.2; p.s0 = size * (0.7 + Math.random() * 0.6);
+    p.vx = (Math.random() - 0.5) * 1.2; p.vy = 0.8 + Math.random() * 0.8; p.vz = (Math.random() - 0.5) * 1.2;
+    p.s.position.set(x + (Math.random() - .5) * 0.15, y, z + (Math.random() - .5) * 0.15);
+    p.s.material.color.set(color); p.s.visible = true;
+  }
+}
+function updateFx(dt) {
+  for (const p of Fx.puffs) {
+    if (p.t >= p.life) continue;
+    p.t += dt; const k = Math.min(1, p.t / p.life);
+    p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
+    const sc = p.s0 * (0.6 + k * 1.2); p.s.scale.set(sc, sc, sc);
+    p.s.material.opacity = 0.7 * (1 - k); if (k >= 1) p.s.visible = false;
+  }
+  // emiş akıntısı: dış çemberden ağza, hızlanarak (yarık başlıkta öne doğru dar bir hüzme)
+  const H = Noz.H, R = H.radius * 0.95, c = Math.cos(Noz.yaw), s = Math.sin(Noz.yaw);
+  Fx.flowS.forEach((f, i) => {
+    f.d -= dt * f.sp * (0.5 + (1 - f.d) * 3.2);
+    if (f.d <= 0.04) { f.d = 1; f.a = Math.random() * TAU; f.h = Math.random(); }
+    let a = f.a + (1 - f.d) * 1.3, r = f.d * R;
+    if (H.cone > 0) { a = PI / 2 + (f.a - PI) * (1 - H.cone) * 0.5; }   // öne yönelik yelpaze
+    else if (Math.sin(f.a) < 0) r *= 0.75;
+    const lx = H.mx + Math.cos(a) * r, lz = H.mz + Math.sin(a) * r;
+    Fx.flowPos[i * 3] = Noz.x + lx * c + lz * s; Fx.flowPos[i * 3 + 1] = 0.03 + f.h * 0.08 * f.d + (1 - f.d) * 0.06;
+    Fx.flowPos[i * 3 + 2] = Noz.z - lx * s + lz * c;
+  });
+  Fx.flow.geometry.attributes.position.needsUpdate = true;
+}
+const fxEl = document.getElementById('fx'), _proj = new V3();
+function popText(txt, x, y, z, size) {
+  _proj.set(x, y, z).project(camera);
+  const el = document.createElement('div'); el.className = 'pop'; el.textContent = txt;
+  el.style.left = ((_proj.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - _proj.y) / 2 * innerHeight) + 'px';
+  el.style.fontSize = size + 'px'; fxEl.appendChild(el); setTimeout(() => el.remove(), 820);
+}
+/* son çöpler ekran dışındaysa kenarda ok göster */
+const arrows = [];
+for (let i = 0; i < CFG.cam.arrowsAt; i++) { const d = document.createElement('div'); d.className = 'arrow'; d.hidden = true; fxEl.appendChild(d); arrows.push(d); }
+function updateArrows() {
+  let n = 0;
+  if (state === 'play' && Items.left <= CFG.cam.arrowsAt) {
+    const W = innerWidth, H = innerHeight, m = 26, top = 96, bot = 90, cx = W / 2, cy = H / 2;
+    for (const it of Items.list) {
+      if (it.st >= 2) continue;
+      _proj.set(it.x, it.y, it.z).project(camera);
+      const sx = (_proj.x + 1) / 2 * W, sy = (1 - _proj.y) / 2 * H;
+      if (sx > m && sx < W - m && sy > top && sy < H - bot) continue;
+      const dx = sx - cx, dy = sy - cy;
+      const k = Math.min((W / 2 - m) / Math.max(1e-6, Math.abs(dx)), (dy < 0 ? cy - top : H - bot - cy) / Math.max(1e-6, Math.abs(dy)), 1);
+      const a = arrows[n++]; a.hidden = false;
+      a.style.transform = `translate(${cx + dx * k}px,${cy + dy * k}px) rotate(${Math.atan2(dy, dx)}rad) translate(-8px,-9px)`;
+      if (n >= arrows.length) break;
+    }
+  }
+  for (let i = n; i < arrows.length; i++) if (!arrows[i].hidden) arrows[i].hidden = true;
+}
+const hintEl = document.getElementById('hint');
+let hintTimer = 0;
+function showHint(txt, sec) {
+  hintEl.textContent = txt; hintEl.hidden = false; hintEl.style.opacity = 1; clearTimeout(hintTimer);
+  if (sec) hintTimer = setTimeout(hideHint, sec * 1000);
+}
+function hideHint() { hintEl.style.opacity = 0; clearTimeout(hintTimer); hintTimer = setTimeout(() => hintEl.hidden = true, 400); }
+
+/* ---------------- ÇÖPLER: doğma, ızgara, emiş fiziği, yutulma ---------------- */
+const Items = { list: [], meshes: {}, left: 0, total: 0, totalMass: 1, me: 0, combo: 0, bestCombo: 0, lastGulp: -9, wedgeHinted: false };
+/* uzamsal ızgara (bağlı liste): yakın çift aramaları O(n) */
+const Grid = { cs: CFG.grid.cell, cols: 1, rows: 1, head: null, next: null, W: 0, D: 0 };
+function gridInit(n) {
+  Grid.W = World.W; Grid.D = World.D;
+  Grid.cols = Math.ceil(World.W / Grid.cs) + 1; Grid.rows = Math.ceil(World.D / Grid.cs) + 1;
+  Grid.head = new Int32Array(Grid.cols * Grid.rows); Grid.next = new Int32Array(n);
+}
+const gcx = x => clamp(Math.floor((x + Grid.W / 2) / Grid.cs), 0, Grid.cols - 1);
+const gcz = z => clamp(Math.floor((z + Grid.D / 2) / Grid.cs), 0, Grid.rows - 1);
+function gridBuild() {
+  Grid.head.fill(-1); const L = Items.list;
+  for (let i = 0; i < L.length; i++) { const it = L[i]; if (it.st >= 2) continue;
+    const c = gcz(it.z) * Grid.cols + gcx(it.x); Grid.next[i] = Grid.head[c]; Grid.head[c] = i; }
+}
+function wake(it) { it.awake = true; it.sleepT = 0; }
+
+function spawnItems(L, rnd) {
+  for (const k in Items.meshes) { const m = Items.meshes[k]; scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+  Items.meshes = {}; Items.list = [];
+  const plan = [];
+  for (const [k, n, cx, cz, rad] of L.spawn) for (let i = 0; i < n; i++) {
+    const a = rnd() * TAU, d = Math.sqrt(rnd()) * rad;
+    plan.push({ key: Array.isArray(k) ? k[Math.floor(rnd() * k.length)] : k, x: cx + Math.cos(a) * d, z: cz + Math.sin(a) * d, wedge: false });
+  }
+  for (const [k, x, z] of L.wedge || []) plan.push({ key: k, x, z, wedge: true });
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {   // boş köşelerde sıkışmış çöp
+    const kx = sx * L.W / 2, kz = sz * L.D / 2;
+    if (World.colliders.some(o => !o.tall && (o.t === 'box'
+      ? Math.abs(kx - o.x) < o.hw + 1.0 && Math.abs(kz - o.z) < o.hd + 1.0
+      : Math.hypot(kx - o.x, kz - o.z) < o.r + 1.0))) continue;   // köşede engel varsa arkasına düşer, erişilemez
+    plan.push({ key: 'dust', x: sx * L.W / 2, z: sz * L.D / 2, wedge: true });
+    plan.push({ key: rnd() < 0.5 ? 'crumb' : 'lego1', x: sx * (L.W / 2 - 0.22), z: sz * L.D / 2, wedge: true });
+  }
+  const counts = {}; plan.forEach(p => counts[p.key] = (counts[p.key] || 0) + 1);
+  for (const k in counts) {
+    const a = typeAsset(k, rnd), m = new THREE.InstancedMesh(a.g, a.m, counts[k]);
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
+    Items.meshes[k] = m; m.userData.n = 0; scene.add(m);
+  }
+  const col = new THREE.Color(), up = new V3(0, 1, 0);
+  let mass = 0;
+  for (const p of plan) {
+    const T = TYPES[p.key], mesh = Items.meshes[p.key];
+    let x = p.x, z = p.z;
+    if (!p.wedge && Math.hypot(x - L.start[0], z - L.start[1]) < 1.4) z -= 1.6;
+    const r = resolveCircle(x, z, p.wedge ? T.r * 0.8 : T.r + 0.02, false); x += r.x; z += r.z;
+    const rest = new THREE.Quaternion().setFromAxisAngle(up, rnd() * TAU);
+    if (T.roll) rest.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * TAU, 0, rnd() * TAU)));
+    const it = { T, key: p.key, mesh, idx: mesh.userData.n++, x, z, y: T.h / 2, vx: 0, vz: 0, wedge: p.wedge,
+      q: rest.clone(), rest, st: 0, stick: 0, free: false, yank: false, jit: 0, gt: 0, g0x: 0, g0y: 0, g0z: 0,
+      sw: rnd() < 0.5 ? -1 : 1, spin: new V3(rnd() - .5, rnd() - .5, rnd() - .5).normalize(), spinV: 0, tickT: 0,
+      ph: rnd() * TAU, awake: true, sleepT: 0, dirty: true, hidden: false };
+    mesh.setColorAt(it.idx, col.setHex(T.colors[Math.floor(rnd() * T.colors.length)]).offsetHSL(0, 0, (rnd() - 0.5) * 0.06));
+    Items.list.push(it); mass += T.mass;
+  }
+  for (const k in Items.meshes) Items.meshes[k].instanceColor.needsUpdate = true;
+  Items.total = Items.left = Items.list.length; Items.totalMass = mass; Items.me = 0;
+  Items.combo = 0; Items.bestCombo = 0; Items.lastGulp = -9; Items.wedgeHinted = false;
+  gridInit(Items.list.length);
+  for (let i = 0; i < 8; i++) separate(true);   // yığınları gevşet, sonra hepsini uyut
+  for (const it of Items.list) {
+    if (!it.wedge) { const r = resolveCircle(it.x, it.z, it.T.r * 0.8, false); it.x += r.x; it.z += r.z; }
+    it.awake = false; it.dirty = true;
+  }
+}
+
+/* yerdeki çöpler birbirini iter. all: hepsini uyanık say (başlangıç gevşetmesi) */
+function separate(all) {
+  gridBuild();
+  const L = Items.list, cols = Grid.cols, head = Grid.head, next = Grid.next;
+  for (let i = 0; i < L.length; i++) {
+    const a = L[i]; if (a.st >= 2 || a.T.flutter || !(all || a.awake)) continue;
+    const c0 = gcx(a.x), r0 = gcz(a.z);
+    for (let r = Math.max(0, r0 - 1); r <= Math.min(Grid.rows - 1, r0 + 1); r++)
+      for (let c = Math.max(0, c0 - 1); c <= Math.min(cols - 1, c0 + 1); c++) {
+        for (let j = head[r * cols + c]; j >= 0; j = next[j]) {
+          if (j === i) continue; const b = L[j];
+          if (b.T.flutter || ((all || b.awake) && j < i) || (a.wedge && b.wedge)) continue;
+          const dx = b.x - a.x, dz = b.z - a.z, m = (a.T.r + b.T.r) * 0.8, d2 = dx * dx + dz * dz;
+          if (d2 >= m * m || d2 < 1e-9) continue;
+          // sıkışmış çöp yerinden oynamaz (sonsuz kütle gibi)
+          const wa = a.wedge ? 0 : b.wedge ? 1 : b.T.mass / (a.T.mass + b.T.mass), wb = 1 - wa;
+          const d = Math.sqrt(d2), k = (m - d) / d;
+          a.x -= dx * k * wa; a.z -= dz * k * wa; b.x += dx * k * wb; b.z += dz * k * wb;
+          a.dirty = b.dirty = true;
+          if (!all && !b.awake && (m - d) * wb > 0.004) wake(b);
+        }
+      }
+  }
+}
+/* hortum ve gövde çöpleri gerçek bir cisim gibi iter */
+function bodyPushItems() {
+  const L = Items.list, cols = Grid.cols, head = Grid.head, next = Grid.next, N = Hose.N;
+  for (let h = 1; h < N; h++) {
+    const hx = Hose.px[h], hz = Hose.pz[h], R = h === N - 1 ? CFG.canister.r : CFG.hose.r;
+    const c0 = gcx(hx), r0 = gcz(hz), span = h === N - 1 ? 2 : 1;
+    for (let r = Math.max(0, r0 - span); r <= Math.min(Grid.rows - 1, r0 + span); r++)
+      for (let c = Math.max(0, c0 - span); c <= Math.min(cols - 1, c0 + span); c++)
+        for (let j = head[r * cols + c]; j >= 0; j = next[j]) {
+          const it = L[j]; if (it.st >= 2 || it.wedge) continue;   // sıkışmış çöp hortumla kurtulmaz
+          const dx = it.x - hx, dz = it.z - hz, m = R + it.T.r * 0.7, d2 = dx * dx + dz * dz;
+          if (d2 >= m * m || d2 < 1e-9) continue;
+          const d = Math.sqrt(d2), k = (m - d) / d;
+          it.x += dx * k; it.z += dz * k; it.vx += dx * k * 6; it.vz += dz * k * 6; it.dirty = true; wake(it);
+        }
+  }
+  // robotun gövdesi de iter; önünde emdiği çöpleri itmez
+  const B = Robot, RR = CFG.robot.r, fx = Math.sin(B.yaw), fz = Math.cos(B.yaw), c0 = gcx(B.x), r0 = gcz(B.z);
+  for (let r = Math.max(0, r0 - 1); r <= Math.min(Grid.rows - 1, r0 + 1); r++)
+    for (let c = Math.max(0, c0 - 1); c <= Math.min(cols - 1, c0 + 1); c++)
+      for (let j = head[r * cols + c]; j >= 0; j = next[j]) {
+        const it = L[j]; if (it.st >= 2 || it.wedge) continue;
+        const dx = it.x - B.x, dz = it.z - B.z, m = RR + it.T.r * 0.7, d2 = dx * dx + dz * dz;
+        if (d2 >= m * m || d2 < 1e-9 || (it.free && dx * fx + dz * fz > 0)) continue;
+        const d = Math.sqrt(d2), k = (m - d) / d;
+        it.x += dx * k; it.z += dz * k; it.vx += dx * k * 6; it.vz += dz * k * 6; it.dirty = true; wake(it);
+      }
+  // itilen saksı/kova önündeki çöpleri süpürür (uyuyan çöpler de uyanır)
+  for (const pr of World.props) {
+    const c0 = gcx(pr.x), r0 = gcz(pr.z);
+    for (let r = Math.max(0, r0 - 2); r <= Math.min(Grid.rows - 1, r0 + 2); r++)
+      for (let c = Math.max(0, c0 - 2); c <= Math.min(cols - 1, c0 + 2); c++)
+        for (let j = head[r * cols + c]; j >= 0; j = next[j]) {
+          const it = L[j]; if (it.st >= 2 || it.wedge) continue;
+          const dx = it.x - pr.x, dz = it.z - pr.z, m = pr.r + it.T.r * 0.75, d2 = dx * dx + dz * dz;
+          if (d2 >= m * m || d2 < 1e-9) continue;
+          const d = Math.sqrt(d2), k = (m - d) / d;
+          it.x += dx * k; it.z += dz * k; it.vx += pr.vx * 0.8 + dx * k * 5; it.vz += pr.vz * 0.8 + dz * k * 5; it.dirty = true; wake(it);
+        }
+  }
+}
+
+const _qs = new THREE.Quaternion(), _ax = new V3(), _po = { x: 0, z: 0, hit: false };
+function updateItems(dt, now) {
+  const S = CFG.suction, H = Noz.H, m = H.mouth, reach = H.radius + 0.6;
+  const cy = Math.cos(Noz.yaw), sy = Math.sin(Noz.yaw), baseF = S.strength * H.strength;
+  const RC = CFG.robot, robotOn = state === 'play', RR = RC.suctionR + 0.3, rfx = Math.sin(Robot.yaw), rfz = Math.cos(Robot.yaw);
+  let strain = 0, load = 0;
+  for (const it of Items.list) {
+    if (it.st === 3) continue;
+    if (it.st === 2) { updateGulp(it, dt, now); continue; }
+    const T = it.T, dx = it.x - Noz.x, dz = it.z - Noz.z;
+    const near = robotOn && Math.abs(dx) < reach && Math.abs(dz) < reach;   // maç dışında emiş yok
+    const nearR = robotOn && Math.abs(it.x - Robot.mx) < RR && Math.abs(it.z - Robot.mz) < RR;
+    if (!it.awake && !near && !nearR) continue;
+    let F = 0, d = 99, lx = 0, lz = 0, qx = 0, qz = 0, under = false, R = 1;
+    if (near) {
+      lx = dx * cy - dz * sy; lz = dx * sy + dz * cy;          // başlık yerel: lx sağ, lz ileri
+      const t = clamp(((lx - m[0]) * H.ux + (lz - m[1]) * H.uz) / H.len2, 0, 1);
+      qx = m[0] + H.ux * t; qz = m[1] + H.uz * t; d = Math.hypot(lx - qx, lz - qz);
+      const rx = lx - H.mx, rz = lz - H.mz, cosA = rz / (Math.hypot(rx, rz) || 1e-6);
+      let w = cosA >= 0 ? 1 : lerp(1, H.back, Math.min(1, -cosA * 1.5));
+      if (H.cone) w *= lerp(1, clamp((cosA + 0.2) / 1.0, 0.1, 1), Math.min(1, H.cone * 1.6));
+      w = Math.max(w, 1 - d / 0.35);
+      R = H.radius * w; under = inPoly(H.suck, lx, lz);
+      if (under) F = baseF; else if (d < R) { const f = 1 - d / R; F = baseF * (f * f * 0.65 + f * 0.35); }
+      if (it.wedge) {   // sıkışmış: ağız ucu bir kez dibine değerse çözülür, sonra normal çekilir
+        if (under || d <= S.wedgeReach) it.wedge = false;
+        else { if (F > 0 && d < 0.8) { it.jit = Math.max(it.jit, 0.28); wake(it); maybeWedgeHint(); } F = 0; }
+      }
+    }
+    // robotun emiş alanı: önünde küçük bir daire. Çöp, onu daha güçlü çekene gider (çalma buradan doğar)
+    let F2 = 0, d2 = 99;
+    if (nearR) {
+      const rx = it.x - Robot.mx, rz = it.z - Robot.mz; d2 = Math.hypot(rx, rz);
+      const Rr = RC.suctionR * (rx * rfx + rz * rfz >= -0.05 ? 1 : RC.back);
+      if (d2 < Rr && !(it.wedge && d2 > S.wedgeReach)) F2 = RC.strength * (1 - d2 / Rr);
+    }
+    const byRobot = F2 > F, Fu = byRobot ? F2 : F;
+    const inField = Fu > T.mass * S.minForceK;
+    if (inField) {
+      wake(it); it.wedge = false;
+      if (byRobot) it.robT = now; else load += Math.min(1, F / baseF) * 0.12;
+      if (!it.free) {
+        if (T.grip <= 0) it.free = true;
+        else {   // ağır çöp: yerinde titrer, tıkırdar, motor zorlanır… sonra kopar
+          it.stick += dt * (Fu / S.strength) / T.grip; it.jit = Math.min(1, it.stick * 1.25);
+          if (!byRobot) {
+            strain += T.mass * it.stick * 0.55;
+            if ((it.tickT -= dt) <= 0) { it.tickT = 0.045 + Math.random() * 0.08; SFX.tick(0.4 + it.stick * T.mass * 0.4); }
+          }
+          if (it.stick >= 1) { it.free = true; it.yank = true; it.jit = 0; }
+        }
+      }
+    } else {
+      it.free = false; if (it.stick > 0) it.stick = Math.max(0, it.stick - dt * 1.5);
+      if (!it.wedge || d > 0.8) it.jit = it.stick;
+    }
+    let ty = T.h / 2;
+    if (it.free && inField) {
+      let wx, wz, f;
+      if (byRobot) {   // robot: doğrudan ağzına
+        const rx = Robot.mx - it.x, rz = Robot.mz - it.z, rl = Math.hypot(rx, rz) || 1;
+        wx = rx / rl; wz = rz / rl; f = 1 - Math.min(1, d2 / RC.suctionR);
+      } else {         // biz: ağız çizgisi, huni ile ortaya
+        let px = lerp(qx, H.mx, H.funnel) - lx, pz = lerp(qz, H.mz, H.funnel) - lz; const pl = Math.hypot(px, pz) || 1; px /= pl; pz /= pl;
+        wx = px * cy + pz * sy; wz = -px * sy + pz * cy; f = 1 - Math.min(1, d / R);
+      }
+      const sw = S.swirl * it.sw * Math.sin(f * PI);
+      const acc = Fu / (0.45 + T.mass * 0.55);
+      it.vx += (wx - wz * sw) * acc * dt; it.vz += (wz + wx * sw) * acc * dt;
+      if (it.yank) {
+        it.yank = false; it.vx += wx * S.yank; it.vz += wz * S.yank;
+        if (byRobot) Robot.bumpV -= 1.5;
+        else { SFX.yank(T.mass); buzz(20); Noz.shake = Math.max(Noz.shake, 0.06 * T.mass); Noz.bumpV -= 2; }
+      }
+      if (T.flutter) { it.vx += (Math.random() - .5) * 26 * T.flutter * dt; it.vz += (Math.random() - .5) * 26 * T.flutter * dt; }
+      const drag = Math.exp(-S.airDrag * dt); it.vx *= drag; it.vz *= drag;
+      ty = T.h / 2 + T.lift * Math.pow(f, 1.3) + (T.flutter ? Math.sin(now * 14 + it.ph) * 0.05 * f : 0);
+      it.spinV = lerp(it.spinV, 3 + Math.hypot(it.vx, it.vz) * 2.2 + (T.flutter || 0) * 14, 1 - Math.exp(-6 * dt));
+      if (byRobot ? d2 < RC.capture : (d < T.capture * H.cap || under)) {
+        it.stolen = !byRobot && now - (it.robT || -9) < 0.6;   // robotun ağzından kaptık
+        startGulp(it, byRobot ? 'r' : 'p'); continue;
+      }
+    } else {
+      const drag = Math.exp(-(T.drag || S.floorDrag) * dt); it.vx *= drag; it.vz *= drag; it.spinV *= Math.exp(-5 * dt);
+      if (T.big && near) {   // büyük çöp başlığın altına sığmaz: kenara dayanır
+        pushOutOfHead(it.x, it.z, T.r * 0.8, _po); if (_po.hit) { it.x = _po.x; it.z = _po.z; wake(it); }
+      }
+    }
+    if (!it.awake) continue;
+    const sp = Math.hypot(it.vx, it.vz);
+    if (sp > S.maxItemSpeed) { it.vx *= S.maxItemSpeed / sp; it.vz *= S.maxItemSpeed / sp; }
+    it.x += it.vx * dt; it.z += it.vz * dt;
+    const p = resolveCircle(it.x, it.z, T.r * 0.8, false);
+    if (p.hit) { const pl = Math.hypot(p.x, p.z);
+      if (pl > 1e-6) { const nx = p.x / pl, nz = p.z / pl, vn = it.vx * nx + it.vz * nz; if (vn < 0) { it.vx -= 1.5 * vn * nx; it.vz -= 1.5 * vn * nz; } }
+      it.x += p.x; it.z += p.z; }
+    it.y = ty > it.y ? lerp(it.y, ty, 1 - Math.exp(-12 * dt)) : Math.max(ty, it.y - CFG.gravity * 0.12 * dt * (1 + (it.y - ty) * 8));
+    // dönüş: yuvarlanan tipler yerde yuvarlanır, havadakiler takla atar, düzler yere yatar
+    if (it.spinV > 0.2 && (it.y > T.h / 2 + 0.02 || !T.roll)) {
+      _qs.setFromAxisAngle(it.spin, it.spinV * dt); it.q.premultiply(_qs);
+    } else if (T.roll && sp > 0.05) {
+      _ax.set(it.vz, 0, -it.vx).normalize(); _qs.setFromAxisAngle(_ax, sp * dt / (T.h / 2)); it.q.premultiply(_qs);
+    } else if (!T.roll) it.q.slerp(it.rest, 1 - Math.exp(-6 * dt));
+    it.dirty = true;
+    // uyku: durgun ve alan dışındaysa hesaptan çık
+    if (!inField && sp < CFG.sleep.speed && it.y - T.h / 2 < 0.003 && it.jit < 0.01 && it.spinV < 0.3) {
+      if ((it.sleepT += dt) > CFG.sleep.time) { it.awake = false; it.vx = it.vz = 0; }
+    } else it.sleepT = 0;
+  }
+  separate(false); bodyPushItems();
+  Noz.strain = lerp(Noz.strain, Math.min(2, strain), 1 - Math.exp(-10 * dt));
+  Noz.load = lerp(Noz.load, Math.min(1.5, load), 1 - Math.exp(-8 * dt));
+}
+/* uzun süre hiçbir şey yutulmadıysa başlık öner (kalanlar genelde köşede ya da dar aralıktadır) */
+let idleHintAt = 0;
+function idleHint(now) {
+  if (state !== 'play' || Items.left === 0 || now - Items.lastGulp < 9 || now < idleHintAt) return;
+  idleHintAt = now + 20;
+  showHint(Items.left <= CFG.cam.arrowsAt ? 'Oklar kalan çöpleri gösteriyor. Köşe için ▲ Üçgen, dar aralık için ▮ Yarık.'
+    : 'Dar aralıklara ▮ Yarık, köşelere ▲ Üçgen başlıkla gir.', 4.5);
+}
+function maybeWedgeHint() {
+  if (Items.wedgeHinted || Noz.H.key !== 'wide') return;
+  Items.wedgeHinted = true; showHint('Sıkışmış çöp! Köşeye ▲ Üçgen, dar aralığa ▮ Yarık başlıkla gir.', 4);
+}
+
+const _mw = { x: 0, y: 0.12, z: 0 };
+function mouthWorld(out) { toWorld(Noz.H.mx, Noz.H.mz, out); out.y = 0.12; return out; }
+function gulpTarget(it, out) {   // kim yutuyorsa onun ağzı
+  if (it.owner === 'r') { out.x = Robot.mx; out.y = 0.05; out.z = Robot.mz; return out; }
+  return mouthWorld(out);
+}
+function startGulp(it, owner) { it.st = 2; it.owner = owner; it.gt = 0; it.g0x = it.x; it.g0y = it.y; it.g0z = it.z; it.jit = 0; }
+function updateGulp(it, dt, now) {
+  it.gt = Math.min(1, it.gt + dt / it.T.dur);
+  const t = it.gt, e = t * t; gulpTarget(it, _mw);
+  it.x = lerp(it.g0x, _mw.x, e); it.z = lerp(it.g0z, _mw.z, e);
+  it.y = lerp(it.g0y, _mw.y, e) + Math.sin(PI * t) * 0.1;
+  it.spinV += 40 * dt; _qs.setFromAxisAngle(it.spin, it.spinV * dt); it.q.premultiply(_qs);
+  it.dirty = true;
+  if (t >= 1) finishGulp(it, now);
+}
+function finishGulp(it, now) {
+  const T = it.T; it.st = 3; Items.left--; HUD.dirty = true;
+  if (state !== 'play') return;   // süre bittikten sonra ağza varan sayılmaz
+  if (it.owner === 'r') {   // robot yuttu
+    Robot.count++; Robot.bumpV += 1 + T.mass; Robot.lastGain = now; Robot.bumps = Robot.trap = 0; HUD.flash('r');
+    SFX.robotGulp(robotVol());
+    puff(Robot.x, 0.18, Robot.z, 0xFF9A9A, 1, 0.14);
+    return;
+  }
+  Items.me++; HUD.flash('b');
+  if (it.stolen && Robot.angryT <= 0) {   // robotun ağzından kaptık
+    Robot.angryT = 1.2; SFX.angry();
+    mouthWorld(_mw); popText('ÇALDIN!', _mw.x, 0.6, _mw.z, 17); fxEl.lastChild.classList.add('steal');
+  }
+  Items.combo = now - Items.lastGulp < CFG.combo.window ? Items.combo + 1 : 0; Items.lastGulp = now;
+  Items.bestCombo = Math.max(Items.bestCombo, Items.combo + 1);
+  SFX.gulp(T.snd, Items.combo); buzz(T.mass > 0.8 ? 16 : 6);
+  const last = Hose.pulses[Hose.pulses.length - 1], amp = 0.16 + T.mass * 0.2;
+  if (last && last.s < 0.05) { last.a = Math.min(0.85, last.a + amp * 0.35); last.m += T.mass; }
+  else Hose.pulses.push({ s: 0, a: Math.min(0.85, amp), m: T.mass });
+  Noz.bumpV += 1.2 + T.mass * 1.6;
+  if (T.mass >= 2) Noz.shake = Math.max(Noz.shake, 0.14);
+  mouthWorld(_mw);
+  puff(_mw.x, 0.2, _mw.z, T.key === 'dust' || T.key === 'crumb' ? 0xD8CFC4 : T.colors[0], T.mass > 0.8 ? 4 : 2, 0.18 + T.mass * 0.08);
+  const c = Items.combo + 1;
+  if (c >= 5 && c % 5 === 0) popText('x' + c, _mw.x, 0.5, _mw.z, 18 + Math.min(18, c));
+  else if (T.mass >= 2) popText('TAK!', _mw.x, 0.5, _mw.z, 22);
+  else if (T.key === 'sock') popText('ŞLURP!', _mw.x, 0.5, _mw.z, 20);
+}
+
+const _mA = new THREE.Matrix4(), _mB = new THREE.Matrix4(), _mR = new THREE.Matrix4(), _mS = new THREE.Matrix4();
+const _qd = new THREE.Quaternion(), _X = new V3(1, 0, 0), _dir = new V3(), _zero = new V3(), _sc = new V3(1, 1, 1), _jq = new THREE.Quaternion(), _je = new THREE.Euler();
+function renderItems() {
+  const touched = {};
+  for (const it of Items.list) {
+    if (!it.dirty && it.jit <= 0) continue;
+    const m = it.mesh; it.dirty = false; touched[it.key] = m;
+    if (it.st === 3) { if (!it.hidden) { it.hidden = true; _mA.makeScale(0, 0, 0); m.setMatrixAt(it.idx, _mA); } continue; }
+    let x = it.x, y = it.y, z = it.z;
+    _mA.compose(_zero, it.q, _sc);
+    if (it.jit > 0) {   // koparken titreme: küçük sıçrama + sallanma
+      const j = it.jit * it.jit; x += (Math.random() - .5) * 0.05 * j; z += (Math.random() - .5) * 0.05 * j; y += Math.random() * 0.03 * j;
+      _jq.setFromEuler(_je.set((Math.random() - .5) * 0.5 * j, (Math.random() - .5) * 0.4 * j, (Math.random() - .5) * 0.5 * j));
+      _mB.makeRotationFromQuaternion(_jq); _mA.premultiply(_mB);
+    }
+    if (it.st === 2) {  // yutulma: ağza doğru uzar, incelir, küçülür
+      const t = it.gt, st = 1 + (it.key === 'sock' ? 2 : 1.1) * Math.sin(PI * Math.min(1, t * 1.1)) * (0.5 + t * 0.5);
+      const sc = 1 - t * t * t * 0.85;
+      gulpTarget(it, _mw); _dir.set(_mw.x - it.x, _mw.y - it.y, _mw.z - it.z);
+      if (_dir.lengthSq() > 1e-6) {
+        _dir.normalize(); _qd.setFromUnitVectors(_X, _dir); _mR.makeRotationFromQuaternion(_qd);
+        const inv = 1 / Math.sqrt(st); _mS.makeScale(st * sc, inv * sc, inv * sc);
+        _mB.multiplyMatrices(_mR, _mS); _mR.transpose(); _mB.multiply(_mR); _mA.premultiply(_mB);
+      }
+    }
+    _mA.setPosition(x, y, z); m.setMatrixAt(it.idx, _mA);
+  }
+  for (const k in touched) touched[k].instanceMatrix.needsUpdate = true;
+}
+
+/* ---------------- AĞIZ HAREKETİ + GİRDİ ---------------- */
+const keys = {};
+function resolveHead() {
+  let hit = false; const c = Math.cos(Noz.yaw), s = Math.sin(Noz.yaw);
+  for (let pass = 0; pass < 2; pass++) for (const [lx, lz, r] of Noz.H.probes) {
+    const px = Noz.x + lx * c + lz * s, pz = Noz.z - lx * s + lz * c;
+    const p = resolveCircle(px, pz, r, false); if (p.hit) { Noz.x += p.x; Noz.z += p.z; hit = true; }
+  }
+  return hit;
+}
+function updateNozzle(dt) {
+  const N = CFG.nozzle, H = Noz.H;
+  // başlık değişimi: yarı yolda model değişir
+  if (Noz.swapT < 1) {
+    const prev = Noz.swapT; Noz.swapT = Math.min(1, Noz.swapT + dt / N.swapTime);
+    if (prev < 0.5 && Noz.swapT >= 0.5 && Noz.pendingHead) {
+      Noz.heads[Noz.H.key].visible = false; Noz.H = HEADS[Noz.pendingHead]; Noz.heads[Noz.H.key].visible = true;
+      Noz.pendingHead = null; Noz.sx = Noz.x; Noz.sz = Noz.z; Noz.syaw = Noz.yaw;
+    }
+  }
+  const kx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+  const kz = (keys.ArrowDown || keys.KeyS ? 1 : 0) - (keys.ArrowUp || keys.KeyW ? 1 : 0);
+  if (kx || kz) { const l = Math.hypot(kx, kz); Noz.tx = Noz.x + kx / l * N.keySpeed / N.followK; Noz.tz = Noz.z + kz / l * N.keySpeed / N.followK; }
+  Noz.tx = clamp(Noz.tx, -World.W / 2 + 0.2, World.W / 2 - 0.2); Noz.tz = clamp(Noz.tz, -World.D / 2 + 0.2, World.D / 2 - 0.2);
+  const vmax = N.maxSpeed * H.speed;
+  let dvx = (Noz.tx - Noz.x) * N.followK, dvz = (Noz.tz - Noz.z) * N.followK;
+  const dl = Math.hypot(dvx, dvz); if (dl > vmax) { dvx *= vmax / dl; dvz *= vmax / dl; }
+  const k = 1 - Math.exp(-N.accel * dt); Noz.vx = lerp(Noz.vx, dvx, k); Noz.vz = lerp(Noz.vz, dvz, k);
+  const ox = Noz.x, oz = Noz.z;
+  Noz.x += Noz.vx * dt; Noz.z += Noz.vz * dt;
+  let pushing = false;   // saksıya/kovaya çarpınca iter (ağır olan yavaşlatır)
+  for (const [lx, lz, r] of H.probes) { toWorld(lx, lz, _loc); if (kickProps(_loc.x, _loc.z, r, Noz.vx, Noz.vz)) pushing = true; }
+  if (pushing) { Noz.vx *= 1 - CFG.props.slow; Noz.vz *= 1 - CFG.props.slow; }
+  if (resolveHead()) {   // hedef engelin içine kaçmasın
+    const tx = Noz.tx - Noz.x, tz = Noz.tz - Noz.z, tl = Math.hypot(tx, tz);
+    if (tl > 0.5) { Noz.tx = Noz.x + tx / tl * 0.5; Noz.tz = Noz.z + tz / tl * 0.5; }
+  }
+  const mvx = (Noz.x - ox) / dt, mvz = (Noz.z - oz) / dt;
+  Noz.speed = lerp(Noz.speed, Math.hypot(mvx, mvz), 1 - Math.exp(-12 * dt));
+  // gidilmek istenen yöne dön (duvara itince de uç duvara döner); geri çekerken kafayı çevirme
+  const ix = Noz.tx - Noz.x, iz = Noz.tz - Noz.z, il = Math.hypot(ix, iz), intent = il > 0.06;
+  if (intent || Noz.speed > 0.35) {
+    let diff = wrapA(Math.atan2(intent ? ix : mvx, intent ? iz : mvz) - Noz.yaw);
+    if (Math.abs(diff) > N.reverseAngle) diff = wrapA(diff + PI);
+    const mx = N.turnRate * H.turn * dt * Math.min(1, Math.max(Noz.speed, il * 6) / 2);
+    Noz.yaw = wrapA(Noz.yaw + clamp(diff, -mx, mx));
+    resolveHead();   // dönerken köşeleri duvara gömme
+  }
+  // geçilen yerin tozunu başlığın şekliyle sil (aradaki boşlukları doldurarak)
+  if (Noz.swapT < 1) return;
+  const dist = Math.hypot(Noz.x - Noz.sx, Noz.z - Noz.sz), dy = wrapA(Noz.yaw - Noz.syaw);
+  if (dist > 0.004 || Math.abs(dy) > 0.01) {
+    const steps = Math.max(1, Math.ceil(Math.max(dist, Math.abs(dy) * H.reach) / CFG.dust.stampStep));
+    for (let i = 1; i <= steps; i++) { const t = i / steps;
+      Dust.stamp(lerp(Noz.sx, Noz.x, t), lerp(Noz.sz, Noz.z, t), Noz.syaw + dy * t, H); }
+    Noz.sx = Noz.x; Noz.sz = Noz.z; Noz.syaw = Noz.yaw; HUD.dustDirty = true;
+  }
+}
+
+const ray = new THREE.Raycaster(), floorPlane = new THREE.Plane(new V3(0, 1, 0), 0), _ndc = new THREE.Vector2(), _hit = new V3();
+function floorAt(cx, cy) {
+  _ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(_ndc, camera);
+  return ray.ray.intersectPlane(floorPlane, _hit);
+}
+let drag = null;
+stageEl.addEventListener('pointerdown', e => {
+  if (state !== 'play') return;
+  drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; stageEl.setPointerCapture(e.pointerId);
+});
+stageEl.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  // bağıl sürükleme: parmak ağzı kapatmaz. İki nokta da şimdiki kamerayla çevrilir,
+  // yoksa takip eden kamera parmak dururken ağzı kaydırır.
+  const a = floorAt(drag.x, drag.y); if (!a) return; const ax = a.x, az = a.z;
+  const b = floorAt(e.clientX, e.clientY); if (!b) return;
+  const s = CFG.nozzle.dragSens;
+  Noz.tx += (b.x - ax) * s; Noz.tz += (b.z - az) * s; drag.x = e.clientX; drag.y = e.clientY;
+  if (firstHint) { firstHint = false; hideHint(); }
+});
+const endDrag = e => { if (drag && e.pointerId === drag.id) drag = null; };
+stageEl.addEventListener('pointerup', endDrag); stageEl.addEventListener('pointercancel', endDrag);
+addEventListener('keydown', e => {
+  keys[e.code] = true; if (e.code.startsWith('Arrow')) e.preventDefault();
+  if (state === 'play') { const h = { Digit1: 'wide', Digit2: 'tri', Digit3: 'slot' }[e.code]; if (h) setHead(h); }
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+document.querySelectorAll('.hd').forEach(b => b.addEventListener('click', () => setHead(b.dataset.h)));
+
+/* ---------------- KAMERA ----------------
+   Oyunda yakın kamera ağzı takip eder (viewW × viewD alan görünür); bölüm bitince bütün odayı gösterir */
+const Cam = { dir: new V3(), overDist: 10, playDist: 6, dist: 6, z0: 0, cx: 0, cz: 0, xMax: 0, zMin: 0, zMax: 0 };
+const _v = new V3(), _cc = new V3();
+function fitCamera() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+  const pitch = CFG.cam.pitchDeg * PI / 180, dir = Cam.dir.set(0, -Math.sin(pitch), -Math.cos(pitch));
+  const W = World.W / 2 + CFG.room.wallT, D = World.D / 2 + CFG.room.wallT;
+  const top = 1 - 2 * (78 / h), bot = -1 + 2 * (80 / h), side = CFG.cam.margin, c = new V3();
+  const at = (x, z, dist) => { c.set(x, 0, z); camera.position.copy(c).addScaledVector(dir, -dist); camera.lookAt(c); camera.updateMatrixWorld(); };
+  const ndc = (x, y, z) => _v.set(x, y, z).project(camera);
+  const fitsAll = pts => pts.every(p => { ndc(p[0], p[1], p[2]); return Math.abs(_v.x) <= side && _v.y <= top && _v.y >= bot; });
+  const minDist = (cx, cz, pts) => { let lo = 1, hi = 150; for (let i = 0; i < 28; i++) { const m = (lo + hi) / 2; at(cx, cz, m); if (fitsAll(pts)) hi = m; else lo = m; } return hi; };
+  // genel bakış: bütün oda
+  const room = []; for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, CFG.room.wallH]) room.push([sx * W, y, sz * D]);
+  let best = null;
+  for (let cz = -3; cz <= 3; cz += 0.2) { const d = minDist(0, cz, room); if (!best || d < best.d) best = { cz, d }; }
+  Cam.overDist = best.d; Cam.z0 = best.cz;
+  // oyun: ağzın çevresinde viewW × viewD alan
+  const vw = CFG.cam.viewW / 2, vd = CFG.cam.viewD / 2;
+  Cam.playDist = minDist(0, 0, [[-vw, 0, -vd], [vw, 0, -vd], [-vw, 0, vd], [vw, 0, vd]]);
+  const pd = Cam.playDist;
+  // takip sınırları: duvarlar ekran kenarından içeri girmesin (eğik perspektif simetrik değil)
+  const bsearch = (lo, hi, ok) => { for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; } return lo; };
+  Cam.zMax = bsearch(-D, D, z => { at(0, z, pd); return ndc(0, 0, D).y <= bot; });
+  Cam.zMin = -bsearch(-D, D, z => { at(0, -z, pd); return ndc(0, CFG.room.wallH, -D).y >= top; });
+  if (Cam.zMin > Cam.zMax) Cam.zMin = Cam.zMax = (Cam.zMin + Cam.zMax) / 2;
+  const zm = (Cam.zMin + Cam.zMax) / 2;
+  Cam.xMax = Math.max(0, bsearch(0, W, x => { at(x, zm, pd); return ndc(W, 0, zm).x >= 1; }));
+  Cam.dist = state === 'won' ? Cam.overDist : pd;
+  Cam.cx = clamp(Noz.x, -Cam.xMax, Cam.xMax); Cam.cz = clamp(Noz.z, Cam.zMin, Cam.zMax); placeCam(0);
+}
+function placeCam(dt) {
+  const over = state === 'won', k = dt ? 1 - Math.exp(-CFG.cam.follow * dt) : 1;
+  Cam.dist = lerp(Cam.dist, over ? Cam.overDist : Cam.playDist, dt ? 1 - Math.exp(-2.2 * dt) : 1);
+  const tx = over ? 0 : clamp(Noz.x, -Cam.xMax, Cam.xMax), tz = over ? Cam.z0 : clamp(Noz.z, Cam.zMin, Cam.zMax);
+  Cam.cx = lerp(Cam.cx, tx, k); Cam.cz = lerp(Cam.cz, tz, k);
+  _cc.set(Cam.cx, 0, Cam.cz);
+  camera.position.copy(_cc).addScaledVector(Cam.dir, -Cam.dist); camera.lookAt(_cc);
+}
+addEventListener('resize', () => { fitCamera(); });
+
+/* ---------------- HUD + AKIŞ ---------------- */
+const $ = id => document.getElementById(id);
+const HUD = { dirty: true, dustDirty: true, dustT: 0, lastSec: -1, ft: {},
+  update(dt) {
+    const rem = Math.max(0, CFG.match.time - levelTime), sec = Math.ceil(rem);
+    if (sec !== this.lastSec) {   // geri sayım; son saniyelerde kırmızı + bip
+      this.lastSec = sec; $('tm').textContent = sec;
+      const warn = state === 'play' && rem <= CFG.match.warnAt;
+      $('tmPill').classList.toggle('warn', warn); if (warn && sec > 0) SFX.beep(false);
+    }
+    if (this.dirty) {   // çekişme barı: kim daha çok topladıysa sınır o tarafa kayar
+      this.dirty = false;
+      const me = Items.me, bot = Robot.count, tot = me + bot, share = tot ? me / tot : 0.5, pm = Math.round(share * 100);
+      $('scMe').textContent = me; $('scBot').textContent = bot; $('leftTxt').textContent = Items.left + ' çöp';
+      $('tugB').textContent = pm >= 12 ? pm + '%' : ''; $('tugR').textContent = pm <= 88 ? (100 - pm) + '%' : '';
+      Tug.target = share;
+    }
+    if (this.dustDirty && (this.dustT -= dt) <= 0) { this.dustT = 0.2; this.dustDirty = false; $('dustP').textContent = Dust.pct(); }
+  },
+  flash(side) {
+    const el = $('tug'), c = side === 'b' ? 'fb' : 'fr';
+    el.classList.add(c); clearTimeout(this.ft[c]); this.ft[c] = setTimeout(() => el.classList.remove(c), 140);
+    Tug.shove(side);
+  } };
+
+/* çekişme barı: yaylı sınır (taşar, geri teper), mücadele titremesi, yutuşta itme + kıvılcım, lider değişince parlama */
+const Tug = { share: 0.5, v: 0, target: 0.5, lead: 0, lastSpark: 0,
+  reset() { this.share = this.target = 0.5; this.v = 0; this.lead = 0; },
+  shove(side) {
+    this.v += side === 'b' ? 0.9 : -0.9;   // atan taraf sınırı karşıya iter
+    const now = performance.now(); if (now - this.lastSpark < 70) return; this.lastSpark = now;
+    const cl = $('clash'); cl.classList.remove('hit'); void cl.offsetWidth; cl.classList.add('hit');
+    const tug = $('tug'), col = side === 'b' ? '#6FB6FF' : '#FF6B6B', dir = side === 'b' ? 1 : -1;
+    for (let i = 0; i < 6; i++) {
+      const s = document.createElement('span'); s.className = 'spark';
+      s.style.left = cl.style.left || '50%';
+      s.style.setProperty('--c', col);
+      s.style.setProperty('--dx', (dir * (10 + Math.random() * 26)) + 'px');
+      s.style.setProperty('--dy', ((Math.random() - 0.5) * 34) + 'px');
+      tug.appendChild(s); setTimeout(() => s.remove(), 520);
+    }
+  },
+  update(dt, now) {
+    this.v += ((this.target - this.share) * 160 - this.v * 11) * dt; this.share += this.v * dt;
+    const fight = state === 'play' ? Math.sin(now * 23) * 0.004 + Math.sin(now * 41) * 0.003 : 0;   // mücadele titremesi
+    const d = clamp(this.share + fight, 0.03, 0.97);
+    $('tugB').style.width = d * 100 + '%'; $('tugR').style.width = (1 - d) * 100 + '%'; $('clash').style.left = d * 100 + '%';
+    const lead = this.target > 0.52 ? 1 : this.target < 0.48 ? -1 : 0;
+    if (lead && lead !== this.lead) {   // önde olan değişti
+      const t = $('tug'); t.classList.remove('lead'); void t.offsetWidth; t.classList.add('lead');
+    }
+    if (lead) this.lead = lead;
+  } };
+
+let state = 'menu', levelIdx = 0, levelTime = 0, firstHint = true, countT = 0, lastCount = -1;
+function loadLevel(i) {
+  levelIdx = i % LEVELS.length; const L = LEVELS[levelIdx];
+  L.start = L.start || [0, L.D / 2 - 1.8];
+  const rnd = mulberry(L.seed);
+  buildRoom(L, rnd);
+  Noz.heads[Noz.H.key].visible = false; Noz.H = HEADS.wide; Noz.heads.wide.visible = true; Noz.swapT = 1; Noz.pendingHead = null;
+  document.querySelectorAll('.hd').forEach(b => b.classList.toggle('on', b.dataset.h === 'wide'));
+  Noz.x = Noz.tx = Noz.sx = L.start[0]; Noz.z = Noz.tz = Noz.sz = L.start[1];
+  Noz.vx = Noz.vz = Noz.speed = 0; Noz.yaw = Noz.syaw = PI; Noz.strain = Noz.load = 0;
+  resetHose(); spawnItems(L, rnd); buildNav(); resetRobot(L);
+  Bag.fill = Bag.target = Bag.vel = 0; Bag.drawn = -1;
+  levelTime = 0; HUD.dirty = HUD.dustDirty = true; HUD.dustT = 0; HUD.lastSec = -1; Tug.reset();
+  $('lvName').textContent = `Bölüm ${levelIdx + 1} · ${L.name}`; $('tmPill').classList.remove('warn');
+  fitCamera();
+}
+function startPlay() {
+  SFX.init(); $('ovStart').hidden = true; $('ovWin').hidden = true; $('hud').hidden = false; $('heads').hidden = false;
+  state = 'count'; countT = CFG.match.countdown; lastCount = -1; firstHint = true; placeCam(0); hideHint();
+}
+function showCount(txt, big) {
+  const el = $('count'); el.hidden = false;
+  el.innerHTML = `<span class="${big ? 'go2' : ''}">${txt}</span>`;
+}
+function beginMatch(now) {   // geri sayım bitti: ikisi aynı anda başlar
+  state = 'play'; Items.lastGulp = now; idleHintAt = now + 15;
+  setTimeout(() => $('count').hidden = true, 900);
+  showHint('Sürükle ve süpür · başlığı alttan değiştir', 0);
+}
+function endMatch() {
+  state = 'won'; drag = null; const L = LEVELS[levelIdx], dp = Dust.pct();
+  const me = Items.me, bot = Robot.count, tot = me + bot, share = tot ? me / tot : 0.5, win = me > bot;
+  const got = [win, dp >= CFG.dust.starPct, win && share >= CFG.match.dominate];   // her yıldız kendi koşuluna bağlı
+  $('winLv').textContent = `Bölüm ${levelIdx + 1} · ${L.name}`;
+  $('winTitle').textContent = win ? 'Kazandın!' : me === bot ? 'Berabere!' : 'Robot kazandı!';
+  $('wMe').textContent = me; $('wBot').textContent = bot; $('wDust').textContent = dp + '%';
+  $('starHelp').textContent = `★ kazan · ★ toz %${CFG.dust.starPct}+ · ★ %${Math.round(CFG.match.dominate * 100)} pay  —  en iyi seri x${Items.bestCombo}`;
+  $('stars').hidden = !win;
+  $('btnNext').textContent = win ? 'Sonraki bölüm' : 'Yine de geç'; $('btnNext').className = win ? 'go' : 'go alt';
+  $('btnAgain').textContent = win ? 'Tekrar oyna' : 'Tekrar dene'; $('btnAgain').className = win ? 'go alt' : 'go';
+  $('btnNext').style.order = 5; $('btnAgain').style.order = win ? 6 : 4;   // ana buton üstte
+  const st = [...$('stars').children]; st.forEach(s => s.classList.remove('on'));
+  hideHint(); $('heads').hidden = true; $('tmPill').classList.remove('warn');
+  if (win) SFX.win(); else SFX.lose();
+  // önce kamera geri çekilip temiz odayı göstersin, sonra perde
+  setTimeout(() => {
+    if (state !== 'won') return;
+    $('ovWin').hidden = false;
+    st.forEach((s, i) => { if (got[i]) setTimeout(() => { s.classList.add('on'); buzz(12); }, 300 + i * 260); });
+  }, 1400);
+}
+$('btnStart').onclick = startPlay;
+$('btnNext').onclick = () => { loadLevel(levelIdx + 1); startPlay(); };
+$('btnAgain').onclick = () => { loadLevel(levelIdx); startPlay(); };
+$('btnRe').onclick = () => { loadLevel(levelIdx); startPlay(); };
+
+/* ---------------- ANA DÖNGÜ ---------------- */
+buildNozzle(); buildCanister(); buildHose(); buildRobot(); buildFx();
+loadLevel(0);
+const _cyan = new THREE.Color(0x7FF3FF), _warn = new THREE.Color(0xFF9A3C);
+function stepSim(dt, now) {
+  if (state === 'play') { updateNozzle(dt); updateRobot(dt, now); }
+  updateProps(dt); updateHose(dt); if (state !== 'menu') updateItems(dt, now);
+}
+function drawFrame(dtAll, now) {
+  updateFx(dtAll); updateFades(dtAll); updateBag(dtAll);
+  // yaylar: ağız şişmesi, gövde zıplaması, başlık değişim zıplaması, sarsıntı
+  Noz.bumpV += (-Noz.bump * 260 - Noz.bumpV * 16) * dtAll; Noz.bump += Noz.bumpV * dtAll;
+  Can.wobV += (-Can.wob * 140 - Can.wobV * 9) * dtAll; Can.wob += Can.wobV * dtAll;
+  const b = clamp(Noz.bump, -0.6, 1.2), tr = Noz.strain, sw = Noz.swapT < 1 ? Math.sin(Noz.swapT * PI) : 0;
+  const head = Noz.heads[Noz.H.key], ud = head.userData;
+  Noz.g.position.set(Noz.x, sw * 0.12, Noz.z); Noz.g.rotation.y = Noz.yaw;
+  head.scale.set((1 + b * 0.05) * (1 - sw * 0.35), (1 + b * 0.16) * (1 - sw * 0.2), (1 + b * 0.05) * (1 - sw * 0.35));
+  head.position.set((Math.random() - .5) * 0.018 * tr, 0, (Math.random() - .5) * 0.018 * tr);
+  ud.led.color.copy(_cyan).lerp(_warn, clamp(tr, 0, 1));
+  ud.glowM.opacity = 0.07 + Noz.load * 0.1 + Math.sin(now * 9) * 0.01;
+  renderHose(); renderRobot(dtAll); renderProps(dtAll); renderItems(); Dust.flush(); HUD.update(dtAll); Tug.update(dtAll, now);
+  SFX.setMotor(state === 'play', Noz.speed, tr, Noz.load, Noz.H.key === 'slot' ? 1.35 : Noz.H.key === 'tri' ? 1.12 : 1);
+  Noz.shake *= Math.exp(-9 * dtAll);
+  placeCam(dtAll); updateArrows();
+  if (Noz.shake > 0.002) camera.position.add(_v.set((Math.random() - .5) * Noz.shake, (Math.random() - .5) * Noz.shake, 0));
+  renderer.render(scene, camera);
+}
+let lastT = performance.now();
+function frame(nowMs) {
+  requestAnimationFrame(frame);
+  const now = nowMs / 1000, dtAll = Math.min(0.05, (nowMs - lastT) / 1000); lastT = nowMs;
+  const sub = Math.max(1, Math.ceil(dtAll / 0.0167)), dt = dtAll / sub;
+  for (let i = 0; i < sub; i++) stepSim(dt, now);
+  if (state === 'count') {   // 3-2-1-SÜPÜR!
+    countT -= dtAll; const n = Math.ceil(countT);
+    if (n !== lastCount) { lastCount = n; showCount(n > 0 ? n : 'SÜPÜR!', n <= 0); SFX.beep(n <= 0); }
+    if (countT <= 0) beginMatch(now);
+  } else if (state === 'play') {
+    levelTime += dtAll; idleHint(now);
+    if (levelTime >= CFG.match.time || Items.left === 0) endMatch();
+  }
+  drawFrame(dtAll, now);
+}
+requestAnimationFrame(frame);
+</script>
