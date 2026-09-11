@@ -106,6 +106,14 @@ body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
   border-top:9px solid transparent;border-bottom:9px solid transparent;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6));
   animation:arw .7s ease-in-out infinite alternate}
 @keyframes arw{from{opacity:.55}to{opacity:1}}
+/* yüzen joystick */
+.stick{position:fixed;left:0;top:0;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;pointer-events:none;z-index:7;
+  border:2.5px solid rgba(255,255,255,.75);background:radial-gradient(circle,rgba(20,14,10,.12),rgba(20,14,10,.32) 72%);
+  box-shadow:0 0 0 1px rgba(0,0,0,.25),0 6px 20px rgba(0,0,0,.25);
+  opacity:0;transform:scale(.7);transition:opacity .12s,transform .12s}
+.stick.on{opacity:1;transform:scale(1)}
+.stick i{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;
+  background:radial-gradient(circle at 40% 35%,#fff,#FFE3D0);border:2px solid rgba(255,122,89,.9);box-shadow:0 4px 14px rgba(0,0,0,.4)}
 .hint{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 90px);transform:translateX(-50%);
   font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--ink);background:var(--panel);text-align:center;
   border:1px solid var(--line);padding:8px 14px;border-radius:20px;pointer-events:none;z-index:5;
@@ -148,6 +156,7 @@ body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
 <div class="fx" id="fx"></div>
 <div class="hint" id="hint" hidden></div>
 <div class="count" id="count" hidden></div>
+<div class="stick" id="stick"><i id="knob"></i></div>
 <div class="heads" id="heads" hidden>
   <button class="hd on" data-h="wide" aria-label="Geniş başlık"><svg viewBox="0 0 40 24"><rect x="3" y="8" width="34" height="9" rx="3"/></svg>Geniş<span class="k">1</span></button>
   <button class="hd" data-h="tri" aria-label="Üçgen başlık"><svg viewBox="0 0 40 24"><path d="M20 1.5 L33 22 L7 22Z"/></svg>Üçgen<span class="k">2</span></button>
@@ -185,7 +194,9 @@ body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
    Ayarlar: CFG · başlıklar: HEADS · çöp tipleri: TYPES · bölümler: LEVELS
    ============================================================ */
 const CFG = {
-  nozzle:  { followK:14, accel:22, maxSpeed:8.5, turnRate:8, reverseAngle:2.1, dragSens:1.15, keySpeed:6, swapTime:0.28 },
+  nozzle:  { followK:14, accel:22, maxSpeed:8.5, turnRate:11, keySpeed:6, swapTime:0.28 },
+  // yüzen joystick (px): parmağın değdiği yerde çıkar; radius'tan uzağa çekince merkez parmağı izler
+  stick:   { radius:58, dead:8, curve:1.35 },
   suction: { strength:30, minForceK:1.6, maxItemSpeed:11, airDrag:2.2, floorDrag:7.5, yank:3.2, swirl:0.35,
              wedgeReach:0.17 },        // sıkışmış çöpe ağız çizgisinin bu kadar yaklaşması gerekir
   hose:    { segs:24, segLen:0.3, iters:8, beads:120, r:0.1, neckY:0.32, pulseSpeed:1.15, pulseW:0.03, skipNear:3 },
@@ -218,7 +229,7 @@ const HEADS = {
           rear:-0.16, color:0x4FC3A1, radius:1.25, strength:1.15, back:0.5, cone:0.2, funnel:0.3, cap:0.9, speed:1.0, turn:1.1 },
   slot: { name:'Yarık', foot:[[-0.13,-0.2],[0.13,-0.2],[0.1,0.74],[-0.1,0.74]], mouth:[0,0.5,0,0.72],
           probes:[[0,-0.08,0.14],[0,0.2,0.13],[0,0.46,0.12],[0,0.65,0.1]], rear:-0.2, color:0x6C8CFF,
-          radius:2.0, strength:1.55, back:0.2, cone:0.55, funnel:0, cap:0.8, speed:0.9, turn:0.65 },
+          radius:2.0, strength:1.55, back:0.2, cone:0.55, funnel:0, cap:0.8, speed:0.9, turn:0.85 },
 };
 
 /* Çöp tipleri. r: çarpışma yarıçapı, h: yükseklik (dinlenme y = h/2), mass: ağırlık,
@@ -1769,9 +1780,12 @@ function updateNozzle(dt) {
   }
   const kx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
   const kz = (keys.ArrowDown || keys.KeyS ? 1 : 0) - (keys.ArrowUp || keys.KeyW ? 1 : 0);
-  if (kx || kz) { const l = Math.hypot(kx, kz); Noz.tx = Noz.x + kx / l * N.keySpeed / N.followK; Noz.tz = Noz.z + kz / l * N.keySpeed / N.followK; }
-  Noz.tx = clamp(Noz.tx, -World.W / 2 + 0.2, World.W / 2 - 0.2); Noz.tz = clamp(Noz.tz, -World.D / 2 + 0.2, World.D / 2 - 0.2);
   const vmax = N.maxSpeed * H.speed;
+  if (Stick.id !== null) {   // joystick: çekilen yöne, çekme miktarına göre hızda sürekli git; bırakınca dur
+    Noz.tx = Noz.x + Stick.ux * Stick.mag * vmax / N.followK; Noz.tz = Noz.z + Stick.uz * Stick.mag * vmax / N.followK;
+  } else if (kx || kz) { const l = Math.hypot(kx, kz); Noz.tx = Noz.x + kx / l * N.keySpeed / N.followK; Noz.tz = Noz.z + kz / l * N.keySpeed / N.followK; }
+  else { Noz.tx = Noz.x; Noz.tz = Noz.z; }
+  Noz.tx = clamp(Noz.tx, -World.W / 2 + 0.2, World.W / 2 - 0.2); Noz.tz = clamp(Noz.tz, -World.D / 2 + 0.2, World.D / 2 - 0.2);
   let dvx = (Noz.tx - Noz.x) * N.followK, dvz = (Noz.tz - Noz.z) * N.followK;
   const dl = Math.hypot(dvx, dvz); if (dl > vmax) { dvx *= vmax / dl; dvz *= vmax / dl; }
   const k = 1 - Math.exp(-N.accel * dt); Noz.vx = lerp(Noz.vx, dvx, k); Noz.vz = lerp(Noz.vz, dvz, k);
@@ -1786,12 +1800,11 @@ function updateNozzle(dt) {
   }
   const mvx = (Noz.x - ox) / dt, mvz = (Noz.z - oz) / dt;
   Noz.speed = lerp(Noz.speed, Math.hypot(mvx, mvz), 1 - Math.exp(-12 * dt));
-  // gidilmek istenen yöne dön (duvara itince de uç duvara döner); geri çekerken kafayı çevirme
-  const ix = Noz.tx - Noz.x, iz = Noz.tz - Noz.z, il = Math.hypot(ix, iz), intent = il > 0.06;
-  if (intent || Noz.speed > 0.35) {
-    let diff = wrapA(Math.atan2(intent ? ix : mvx, intent ? iz : mvz) - Noz.yaw);
-    if (Math.abs(diff) > N.reverseAngle) diff = wrapA(diff + PI);
-    const mx = N.turnRate * H.turn * dt * Math.min(1, Math.max(Noz.speed, il * 6) / 2);
+  // başlık hep gidilmek istenen yöne bakar (duvara itince de uç duvara döner) — üçgen/yarık ucu joystick yönünü gösterir
+  const ix = Noz.tx - Noz.x, iz = Noz.tz - Noz.z, il = Math.hypot(ix, iz), intent = il > 0.04;
+  if (intent) {
+    const diff = wrapA(Math.atan2(ix, iz) - Noz.yaw);
+    const mx = N.turnRate * H.turn * dt * Math.min(1, il * 14);
     Noz.yaw = wrapA(Noz.yaw + clamp(diff, -mx, mx));
     resolveHead();   // dönerken köşeleri duvara gömme
   }
@@ -1806,28 +1819,32 @@ function updateNozzle(dt) {
   }
 }
 
-const ray = new THREE.Raycaster(), floorPlane = new THREE.Plane(new V3(0, 1, 0), 0), _ndc = new THREE.Vector2(), _hit = new V3();
-function floorAt(cx, cy) {
-  _ndc.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(_ndc, camera);
-  return ray.ray.intersectPlane(floorPlane, _hit);
+/* yüzen joystick: ekrana dokunulan yerde halka çıkar. Ekran yönü = dünya yönü (kamera dönmez: sağ = +x, aşağı = +z).
+   Parmak halkadan dışarı taşarsa merkez parmağın peşinden gelir: ters yöne dönüş anında olur. */
+const Stick = { id: null, ox: 0, oy: 0, ux: 0, uz: 0, mag: 0 };
+const stickEl = document.getElementById('stick'), knobEl = document.getElementById('knob');
+function stickMove(x, y) {
+  const S = CFG.stick; let dx = x - Stick.ox, dy = y - Stick.oy, d = Math.hypot(dx, dy);
+  if (d > S.radius) { Stick.ox += dx / d * (d - S.radius); Stick.oy += dy / d * (d - S.radius); dx = x - Stick.ox; dy = y - Stick.oy; d = S.radius; }
+  Stick.mag = d <= S.dead ? 0 : Math.pow((d - S.dead) / (S.radius - S.dead), S.curve);
+  if (d > 1e-3) { Stick.ux = dx / d; Stick.uz = dy / d; }
+  stickEl.style.left = Stick.ox + 'px'; stickEl.style.top = Stick.oy + 'px';
+  knobEl.style.transform = `translate(${dx}px,${dy}px)`;
+  if (firstHint && Stick.mag > 0.2) { firstHint = false; hideHint(); }
 }
-let drag = null;
+function stickRelease() { Stick.id = null; Stick.mag = 0; stickEl.classList.remove('on'); }
 stageEl.addEventListener('pointerdown', e => {
-  if (state !== 'play') return;
-  drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; stageEl.setPointerCapture(e.pointerId);
+  // ikinci parmak yok sayılır; ama yeni bir "ilk" dokunuş, bitişi kaçırılmış eski dokunuşu geçersiz kılar (joystick kilitlenmesin)
+  if (state !== 'play' || (Stick.id !== null && !e.isPrimary)) return;
+  Stick.id = e.pointerId; Stick.ox = e.clientX; Stick.oy = e.clientY;
+  try { stageEl.setPointerCapture(e.pointerId); } catch (err) { /* sentetik olaylarda yakalama olmayabilir */ }
+  stickMove(e.clientX, e.clientY); stickEl.classList.add('on'); buzz(6);
 });
-stageEl.addEventListener('pointermove', e => {
-  if (!drag || e.pointerId !== drag.id) return;
-  // bağıl sürükleme: parmak ağzı kapatmaz. İki nokta da şimdiki kamerayla çevrilir,
-  // yoksa takip eden kamera parmak dururken ağzı kaydırır.
-  const a = floorAt(drag.x, drag.y); if (!a) return; const ax = a.x, az = a.z;
-  const b = floorAt(e.clientX, e.clientY); if (!b) return;
-  const s = CFG.nozzle.dragSens;
-  Noz.tx += (b.x - ax) * s; Noz.tz += (b.z - az) * s; drag.x = e.clientX; drag.y = e.clientY;
-  if (firstHint) { firstHint = false; hideHint(); }
-});
-const endDrag = e => { if (drag && e.pointerId === drag.id) drag = null; };
-stageEl.addEventListener('pointerup', endDrag); stageEl.addEventListener('pointercancel', endDrag);
+stageEl.addEventListener('pointermove', e => { if (e.pointerId === Stick.id) stickMove(e.clientX, e.clientY); });
+const endStick = e => { if (e.pointerId === Stick.id) stickRelease(); };
+stageEl.addEventListener('pointerup', endStick); stageEl.addEventListener('pointercancel', endStick);
+stageEl.addEventListener('lostpointercapture', endStick);
+addEventListener('blur', () => { if (Stick.id !== null) stickRelease(); });   // uygulama arka plana geçince
 addEventListener('keydown', e => {
   keys[e.code] = true; if (e.code.startsWith('Arrow')) e.preventDefault();
   if (state === 'play') { const h = { Digit1: 'wide', Digit2: 'tri', Digit3: 'slot' }[e.code]; if (h) setHead(h); }
@@ -1959,10 +1976,10 @@ function showCount(txt, big) {
 function beginMatch(now) {   // geri sayım bitti: ikisi aynı anda başlar
   state = 'play'; Items.lastGulp = now; idleHintAt = now + 15;
   setTimeout(() => $('count').hidden = true, 900);
-  showHint('Sürükle ve süpür · başlığı alttan değiştir', 0);
+  showHint('Ekrana dokun ve çek · başlığı alttan değiştir', 0);
 }
 function endMatch() {
-  state = 'won'; drag = null; const L = LEVELS[levelIdx], dp = Dust.pct();
+  state = 'won'; stickRelease(); const L = LEVELS[levelIdx], dp = Dust.pct();
   const me = Items.me, bot = Robot.count, tot = me + bot, share = tot ? me / tot : 0.5, win = me > bot;
   const got = [win, dp >= CFG.dust.starPct, win && share >= CFG.match.dominate];   // her yıldız kendi koşuluna bağlı
   $('winLv').textContent = `Bölüm ${levelIdx + 1} · ${L.name}`;
