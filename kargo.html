@@ -374,19 +374,12 @@ function step(dt) {
   for (const p of S.pax) p.pop *= Math.exp(-6 * dt);
   // vinç: ağır kutu parmağı geç takip eder, sarkaç gibi sallanır
   const hm = S.hand ? mass(S.hand) : 1, prevDX = S.handDX;
-  S.handDX = lerp(S.handDX, S.handX, 1 - Math.exp(-(26 / (1 + hm * 0.15)) * dt));   // kutu göründüğü yerden düştüğü için gecikme hafif tutuldu
+  S.handDX = lerp(S.handDX, S.handX, 1 - Math.exp(-(40 / (1 + hm * 0.08)) * dt));   // parmağa sıkı bağlı; ağırlık hissi sallanmada
   const acc = (S.handDX - prevDX) / Math.max(dt, 1e-4);
   S.swingV += (-S.swing * (14 / (1 + hm * 0.15)) - acc * 0.004 - S.swingV * 1.6) * dt;
   S.swing = clamp(S.swing + S.swingV * dt, -0.5, 0.5);
   S.handAnim *= Math.exp(-9 * dt);
   if (S.hand) S.hookX = craneGeom().hookX;   // kutu tam bu x'ten düşer (görünen = olan)
-  if (S.dropReq) { S.dropReq.t += dt;
-    if (!S.hand || S.phase !== 'play' || !S.running || AIM) S.dropReq = null;
-    else {
-      S.swing *= Math.exp(-14 * dt); S.swingV *= Math.exp(-14 * dt);   // bırakırken vinç durulur: kutu parmağın altından düşsün
-      S.hookX = craneGeom().hookX;
-      if ((Math.abs(S.handDX - S.handX) < 3 && Math.abs(S.hookX - S.handX) < 4) || S.dropReq.t > 0.45) { S.dropReq = null; tryDrop(); }
-    } }
 
   if (S.phase === 'play') {
     // rüzgâr: sakin → uyarı → sağanak
@@ -488,15 +481,20 @@ function spill(d) {
 /* ---------------- GİRDİ ---------------- */
 function toL(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
 cv.addEventListener('pointerdown', e => {
-  if (!S.running || S.phase !== 'play' || AIM || S.dropReq) return; e.preventDefault(); SFX.init();
+  if (!S.running || S.phase !== 'play' || AIM) return; e.preventDefault(); SFX.init();
   const [x] = toL(e);
   if (!S.hand) return;   // ambardaki kutulara dokunmak bir şey yapmaz (kazara geri alma olmasın); düzeltme ↶ Geri al ile
-  AIM = { id: e.pointerId }; S.dropReq = null; S.handX = clamp(x, 20, W - 20);
+  AIM = { id: e.pointerId }; S.handX = clamp(x, 20, W - 20);
   try { cv.setPointerCapture(e.pointerId); } catch (err) {}
 });
 cv.addEventListener('pointermove', e => { if (!AIM || e.pointerId !== AIM.id) return; const [x] = toL(e); S.handX = clamp(x, 20, W - 20); });
-/* bırakınca: vinç parmağın olduğu yere yetişince düşür (hızlı dokunuşta kutu eski yerinden düşmesin) */
-function endAim(e) { if (!AIM || (e && e.pointerId !== AIM.id)) return; AIM = null; if (S.running && S.phase === 'play' && S.hand) S.dropReq = { t: 0 }; }
+/* bırakınca: beklemeden, parmağın tam altından düşer (vinç o noktaya oturur) */
+function endAim(e) {
+  if (!AIM || (e && e.pointerId !== AIM.id)) return; AIM = null;
+  if (!S.running || S.phase !== 'play' || !S.hand) return;
+  S.handDX = S.handX; S.swing = 0; S.swingV = 0; S.hookX = craneGeom().hookX;
+  tryDrop();
+}
 cv.addEventListener('pointerup', endAim); cv.addEventListener('pointercancel', endAim);
 
 /* ---------------- EFEKT ---------------- */
