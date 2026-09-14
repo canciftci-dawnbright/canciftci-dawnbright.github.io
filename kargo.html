@@ -44,14 +44,15 @@ button.go{background:var(--go);color:#fff;border-color:#237A52}
     <span class="stat r" id="hTimeBox"><small>Süre</small><b id="hTime">90</b></span>
   </div>
   <div class="stage" id="stage"><canvas id="cv"></canvas></div>
-  <div class="row"><button id="bRe">↻ Bölümü tekrarla</button><button id="bReset">⏮ Baştan başla</button></div>
+  <div class="row"><button id="bUndo">↶ Geri al</button><button id="bRe">↻ Tekrarla</button><button id="bReset">⏮ Baştan</button></div>
 </div></div>
 
 <script>
 'use strict';
 /* ============================================================
    KARGO UÇAĞI — yandan görünüş, canlı denge
-   Dokun/sürükle: vinçteki kutuyu nişanla · bırak: kutu ambara düşer. Ambardaki kutuyu tut: geri al, yerini değiştir.
+   Dokun/sürükle: vinçteki kutuyu gezdir · bırak: kutu tam göründüğü yerden düşer (sütun yok, sıkıştırmayı fizik yapar).
+   ↶ Geri al: son bırakılan kutu vince döner. Ambardan taşan kutu varken uçak kalkmaz.
    Uçak ana tekerleğin üstünde tahterevalli gibi anında yatar; eğim artınca kutular kayar.
    Burun ya da kuyruk 2,5 sn yere sürterse kaybedersin. Tüm yük yüklü + su terazisi yeşilde → uçak kalkar.
    Vinç sabırsızdır (süre dolunca kutuyu kendi bırakır). Bırakınca uçak yeşilde kalırsa +2 sn, art arda: kombo.
@@ -71,6 +72,7 @@ const KS = 100;                                // eğim sertliği: tork (kütle 
 const STRIKE_LOSE = 2.5, READY_HOLD = 0.9, RUN_TIME = 90, WARN_AT = 10;
 const COMBO_BONUS = 2, SETTLE_CHECK = 0.9;     // bırakıştan bu kadar sonra yeşildeyse +sn
 const PAX_M = 1.5;                             // yolcu ağırlığı
+const SUPPORT_MIN = 0.3;                       // üstteki kutu alttakine en az bu oranda basmazsa oturmaz, yana kayar
 const GLASS_BREAK_PENALTY = 8, GLASS_HIT = 300;
 const deg = r => r * 180 / Math.PI, rad = d => d * Math.PI / 180;
 
@@ -201,7 +203,7 @@ function newRun(lv, data) {
     crates: [], total: data.order.length, maxLoaded: 0,
     pax: (cfg.pax || []).map((at, j) => ({ at, col: data.seats[j], boarded: false, pop: 0 })),
     wind: { st: 'calm', t: 0, dur: 4 + Math.random() * 2, dir: 1, v: 0 },
-    fuseT: cfg.fuse || 0, combo: 0, pending: null, slow: 0, debris: [], emo: [],
+    fuseT: cfg.fuse || 0, combo: 0, pending: null, dropStack: [], hookX: W / 2, slow: 0, debris: [], emo: [],
     th: 0, thv: 0, strikeT: 0, readyT: 0, left: RUN_TIME, lastSec: RUN_TIME, running: false, over: false, phase: 'play', anim: { t: 0 },
     t: 0, parts: [], pops: [], shake: 0, fx: { x: 0, y: 0 }, lastAlarm: 0, strikeSide: 0, lastFuseSec: 0 };
   for (const f of cfg.fixed || []) S.crates.push(makeCrate(f.t, f.c * U, 0, true));
@@ -218,27 +220,41 @@ function toScreen(lx, ly, th) { th = th === undefined ? S.th : th;
 function toLocal(sx, sy) { const dx = sx - PIVOT.x, dy = sy - PIVOT.y, c = Math.cos(S.th), s = Math.sin(S.th);
   const px = (dx * c + dy * s) / PS, py = (-dx * s + dy * c) / PS; return [px + BAY_L / 2, FLOOR_Y - py]; }
 
-/* nişan: parmağın x'inden sütun */
-function aimCol(t, sx) {
-  const T = TYPES[t], [, byS] = toScreen(BAY_L / 2, BAY_H), [lx] = toLocal(sx, byS);
-  return clamp(Math.round(lx / U - T.w / 2), 0, COLS - T.w);
-}
-function topUnder(x, w) { let top = null; for (const c of S.crates) if (c.x < x + w - 2 && c.x + c.w > x + 2 && (!top || c.y + c.h > top.y + top.h)) top = c; return top; }
+/* altında duracağı kutu: fizikle aynı kural — yeterince basmıyorsa destek sayılmaz */
+function topUnder(x, w) { let top = null;
+  for (const c of S.crates) { const ox = Math.min(c.x + c.w, x + w) - Math.max(c.x, x);
+    if (ox >= Math.min(c.w, w) * SUPPORT_MIN && (!top || c.y + c.h > top.y + top.h)) top = c; }
+  return top; }
 function landingY(x, w) { const t = topUnder(x, w); return t ? t.y + t.h : 0; }
-function canDrop(t, col) { const T = TYPES[t]; return landingY(col * U, T.w * U) + T.h * U <= BAY_H + 3; }
+/* eldeki kutunun ambardaki sol kenarı: vinçte göründüğü yerin tam altı */
+function dropLocalX() {
+  const w = TYPES[S.hand].w * U, [, byS] = toScreen(BAY_L / 2, BAY_H), [lx] = toLocal(S.hookX, byS);
+  return clamp(lx - w / 2, 0, BAY_L - w);
+}
+const overflowing = b => b.y + b.h > BAY_H + 4;
 function paxTorque() { let tq = 0; for (const p of S.pax) if (p.boarded) tq += PAX_M * (p.col + 0.5 - COLS / 2); return tq; }
 function torque(list, extra) {
   let tq = paxTorque(); for (const c of list) tq += c.m * ((c.x + c.w / 2) / U - COLS / 2);
   if (extra) tq += extra.m * ((extra.x + extra.w / 2) / U - COLS / 2);
   return tq;
 }
-function colScreenX(t, col) { return toScreen(col * U + TYPES[t].w * U / 2, BAY_H)[0]; }
+/* tavan: ambar 3 kat; kutu bırakılan yerde tavanın altına sığmıyorsa girmez (gökyüzüne yığılmaz) */
+const roomAt = (x, w, h) => landingY(x, w) + h <= BAY_H + 2;
+/* serbest bırakma: sütun yok, kutu vinçte durduğu yerden düşer; yan yana sıkıştırmayı fizik yapar */
 function tryDrop(forced) {
   if (!S.hand) return false;
-  const t = S.hand, T = TYPES[t], col = aimCol(t, S.handX);
-  if (!canDrop(t, col)) { if (!forced) { SFX.bad(); buzz(20); popText('Sığmıyor!', S.handX, HAND_Y - 50, '#D6423A', 18); } return false; }
+  const t = S.hand, T = TYPES[t], w = T.w * U, h = T.h * U;
+  let x = dropLocalX();
+  if (!roomAt(x, w, h)) {
+    if (!forced) { SFX.bad(); buzz(20); S.swingV += 3; popText('Yer yok!', S.hookX, HAND_Y - 60, '#D6423A', 18); return false; }
+    // vinç sabrı bitti ama burada yer yok: en yakın boşluğa bırakır
+    let best = null; for (let xx = 0; xx <= BAY_L - w; xx += 2) if (roomAt(xx, w, h) && (best === null || Math.abs(xx - x) < Math.abs(best - x))) best = xx;
+    if (best === null) { S.fuseT = S.cfg.fuse; return false; }
+    x = best;
+  }
   if (S.pending) settleCheck();   // önceki bırakışın kombosunu hemen değerlendir
-  S.crates.push(Object.assign(makeCrate(t, col * U, BAY_H + 6), { vy: -260 }));
+  const c = Object.assign(makeCrate(t, x, Math.max(BAY_H + 6, landingY(x, w) + 4)), { vy: -260 });
+  S.crates.push(c); S.dropStack.push(c.id);
   S.maxLoaded = Math.max(S.maxLoaded, loadedCount());
   S.pending = { t: 0 };
   SFX.drop(); buzz(6);
@@ -247,15 +263,24 @@ function tryDrop(forced) {
   HUD.dirty = true;
   return true;
 }
-/* vinç sabrı bitti: nişanlanan yere, olmuyorsa en yakın uygun sütuna bırak */
+/* vinç sabrı bitti: kutu durduğu yerden düşer */
 function forceDrop() {
-  const t = S.hand, T = TYPES[t]; let col = aimCol(t, S.handX);
-  if (!canDrop(t, col)) { let best = null; for (let c = 0; c <= COLS - T.w; c++) if (canDrop(t, c) && (best === null || Math.abs(c - col) < Math.abs(best - col))) best = c;
-    if (best === null) { S.fuseT = S.cfg.fuse; return; } col = best; }
-  S.handX = colScreenX(t, col); AIM = null;
-  popText('Vinç bıraktı!', W / 2, 176, '#E07A2E', 18); buzz(20);
-  tryDrop(true);
+  AIM = null;
+  if (tryDrop(true)) { popText('Vinç bıraktı!', W / 2, 176, '#E07A2E', 18); buzz(20); }
 }
+/* geri al: son bırakılan (hâlâ ambarda olan) kutu vince döner */
+function undoLast() {
+  if (!S.running || S.phase !== 'play') return;
+  let c = null;
+  while (S.dropStack.length && !c) { const id = S.dropStack.pop(); c = S.crates.find(b => b.id === id) || null; }
+  if (!c) { SFX.bad(); return; }
+  S.crates.splice(S.crates.indexOf(c), 1);
+  if (S.hand) S.queue.unshift(S.hand);
+  const [sx] = toScreen(c.x + c.w / 2, c.y);
+  setHand(c.t); S.handAnim = 0.6; S.handDX = sx; S.handX = sx; S.pending = null;
+  SFX.pick(); buzz(10); HUD.dirty = true;
+}
+const canUndo = () => S.running && S.phase === 'play' && S.dropStack.some(id => S.crates.some(b => b.id === id));
 function settleCheck() {
   S.pending = null;
   if (!S.cfg.fuse) return;   // ilk bölümde kombo yok, sade öğretim
@@ -264,15 +289,6 @@ function settleCheck() {
     popText('Dengede! +' + COMBO_BONUS + ' sn' + (S.combo > 1 ? '  x' + S.combo : ''), W / 2, 176, '#2F9E6B', 18 + Math.min(S.combo, 5) * 2);
     SFX.combo(S.combo); buzz(12);
   } else S.combo = 0;
-}
-function freeTop(c) { return !S.crates.some(o => o !== c && o.x < c.x + c.w - 2 && o.x + o.w > c.x + 2 && Math.abs(o.y - (c.y + c.h)) < 5); }
-function crateAt(sx, sy) {
-  const [lx, ly] = toLocal(sx, sy);
-  let best = null;
-  for (const c of S.crates) if (lx > c.x - 6 && lx < c.x + c.w + 6 && ly > c.y - 6 && ly < c.y + c.h + 10) { if (!best || c.y > best.y) best = c; }
-  if (!best) return null;
-  let top = best, guard = 0; while (!freeTop(top) && guard++ < 6) { const up = S.crates.find(o => o !== top && o.x < top.x + top.w - 2 && o.x + o.w > top.x + 2 && Math.abs(o.y - (top.y + top.h)) < 5); if (!up) break; top = up; }
-  return top.fixed ? null : top;
 }
 
 /* ---------------- FİZİK (uçak çerçevesinde, kutular eksen hizalı) ---------------- */
@@ -294,7 +310,8 @@ function physics(dt) {
       let a = list[i], b = list[j];
       const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
       if (ox <= 0.5 || oy <= 0.001) continue;   // dikeyde tolerans yok: yığındaki kutu çökmesin, hızı sıfırlansın
-      if (oy < ox) {   // dikey: üsttekini alttakinin üstüne oturt
+      // dikey: üsttekini alttakinin üstüne oturt — ama köşesine az basıyorsa oturmaz, yana itilir (boşluğa kayar)
+      if (oy < ox && ox >= Math.min(a.w, b.w) * SUPPORT_MIN) {
         if (a.y > b.y) { const t = a; a = b; b = t; }
         if (b.fixed) continue;
         b.y = a.y + a.h;
@@ -314,6 +331,9 @@ function physics(dt) {
     for (const b of S.crates) {
       if (b.fixed) continue;
       if (b.x < 0) b.x = 0; if (b.x + b.w > BAY_L) b.x = BAY_L - b.w;
+      // tavan: ambara girmiş kutu bir daha yukarı taşamaz (sıkışınca yana itilir)
+      if (b.y + b.h <= BAY_H + 0.5) b.entered = true;
+      if (b.entered && b.y + b.h > BAY_H) { b.y = BAY_H - b.h; if (b.vy > 0) b.vy = 0; }
       if (!b.ground) continue;
       const rel = b.vx - b.svx;
       if (Math.abs(gx) <= b.mu * gy && Math.abs(rel) < 30) b.vx = b.svx;   // statik sürtünme: durur
@@ -354,11 +374,19 @@ function step(dt) {
   for (const p of S.pax) p.pop *= Math.exp(-6 * dt);
   // vinç: ağır kutu parmağı geç takip eder, sarkaç gibi sallanır
   const hm = S.hand ? mass(S.hand) : 1, prevDX = S.handDX;
-  S.handDX = lerp(S.handDX, S.handX, 1 - Math.exp(-(20 / (1 + hm * 0.3)) * dt));
+  S.handDX = lerp(S.handDX, S.handX, 1 - Math.exp(-(26 / (1 + hm * 0.15)) * dt));   // kutu göründüğü yerden düştüğü için gecikme hafif tutuldu
   const acc = (S.handDX - prevDX) / Math.max(dt, 1e-4);
   S.swingV += (-S.swing * (14 / (1 + hm * 0.15)) - acc * 0.004 - S.swingV * 1.6) * dt;
   S.swing = clamp(S.swing + S.swingV * dt, -0.5, 0.5);
   S.handAnim *= Math.exp(-9 * dt);
+  if (S.hand) S.hookX = craneGeom().hookX;   // kutu tam bu x'ten düşer (görünen = olan)
+  if (S.dropReq) { S.dropReq.t += dt;
+    if (!S.hand || S.phase !== 'play' || !S.running || AIM) S.dropReq = null;
+    else {
+      S.swing *= Math.exp(-14 * dt); S.swingV *= Math.exp(-14 * dt);   // bırakırken vinç durulur: kutu parmağın altından düşsün
+      S.hookX = craneGeom().hookX;
+      if ((Math.abs(S.handDX - S.handX) < 3 && Math.abs(S.hookX - S.handX) < 4) || S.dropReq.t > 0.45) { S.dropReq = null; tryDrop(); }
+    } }
 
   if (S.phase === 'play') {
     // rüzgâr: sakin → uyarı → sağanak
@@ -399,7 +427,7 @@ function step(dt) {
     } else S.strikeT = Math.max(0, S.strikeT - dt * 1.5);
     // kalkışa hazır mı
     const settled = S.crates.every(b => Math.abs(b.vx) < 20 && Math.abs(b.vy) < 20);
-    const ready = S.running && !S.hand && !S.queue.length && settled && S.pax.every(p => p.boarded) && Math.abs(deg(S.th)) <= S.cfg.green && Math.abs(S.thv) < 0.08;
+    const ready = S.running && !S.hand && !S.queue.length && settled && S.pax.every(p => p.boarded) && !S.crates.some(overflowing) && Math.abs(deg(S.th)) <= S.cfg.green && Math.abs(S.thv) < 0.08;
     if (ready) { if (S.readyT === 0) SFX.ready(); S.readyT += dt; } else S.readyT = 0;
     if (S.readyT >= READY_HOLD) { S.phase = 'takeoff'; S.running = false; S.anim = { t: 0, th0: S.th }; AIM = null; SFX.engine(2.6); buzz(40); S.pending = null;
       popText(S.left >= 55 ? 'Kusursuz yükleme!' : 'Kalkışa hazır!', W / 2, 150, '#2F9E6B', 26); }
@@ -460,21 +488,15 @@ function spill(d) {
 /* ---------------- GİRDİ ---------------- */
 function toL(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
 cv.addEventListener('pointerdown', e => {
-  if (!S.running || S.phase !== 'play' || AIM) return; e.preventDefault(); SFX.init();
-  const [x, y] = toL(e);
-  const c = y > HAND_Y + 40 ? crateAt(x, y) : null;
-  if (c) {   // ambardaki kutuyu geri al
-    S.crates.splice(S.crates.indexOf(c), 1);
-    if (S.hand) S.queue.unshift(S.hand);
-    const [sx] = toScreen(c.x + c.w / 2, c.y);
-    setHand(c.t); S.handAnim = 0.6; S.handDX = sx; SFX.pick(); buzz(10); HUD.dirty = true;
-  }
-  if (!S.hand) return;
-  AIM = { id: e.pointerId }; S.handX = clamp(x, 20, W - 20);
+  if (!S.running || S.phase !== 'play' || AIM || S.dropReq) return; e.preventDefault(); SFX.init();
+  const [x] = toL(e);
+  if (!S.hand) return;   // ambardaki kutulara dokunmak bir şey yapmaz (kazara geri alma olmasın); düzeltme ↶ Geri al ile
+  AIM = { id: e.pointerId }; S.dropReq = null; S.handX = clamp(x, 20, W - 20);
   try { cv.setPointerCapture(e.pointerId); } catch (err) {}
 });
 cv.addEventListener('pointermove', e => { if (!AIM || e.pointerId !== AIM.id) return; const [x] = toL(e); S.handX = clamp(x, 20, W - 20); });
-function endAim(e) { if (!AIM || (e && e.pointerId !== AIM.id)) return; AIM = null; if (S.running && S.phase === 'play') tryDrop(); }
+/* bırakınca: vinç parmağın olduğu yere yetişince düşür (hızlı dokunuşta kutu eski yerinden düşmesin) */
+function endAim(e) { if (!AIM || (e && e.pointerId !== AIM.id)) return; AIM = null; if (S.running && S.phase === 'play' && S.hand) S.dropReq = { t: 0 }; }
 cv.addEventListener('pointerup', endAim); cv.addEventListener('pointercancel', endAim);
 
 /* ---------------- EFEKT ---------------- */
@@ -567,17 +589,24 @@ function draw() {
   drawPlane();
   let ghostTh = null;
   if (S.phase === 'play' && S.hand && S.running) {
-    const T = TYPES[S.hand], col = aimCol(S.hand, S.handX), under = topUnder(col * U, T.w * U), land = under ? under.y + under.h : 0;
-    const fits = land + T.h * U <= BAY_H + 3, breaks = fits && under && TYPES[under.t].fragile, ok = fits && !breaks;
-    const gx = -BAY_L / 2 + col * U, gy = FLOOR_Y - land - T.h * U;
-    ctx.fillStyle = ok ? 'rgba(124,240,176,.14)' : 'rgba(255,107,94,.18)'; ctx.fillRect(gx, FLOOR_Y - BAY_H, T.w * U, BAY_H - land);
-    ctx.strokeStyle = ok ? 'rgba(124,240,176,.95)' : 'rgba(255,107,94,.95)'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
-    if (fits) { rr(gx + 1, gy + 1, T.w * U - 2, T.h * U - 2, 5); ctx.stroke(); }
-    ctx.setLineDash([]);
-    if (breaks) { ctx.fillStyle = '#D6423A'; ctx.font = '800 12px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Kırılır!', gx + T.w * U / 2, gy - 8); }
-    if (fits) ghostTh = clamp((torque(S.crates, { m: mass(S.hand), x: col * U, w: T.w * U })) / KS, -TILT_MAX, TILT_MAX);
+    // sade düşüş gölgesi: kutunun tam altına ince çizgi + ineceği yüzeyde yarı saydam iz (renkli onay/ret yok)
+    const T = TYPES[S.hand], w = T.w * U, x = dropLocalX(), under = topUnder(x, w), land = under ? under.y + under.h : 0;
+    const gx = -BAY_L / 2 + x, gy = FLOOR_Y - land - T.h * U;
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 5]);
+    ctx.beginPath(); ctx.moveTo(gx + w / 2, FLOOR_Y - BAY_H - 20); ctx.lineTo(gx + w / 2, gy); ctx.stroke(); ctx.setLineDash([]);
+    if (roomAt(x, w, T.h * U)) { ctx.fillStyle = 'rgba(255,255,255,.12)'; rr(gx + 1, gy + 1, w - 2, T.h * U - 2, 5); ctx.fill(); }
+    else { ctx.fillStyle = 'rgba(214,66,58,.9)'; ctx.font = '800 12px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Yer yok', gx + w / 2, FLOOR_Y - BAY_H - 10); }
+    if (under && TYPES[under.t].fragile) { ctx.fillStyle = '#D6423A'; ctx.font = '800 12px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Kırılır!', gx + w / 2, gy - 8); }
+    ghostTh = clamp(torque(S.crates, { m: mass(S.hand), x, w }) / KS, -TILT_MAX, TILT_MAX);
   }
   for (const b of S.crates) drawCrate(b.t, -BAY_L / 2 + b.x, FLOOR_Y - b.y - b.h, b.w, b.h, b.fixed);
+  // ambardan taşan kutular: kırmızı çerçeve + tavan çizgisi
+  const over = S.phase === 'play' ? S.crates.filter(b => overflowing(b) && Math.abs(b.vy) < 20) : [];
+  if (over.length) {
+    ctx.strokeStyle = `rgba(214,66,58,${0.6 + 0.4 * Math.sin(S.t * 10)})`; ctx.lineWidth = 3;
+    for (const b of over) { rr(-BAY_L / 2 + b.x - 2, FLOOR_Y - b.y - b.h - 2, b.w + 4, b.h + 4, 6); ctx.stroke(); }
+    ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(-BAY_L / 2, FLOOR_Y - BAY_H); ctx.lineTo(BAY_L / 2, FLOOR_Y - BAY_H); ctx.stroke(); ctx.setLineDash([]);
+  }
   ctx.setTransform(BASE_T);
   // fırlayan yük ve kıyafetler
   for (const d of S.debris) { ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot); drawCrate(d.t, -d.w / 2, -d.h / 2, d.w, d.h); ctx.restore(); }
@@ -608,17 +637,22 @@ function draw() {
     ctx.fillStyle = 'rgba(58,46,38,.85)'; rr(W / 2 - 140, 282, 280, 26, 13); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = '800 13px "Baloo 2",sans-serif'; ctx.fillText('Dokun & kaydır → nişan al · bırak → düşür', W / 2, 295);
   }
-  if (S.running && !S.hand && !S.queue.length && S.readyT === 0 && S.strikeT === 0 && S.crates.every(b => Math.abs(b.vx) < 20)) {
-    ctx.fillStyle = 'rgba(214,66,58,.9)'; rr(W / 2 - 148, 282, 296, 26, 13); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = '800 13px "Baloo 2",sans-serif'; ctx.fillText('Dengesiz! Bir kutuyu tutup yerini değiştir', W / 2, 295);
+  if (S.running && S.readyT === 0 && S.strikeT === 0 && S.crates.every(b => Math.abs(b.vx) < 20 && Math.abs(b.vy) < 20)) {
+    const full = S.crates.some(overflowing), stuck = !S.hand && !S.queue.length;
+    const msg = full ? 'Ambar kapanmıyor! Kutuyu ↶ Geri al' : stuck ? 'Dengesiz! ↶ Geri al ile kutuları düzelt' : null;
+    if (msg && (full || stuck)) { ctx.fillStyle = 'rgba(214,66,58,.9)'; rr(W / 2 - 150, 282, 300, 26, 13); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '800 13px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, W / 2, 295); }
   }
 }
 /* vinç: halat ağırlıkla uzar ve gerilir, kutu sarkaç gibi sallanır, üstünde kg etiketi */
-function drawCrane() {
+function craneGeom() {
   const T = TYPES[S.hand], m = mass(S.hand), w = T.w * U * PS, h = T.h * U * PS, hx = S.handDX;
   const stretch = 4 + m * 2.4, hy = HAND_Y + stretch - S.handAnim * 90;
   const ang = S.swing + Math.sin(S.t * (2.6 / (1 + m * 0.12))) * 0.03, pivotY = 24, len = hy - h - 10 - pivotY;
-  const hookX = hx + Math.sin(ang) * len, hookY = pivotY + Math.cos(ang) * len;
+  return { T, m, w, h, hx, ang, pivotY, hookX: hx + Math.sin(ang) * len, hookY: pivotY + Math.cos(ang) * len };
+}
+function drawCrane() {
+  const { m, w, h, hx, ang, pivotY, hookX, hookY } = craneGeom();
   ctx.fillStyle = '#23292F'; rr(hx - 16, 8, 32, 16, 4); ctx.fill();
   ctx.fillStyle = m >= 5 ? '#D6423A' : '#F2B233'; ctx.fillRect(hx - 10, 20, 20, 3);
   ctx.strokeStyle = m >= 5 ? '#1A1A1A' : '#333'; ctx.lineWidth = 1.5 + Math.min(m, 10) * 0.35;
@@ -637,8 +671,6 @@ function drawCrane() {
   ctx.font = '800 10px "Baloo 2",sans-serif'; const tw = ctx.measureText(kg).width + 10;
   ctx.fillStyle = m >= 5 ? '#D6423A' : m >= 2 ? '#C98A10' : 'rgba(40,48,56,.8)'; rr(lx - tw / 2 + 22, ly - 8, tw, 14, 7); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(kg, lx + 22, ly - 1);
-  // nişan çizgisi parmağın hizasında (ağır kutu geriden gelse de düşeceği yer burası)
-  if (AIM) { const ax = colScreenX(S.hand, aimCol(S.hand, S.handX)); ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.setLineDash([3, 5]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hookX, hookY + h + 14); ctx.lineTo(ax, 330); ctx.stroke(); ctx.setLineDash([]); }
 }
 /* rüzgâr: sağ üstte rüzgâr hortumu, sağanakta gökte çizgiler; sağanaktan önce uyarı */
 function drawWind() {
@@ -677,14 +709,15 @@ function drawLevel(ghostTh) {
 /* ---------------- HUD / EKRAN / DÖNGÜ ---------------- */
 const HUD = { dirty: true, update() { if (!this.dirty) return; this.dirty = false;
   $('hLv').textContent = S.lv + 1; $('hLoad').textContent = loadedCount() + '/' + S.total; $('hTime').textContent = Math.ceil(S.left);
-  $('hTimeBox').className = 'stat r' + (S.left <= WARN_AT && S.phase === 'play' ? ' warn' : ''); } };
+  $('hTimeBox').className = 'stat r' + (S.left <= WARN_AT && S.phase === 'play' ? ' warn' : '');
+  const u = canUndo(); $('bUndo').disabled = !u; $('bUndo').style.opacity = u ? 1 : 0.45; } };
 function hideOv() { const o = $('ov'); if (o) o.remove(); }
 function overlay(html) { hideOv(); const d = document.createElement('div'); d.className = 'ov'; d.id = 'ov'; d.innerHTML = html; $('cab').appendChild(d); return d; }
 function startLevel(lv, sameData) {
   newRun(lv, sameData); HUD.dirty = true;
   const c = S.cfg, news = [], prev = LEVELS.slice(0, Math.min(lv, LEVELS.length));
   const firstMix = t => c.mix[t] && !prev.some(p => p.mix[t]), firstRule = k => c[k] && !prev.some(p => p[k]);
-  if (lv === 0) news.push('Ekrana <b>dokun ve kaydır</b>: vinçteki kutuyu nişanla, <b>bırak</b>: düşer.<br>Uçak her kutuda <b>yatar</b>. Ambardaki kutuyu <b>tutarak geri alabilirsin</b>.<br>Burun ya da kuyruk <b>2,5 sn yere sürterse</b> kaybedersin.');
+  if (lv === 0) news.push('Ekrana <b>dokun ve kaydır</b>: vinçteki kutuyu gezdir, <b>bırak</b>: tam altına düşer.<br>Uçak her kutuda <b>yatar</b>. Yanlış mı koydun? <b>↶ Geri al</b>.<br>Burun ya da kuyruk <b>2,5 sn yere sürterse</b> kaybedersin.');
   if (firstRule('fuse')) news.push('Yeni: <b>vinç sabırsız</b> — ' + c.fuse + ' sn içinde bırakmazsan kendi bırakır.<br>Bıraktığında uçak <b>yeşilde</b> kalırsa <b>+' + COMBO_BONUS + ' sn</b>, art arda yaparsan kombo!');
   if (firstMix('bag')) news.push('Yeni: <b>valiz</b> (2 birim).');
   if (firstMix('fridge')) news.push('Yeni: <b>buzdolabı</b> (uzun) ve <b>tuğla paleti</b> (çok ağır).');
@@ -718,6 +751,7 @@ function showFail(why) {
   $('bAg').onclick = () => { startLevel(lv, data); $('bGo').click(); };
 }
 $('bRe').onclick = () => { const lv = S.lv, data = S.data; startLevel(lv, data); $('bGo').click(); };
+$('bUndo').onclick = () => { SFX.init(); undoLast(); };
 /* baştan başla: onay sor, kaydı sil, 1. bölüme dön */
 $('bReset').onclick = () => {
   const wasRunning = S.running; S.running = false; AIM = null;
