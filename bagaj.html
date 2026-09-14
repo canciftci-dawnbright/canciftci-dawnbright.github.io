@@ -1,0 +1,612 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2E3B45">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bagaj Ustası">
+<title>Bagaj Ustası</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap">
+<style>
+:root{ --bg:#2E3B45; --panel:#FFF7EA; --line:#E5D3B8; --ink:#3A2E26; --ink-dim:#A08C78; --go:#2F9E6B; --bad:#D6423A; --gold:#F2B233; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Baloo 2",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;touch-action:none;
+  user-select:none;-webkit-user-select:none;background-image:radial-gradient(640px 360px at 50% 0%,rgba(242,178,51,.16),transparent 72%)}
+#app{min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;padding:6px 5px 10px}
+.cab{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:8px 9px 9px;box-shadow:0 20px 50px rgba(0,0,0,.45);position:relative;overflow:hidden}
+.hud{display:flex;align-items:center;justify-content:space-between;padding:0 4px 7px;border-bottom:1px solid var(--line)}
+.stat{line-height:1}.stat small{display:block;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:2px}
+.stat b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}.stat.r{text-align:right}
+.stat.warn b{color:var(--bad)}
+.stage{position:relative;margin-top:7px;border-radius:13px;overflow:hidden;border:1px solid var(--line);touch-action:none}
+#cv{display:block;margin:0 auto}
+.row{display:flex;gap:7px;margin-top:8px}
+button{flex:1;appearance:none;border:1px solid var(--line);background:#F2E6D2;color:var(--ink);font:inherit;font-size:14px;font-weight:800;padding:10px 8px;border-radius:12px;cursor:pointer}
+button.go{background:var(--go);color:#fff;border-color:#237A52}
+.ov{position:absolute;inset:0;background:rgba(255,247,234,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;z-index:20}
+.ov h2{font-size:30px;margin:0 0 4px;line-height:1.1}.ov p{color:#7A6656;font-size:14px;line-height:1.45;margin:4px 0 12px;max-width:300px}
+.ov .row{width:100%;max-width:280px;flex-direction:column}
+.stars{font-size:44px;letter-spacing:6px;margin:4px 0}
+.stars span{display:inline-block;color:#E8D9C2;transform:scale(.5);transition:transform .35s cubic-bezier(.3,1.8,.5,1),color .2s}
+.stars span.on{color:var(--gold);transform:scale(1)}
+.boot{position:fixed;left:10px;right:10px;top:10px;z-index:9999;padding:12px 14px;border-radius:10px;background:#3B1512;color:#FFD9D2;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+</style>
+
+<div class="boot" id="boot"><b>Oyun başlatılamadı — JavaScript çalışmıyor.</b></div>
+<script>window.addEventListener("error", function(e){ var b=document.getElementById("boot"); if(b) b.innerHTML="<b>Oyun hata verdi</b><br>"+(e.message||"?")+" satır "+(e.lineno||"?"); });</script>
+
+<div id="app"><div class="cab" id="cab">
+  <div class="hud">
+    <span class="stat"><small id="hLv">Bölüm 1</small><b id="hCars">0/2</b></span>
+    <span class="stat" style="text-align:center"><small>Bagaj</small><b id="hFill">0%</b></span>
+    <span class="stat r" id="hTimeBox"><small>Süre</small><b id="hTime">90</b></span>
+  </div>
+  <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+  <div class="row"><button id="bHint">💡 İpucu (<span id="hHints">3</span>)</button><button id="bAuto" title="Bırakınca sığan yöne kendiliğinden çevir">🔄 Oto kapalı</button><button id="bRe">↻ Tekrarla</button></div>
+</div></div>
+
+<script>
+'use strict';
+/* ============================================================
+   BAGAJ USTASI — bölümlü (her bölüm 90 sn)
+   Aşağıdaki eşyaları sürükleyip arabanın bagajına yerleştir. Eşyaya dokun = 90° çevir.
+   Bagaj tamamen dolunca kapak kapanır, araba yola çıkar, yenisi gelir. Hedef sayıda araba → bölüm geçilir; süre biterse kaybedilir.
+   Her bagaj, eşyalarıyla birebir dolacak şekilde üretilir: çözümü her zaman vardır.
+   ============================================================ */
+const W = 360, H = 640;
+const CELL = 44, TRUNK_CY = 262;            // bagaj ızgarası: hücre boyu, merkez y
+const TRAY_Y0 = 424, TRAY_CELL = 29;         // kaldırım: eşyalar küçültülmüş durur
+const RUN_TIME = 90, HONK_AT = 10;
+const DRAG_LIFT = 58;                         // sürüklenen eşya parmağın bu kadar üstünde (parmak kapatmasın)
+
+/* Araba tipleri: '#' = kullanılamaz (tekerlek yuvası, stepne, alet kutusu). tier: hangi zorluktan itibaren gelir */
+const CARS = [
+  { name:'Mini',     body:'#F28CA0', tier:0, mask:['....','....','....'] },
+  { name:'Fiat',     body:'#4FB3BF', tier:0, mask:['.....','.....','.....'] },
+  { name:'Kare',     body:'#F2B233', tier:1, mask:['....','....','....','....'] },
+  { name:'Sedan',    body:'#E5484D', tier:1, mask:['.....','.....','.....','.....'] },
+  { name:'Hatchback',body:'#3E7BFA', tier:2, mask:['#...#','.....','.....','.....'] },
+  { name:'Station',  body:'#E07A2E', tier:2, mask:['......','......','......','......'] },
+  { name:'SUV',      body:'#2F9E6B', tier:3, mask:['......','#....#','......','......','......'] },
+  { name:'Minivan',  body:'#C9A227', tier:3, mask:['......','......','......','..##..','......'] },
+  { name:'Pikap',    body:'#8C6BB8', tier:3, mask:['......','......','##....','##....'] },
+  { name:'Kombi',    body:'#D9683E', tier:4, mask:['......','......','......','......','#....#'] },
+];
+/* Bölümler — bir bölüm = bir araba, 90 sn içinde bagajı doldur.
+   car: araba adı · sizes: parça boyu aralığı · singles: tek hücreli eşya · valiz: 2x3 olasılığı
+   rotate: eşyalar karışık yönde gelir · hints: ipucu hakkı
+   (bırakınca sığan yöne kendiliğinden dönme bölüme bağlı değil: oyuncu ayarı, varsayılan kapalı) */
+const LEVELS = [
+  { car:'Mini',      sizes:[3,4], singles:false, valiz:0,    rotate:false, hints:2 },
+  { car:'Fiat',      sizes:[3,4], singles:false, valiz:0,    rotate:false, hints:2 },
+  { car:'Mini',      sizes:[2,4], singles:false, valiz:0,    rotate:true,  hints:2 },
+  { car:'Kare',      sizes:[3,4], singles:false, valiz:0,    rotate:true,  hints:2 },
+  { car:'Fiat',      sizes:[2,4], singles:false, valiz:0,    rotate:true,  hints:2 },
+  { car:'Sedan',     sizes:[3,4], singles:false, valiz:0.12, rotate:true,  hints:2 },
+  { car:'Kare',      sizes:[2,4], singles:false, valiz:0.1,  rotate:true,  hints:1 },
+  { car:'Hatchback', sizes:[3,4], singles:false, valiz:0,    rotate:true,  hints:1 },
+  { car:'Sedan',     sizes:[2,4], singles:false, valiz:0.15, rotate:true,  hints:1 },
+  { car:'Station',   sizes:[3,4], singles:false, valiz:0.15, rotate:true,  hints:1 },
+  { car:'Hatchback', sizes:[2,5], singles:true,  valiz:0.1,  rotate:true,  hints:1 },
+  { car:'SUV',       sizes:[3,4], singles:false, valiz:0.15, rotate:true,  hints:1 },
+  { car:'Station',   sizes:[2,5], singles:true,  valiz:0.18, rotate:true,  hints:1 },
+  { car:'Pikap',     sizes:[2,5], singles:true,  valiz:0.15, rotate:true,  hints:1 },
+  { car:'Minivan',   sizes:[2,5], singles:true,  valiz:0.18, rotate:true,  hints:1 },
+  { car:'Kombi',     sizes:[2,5], singles:true,  valiz:0.18, rotate:true,  hints:1 },
+];
+/* 16'dan sonrası: en zor arabalardan rastgele, son bölüm ayarları */
+const HARD_CARS = ['SUV', 'Minivan', 'Pikap', 'Kombi', 'Station'];
+const levelCfg = lv => { const c = lv < LEVELS.length ? LEVELS[lv] : Object.assign({}, LEVELS[LEVELS.length - 1], { car: HARD_CARS[(lv * 7) % HARD_CARS.length] });
+  return Object.assign({ cars: 1 }, c); };
+/* Eşya görünümü: şekle göre */
+const LUGGAGE = {
+  1:  [{ n:'Top', e:'⚽', c:'#F4F1EA' }, { n:'Şapka kutusu', e:'🎩', c:'#E7A6B8' }],
+  2:  [{ n:'Spor çantası', e:'👜', c:'#5B7DB1' }, { n:'Termos', e:'☕', c:'#D96C4E' }],
+  I3: [{ n:'Gitar kılıfı', e:'🎸', c:'#6B4A32' }],
+  L3: [{ n:'Kedi taşıma', e:'🐱', c:'#9FC7D9' }],
+  O4: [{ n:'Soğutucu', e:'❄', c:'#4FB3BF' }, { n:'Sırt çantası', e:'🎒', c:'#E5484D' }],
+  I4: [{ n:'Sörf tahtası', e:'🏄', c:'#F2B233' }],
+  L4: [{ n:'Bebek arabası', e:'👶', c:'#B98BD8' }],
+  T4: [{ n:'Oyuncak kutusu', e:'🧸', c:'#F28C28' }],
+  S4: [{ n:'Çadır çantası', e:'⛺', c:'#6DB33F' }],
+  P5: [{ n:'Büyük çanta', e:'👝', c:'#C75B7A' }],
+  R6: [{ n:'Valiz', e:'💼', c:'#3A6FD8' }, { n:'Valiz', e:'💼', c:'#2E2E36' }],
+};
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => 1 - Math.pow(1 - t, 3);
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+
+/* ---------------- SES ---------------- */
+const SFX = (() => {
+  let ctx = null, master = null, noise = null, engine = null;
+  function init() {
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.7; master.connect(ctx.destination);
+    noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function tone(t0, dur, f0, f1, g, type) { const o = ctx.createOscillator(), gg = ctx.createGain(); o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+    gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + 0.006); gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gg); gg.connect(master); o.start(t0); o.stop(t0 + dur + 0.02); }
+  function burst(t0, dur, f, q, g, type) { const s = ctx.createBufferSource(); s.buffer = noise; const bp = ctx.createBiquadFilter(); bp.type = type || 'bandpass';
+    bp.frequency.value = f; bp.Q.value = q; const gg = ctx.createGain(); gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + 0.005);
+    gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); s.connect(bp); bp.connect(gg); gg.connect(master); s.start(t0, Math.random() * 0.5); s.stop(t0 + dur + 0.02); }
+  const w = fn => (...a) => { if (!ctx) return; fn(ctx.currentTime, ...a); };
+  return { init,
+    pick: w(t => { tone(t, 0.07, 500, 750, 0.1, 'triangle'); burst(t, 0.05, 1200, 1, 0.04); }),
+    rotate: w(t => { tone(t, 0.05, 1100, 1500, 0.08, 'triangle'); burst(t, 0.03, 3000, 2, 0.04); }),
+    place: w((t, size, fillK) => { const f = 150 - size * 8; tone(t, 0.16, f * 1.4, f, 0.3); burst(t, 0.09, 500, 0.8, 0.14, 'lowpass');
+      const p = 520 * Math.pow(2, Math.round(fillK * 7) * 2 / 12); tone(t + 0.04, 0.14, p, p, 0.07, 'triangle'); }),
+    bad: w(t => { tone(t, 0.1, 220, 160, 0.14, 'square'); }),
+    slam: w(t => { tone(t, 0.22, 110, 50, 0.4); burst(t, 0.12, 700, 0.7, 0.25, 'lowpass'); tone(t + 0.02, 0.05, 1800, 1200, 0.08, 'square'); }),
+    engine: w(t => { const o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter(); o.type = 'sawtooth'; lp.type = 'lowpass'; lp.frequency.value = 600;
+      o.frequency.setValueAtTime(55, t); o.frequency.exponentialRampToValueAtTime(140, t + 0.9); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + 0.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1); o.connect(lp); lp.connect(g); g.connect(master); o.start(t); o.stop(t + 1.2); }),
+    honk: w(t => { tone(t, 0.18, 420, 410, 0.08, 'square'); tone(t, 0.18, 530, 520, 0.06, 'square'); }),
+    cheer: w(t => { [0, 4, 7, 12].forEach((s, i) => tone(t + 0.15 + i * 0.07, 0.22, 660 * Math.pow(2, s / 12), 660 * Math.pow(2, s / 12), 0.1, 'triangle')); }),
+    tick: w(t => tone(t, 0.04, 1500, 1500, 0.05, 'square')),
+    win: w(t => { [0, 4, 7, 12, 16].forEach((s, i) => tone(t + i * 0.09, 0.35, 523 * Math.pow(2, s / 12), 523 * Math.pow(2, s / 12), 0.14, 'triangle')); }),
+  };
+})();
+const buzz = ms => { try { const ua = navigator.userActivation; if (navigator.vibrate && (!ua || ua.hasBeenActive)) navigator.vibrate(ms); } catch (e) {} };
+
+/* ---------------- ŞEKİL ---------------- */
+const norm = cells => { const mx = Math.min(...cells.map(c => c[0])), my = Math.min(...cells.map(c => c[1]));
+  return cells.map(([x, y]) => [x - mx, y - my]).sort((a, b) => a[1] - b[1] || a[0] - b[0]); };
+const rot = cells => norm(cells.map(([x, y]) => [-y, x]));
+const dims = cells => [Math.max(...cells.map(c => c[0])) + 1, Math.max(...cells.map(c => c[1])) + 1];
+function shapeKey(cells) {
+  const n = cells.length, [w, h] = dims(cells);
+  if (n === 1) return 1; if (n === 2) return 2;
+  if (n === 3) return (w === 3 || h === 3) ? 'I3' : 'L3';
+  if (n === 4) {
+    if (w === 4 || h === 4) return 'I4'; if (w === 2 && h === 2) return 'O4';
+    // T: bir hücrenin 3 komşusu var
+    const has = (x, y) => cells.some(c => c[0] === x && c[1] === y);
+    if (cells.some(([x, y]) => [[1,0],[-1,0],[0,1],[0,-1]].filter(([dx, dy]) => has(x + dx, y + dy)).length === 3)) return 'T4';
+    // S/Z: iki satır/sütun kayık
+    const rows = [...new Set(cells.map(c => c[1]))].length, cols = [...new Set(cells.map(c => c[0]))].length;
+    if (rows === 2 && cols === 3 && !(has(0,0) && has(0,1)) && !(has(2,0) && has(2,1))) return 'S4';
+    if (cols === 2 && rows === 3 && !(has(0,0) && has(1,0)) && !(has(0,2) && has(1,2))) return 'S4';
+    return 'L4';
+  }
+  if (n === 6 && w * h === 6) return 'R6';
+  return 'P5';
+}
+
+/* ---------------- BAGAJ ÜRETİMİ: boş hücreleri eşyalara böl ---------------- */
+/* birkaç bölme dene, bölümün parça boyu aralığına en çok uyanı al (kolay bölümde garip 1'li/5'li parça çıkmasın) */
+function makeTrunk(carIdx, P) {
+  let best = null, bestBad = 1e9;
+  for (let i = 0; i < 30 && bestBad > 0; i++) {
+    const T = makeTrunkOnce(carIdx, P);
+    const bad = T.pieces.filter(p => p.key !== 'R6' && (p.cells.length > P.sizes[1] || p.cells.length < (P.singles ? 1 : P.sizes[0]))).length;
+    if (bad < bestBad) { best = T; bestBad = bad; }
+  }
+  return best;
+}
+function makeTrunkOnce(carIdx, P) {
+  const car = CARS[carIdx], rows = car.mask.length, cols = car.mask[0].length;
+  const free = [], owner = {};
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (car.mask[y][x] === '.') free.push([x, y]);
+  const k = (x, y) => x + ',' + y, isFree = (x, y) => car.mask[y] && car.mask[y][x] === '.';
+  let pieces = [];
+  const unassigned = () => free.filter(([x, y]) => owner[k(x, y)] === undefined);
+  let guard = 0;
+  while (unassigned().length && guard++ < 200) {
+    const un = unassigned(); const [sx, sy] = un[Math.floor(Math.random() * un.length)];
+    const id = pieces.length, cells = [[sx, sy]]; owner[k(sx, sy)] = id;
+    // büyük valiz (2x3) dene
+    if (Math.random() < P.valiz) {
+      const opts = [[2, 3], [3, 2]].sort(() => Math.random() - 0.5);
+      for (const [rw, rh] of opts) {
+        let ok = true; for (let yy = 0; yy < rh && ok; yy++) for (let xx = 0; xx < rw; xx++) { const X = sx + xx, Y = sy + yy; if (!isFree(X, Y) || (owner[k(X, Y)] !== undefined && !(X === sx && Y === sy))) { ok = false; break; } }
+        if (ok) { for (let yy = 0; yy < rh; yy++) for (let xx = 0; xx < rw; xx++) { const X = sx + xx, Y = sy + yy; if (X === sx && Y === sy) continue; owner[k(X, Y)] = id; cells.push([X, Y]); } break; }
+      }
+    }
+    if (cells.length === 1) {
+      const [lo, hi] = P.sizes, target = lo + Math.floor(Math.random() * (hi - lo + 1));
+      let tries = 0;
+      while (cells.length < target && tries++ < 30) {
+        const [cx, cy] = cells[Math.floor(Math.random() * cells.length)], [dx, dy] = [[1,0],[-1,0],[0,1],[0,-1]][Math.floor(Math.random() * 4)];
+        const X = cx + dx, Y = cy + dy; if (isFree(X, Y) && owner[k(X, Y)] === undefined) { owner[k(X, Y)] = id; cells.push([X, Y]); }
+      }
+    }
+    pieces.push(cells);
+  }
+  // hedef boya ulaşamayan küçük parçaları komşuya kat (kolay bölümlerde tek/ikili parça kalmasın)
+  const minSize = P.singles ? 2 : Math.max(2, P.sizes[0]);
+  for (let pass = 0; pass < 3; pass++) pieces.forEach((cells, id) => {
+    if (!cells.length || cells.length >= minSize) return;
+    if (P.singles && cells.length === 1 && Math.random() < 0.5) return;
+    for (const [x, y] of cells) {
+      let done = false;
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) { const o = owner[k(x + dx, y + dy)];
+        if (o !== undefined && o !== id && pieces[o].length && pieces[o].length + cells.length <= 5 && pieces[o].length !== 6) {
+          for (const c of cells) { pieces[o].push(c); owner[k(c[0], c[1])] = o; } pieces[id] = []; done = true; break; } }
+      if (done) break;
+    }
+  });
+  pieces = pieces.filter(c => c.length);
+  return { carIdx, rows, cols, mask: car.mask, grid: Array.from({ length: rows }, () => new Array(cols).fill(-1)),
+    pieces: pieces.map((cells, i) => {
+      const sol = { cells: norm(cells), gx: Math.min(...cells.map(c => c[0])), gy: Math.min(...cells.map(c => c[1])) };   // üretimdeki kesin çözüm
+      let sh = sol.cells; const turns = P.rotate ? Math.floor(Math.random() * 4) : 0; for (let t = 0; t < turns; t++) sh = rot(sh);
+      const key = shapeKey(sh), look = LUGGAGE[key][Math.floor(Math.random() * LUGGAGE[key].length)];
+      return { id: i, cells: sh, key, look, sol, placed: false, gx: 0, gy: 0, tx: 0, ty: 0, x: 0, y: 0, scale: 0.5, rotA: 0, pop: 0 };
+    }) };
+}
+/* şeklin farklı dönüşleri (tekrarsız) */
+function rotations(cells) { const out = []; let c = norm(cells);
+  for (let i = 0; i < 4; i++) { if (!out.some(o => o.join() === c.join())) out.push(c); c = rot(c); } return out; }
+/* mevcut yerleşimle bagaj tamamlanabilir mi? çözüm varsa { id: {cells,gx,gy} } döner */
+function solveFrom(T) {
+  const g = T.grid.map(r => r.slice()), rest = T.pieces.filter(p => !p.placed), used = new Set(), sol = {};
+  const rots = new Map(rest.map(p => [p.id, rotations(p.cells)]));
+  let nodes = 0;
+  function dfs() {
+    if (++nodes > 60000) return false;
+    let ex = -1, ey = -1;
+    outer: for (let y = 0; y < T.rows; y++) for (let x = 0; x < T.cols; x++) if (T.mask[y][x] === '.' && g[y][x] < 0) { ex = x; ey = y; break outer; }
+    if (ex < 0) return true;
+    for (const p of rest) { if (used.has(p.id)) continue;
+      for (const c of rots.get(p.id)) {
+        const gx = ex - c[0][0], gy = ey - c[0][1];   // şeklin ilk hücresi (en üst-sol) boş hücreye otursun
+        if (!c.every(([cx, cy]) => { const X = gx + cx, Y = gy + cy; return Y >= 0 && Y < T.rows && X >= 0 && X < T.cols && T.mask[Y][X] === '.' && g[Y][X] < 0; })) continue;
+        c.forEach(([cx, cy]) => g[gy + cy][gx + cx] = p.id); used.add(p.id); sol[p.id] = { cells: c, gx, gy };
+        if (dfs()) return true;
+        c.forEach(([cx, cy]) => g[gy + cy][gx + cx] = -1); used.delete(p.id); delete sol[p.id];
+      } }
+    return false;
+  }
+  return dfs() ? sol : null;
+}
+
+/* ---------------- DURUM ---------------- */
+let S = null;
+function trunkOrigin(T) { return { x: W / 2 - T.cols * CELL / 2, y: TRUNK_CY - T.rows * CELL / 2 }; }
+const SAVE_KEY = 'dbg.bagaj.v1';
+const loadBest = () => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || { lv: 0, stars: {} }; } catch (e) { return { lv: 0, stars: {} }; } };
+const saveBest = b => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(b)); } catch (e) {} };
+function newRun(lv) {
+  const cfg = levelCfg(lv);
+  S = { lv, cfg, goal: cfg.cars, hints: cfg.hints, hint: null, t: 0, left: RUN_TIME, cars: 0, placed: 0, running: false, over: false, won: false,
+    trunk: null, carAnim: null, parts: [], pops: [], lastCar: -1, lastSec: RUN_TIME };
+  spawnCar();
+}
+function spawnCar() {
+  // bölümün en zor araba grubundan ağırlıklı seç, aynı araba üst üste gelmesin
+  const idx = Math.max(0, CARS.findIndex(c => c.name === S.cfg.car)); S.lastCar = idx;
+  S.trunk = makeTrunk(idx, S.cfg); S.hint = null;
+  S.carAnim = { st: 'in', t: 0, lid: 0 };
+  layoutTray();
+  S.trunk.pieces.forEach(p => { p.x = p.tx; p.y = p.ty + 260; p.scale = 0.5; });
+}
+/* kaldırım dizilimi: yarı boyda, satır satır */
+function layoutTray() {
+  const T = S.trunk, waiting = T.pieces.filter(p => !p.placed && p !== DRAG?.p);
+  // satırlara böl, sonra her satırı ortala
+  const rows = []; let cur = [], x = 0;
+  for (const p of waiting) { const pw = dims(p.cells)[0] * TRAY_CELL;
+    if (cur.length && x + pw > W - 28) { rows.push(cur); cur = []; x = 0; }
+    cur.push(p); x += pw + 14; }
+  if (cur.length) rows.push(cur);
+  let y = TRAY_Y0 + 20;
+  for (const row of rows) {
+    const tot = row.reduce((a, p) => a + dims(p.cells)[0] * TRAY_CELL + 14, -14), rowH = Math.max(...row.map(p => dims(p.cells)[1] * TRAY_CELL));
+    let xx = W / 2 - tot / 2;
+    for (const p of row) { const [w, h] = dims(p.cells); p.tx = xx + w * TRAY_CELL / 2; p.ty = y + rowH / 2; xx += w * TRAY_CELL + 14; }
+    y += rowH + 14;
+  }
+}
+const fillPct = () => { const T = S.trunk; let tot = 0, got = 0; for (let y = 0; y < T.rows; y++) for (let x = 0; x < T.cols; x++) if (T.mask[y][x] === '.') { tot++; if (T.grid[y][x] >= 0) got++; } return got / tot; };
+function fits(T, cells, gx, gy, ignoreId) {
+  return cells.every(([cx, cy]) => { const X = gx + cx, Y = gy + cy;
+    return Y >= 0 && Y < T.rows && X >= 0 && X < T.cols && T.mask[Y][X] === '.' && (T.grid[Y][X] < 0 || T.grid[Y][X] === ignoreId); });
+}
+function place(p, gx, gy) {
+  const T = S.trunk; p.placed = true; p.gx = gx; p.gy = gy; p.pop = 1;
+  p.cells.forEach(([cx, cy]) => T.grid[gy + cy][gx + cx] = p.id);
+  const o = trunkOrigin(T), [w, h] = dims(p.cells); p.tx = o.x + (gx + w / 2) * CELL; p.ty = o.y + (gy + h / 2) * CELL;
+  const fk = fillPct();
+  SFX.place(p.cells.length, fk); buzz(12 + p.cells.length * 2);
+  dust(p.tx, p.ty, p.look.c, 8 + p.cells.length * 2);
+  S.placed++; if (S.hint && S.hint.id === p.id) S.hint = null; layoutTray();
+  if (fk >= 1) closeTrunk();
+}
+function unplace(p) {
+  const T = S.trunk; p.cells.forEach(([cx, cy]) => { if (T.grid[p.gy + cy][p.gx + cx] === p.id) T.grid[p.gy + cy][p.gx + cx] = -1; }); p.placed = false;
+}
+function closeTrunk() {
+  S.carAnim = { st: 'close', t: 0, lid: 0 };
+  S.cars++; S.hint = null; HUD.dirty = true;
+  if (S.cars >= S.goal) { S.running = false; S.won = true; DRAG = null; }   // hedef tamam: süre durur
+}
+/* sürüklenen parçanın bırakılacağı hücre: parmağa en yakın geçerli yer (1 hücre tolerans) */
+function dropSpot(p, px, py) {
+  const T = S.trunk, o = trunkOrigin(T), [w, h] = dims(p.cells);
+  const gx0 = Math.round((px - o.x) / CELL - w / 2), gy0 = Math.round((py - o.y) / CELL - h / 2);
+  let best = null, bd = 1e9;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const gx = gx0 + dx, gy = gy0 + dy; if (!fits(T, p.cells, gx, gy, p.id)) continue;
+    const cx = o.x + (gx + w / 2) * CELL, cy = o.y + (gy + h / 2) * CELL, d = Math.hypot(cx - px, cy - py);
+    if (d < bd) { bd = d; best = { gx, gy }; }
+  }
+  return bd < CELL * 1.1 ? best : null;
+}
+/* bırakma çözümü: önce mevcut yön, oto-çevir açıksa sığmazsa diğer yönler */
+const AUTO_KEY = 'dbg.bagaj.autorot';
+let AUTO_ROT = false; try { AUTO_ROT = localStorage.getItem(AUTO_KEY) === '1'; } catch (e) {}
+function dropResolve(p, px, py) {
+  const s = dropSpot(p, px, py); if (s) return { cells: p.cells, gx: s.gx, gy: s.gy, turned: 0 };
+  if (!AUTO_ROT) return null;
+  let c = p.cells;
+  for (let i = 1; i < 4; i++) { c = rot(c); const s2 = dropSpot({ cells: c, id: p.id }, px, py); if (s2) return { cells: c, gx: s2.gx, gy: s2.gy, turned: i }; }
+  return null;
+}
+/* ipucu: bir eşyanın doğru yerini göster (yanlış yerleşim varsa önce onu söküp kaldırıma geri al) */
+function useHint() {
+  if (!S.running || S.hints <= 0 || S.carAnim.st !== 'idle' || S.hint) return;
+  const T = S.trunk; let sol = solveFrom(T), msg = null;
+  if (!sol) {
+    for (const p of T.pieces) if (p.placed) { unplace(p); p.scale = TRAY_CELL / CELL; }
+    sol = solveFrom(T) || Object.fromEntries(T.pieces.map(p => [p.id, p.sol]));
+    msg = 'Baştan dizelim!'; layoutTray();
+  }
+  const id = Object.keys(sol).map(Number).sort((a, b) => T.pieces[b].cells.length - T.pieces[a].cells.length)[0];
+  if (id === undefined) return;
+  const p = T.pieces[id], s = sol[id];
+  if (p.cells.join() !== s.cells.join()) { p.cells = s.cells; p.rotA = -Math.PI / 2; }   // kaldırımdaki eşyayı doğru yöne çevir
+  S.hint = { id, gx: s.gx, gy: s.gy, t: 0 }; S.hints--; p.pop = 1;
+  SFX.rotate(); layoutTray(); HUD.dirty = true;
+  if (msg) popText(msg, W / 2, TRUNK_CY, '#E07A2E', 22);
+}
+
+/* ---------------- GİRDİ ---------------- */
+let DRAG = null;
+function toL(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+function pieceAt(x, y) {
+  const T = S.trunk;
+  // bagajdaki
+  const o = trunkOrigin(T), gx = Math.floor((x - o.x) / CELL), gy = Math.floor((y - o.y) / CELL);
+  if (gy >= 0 && gy < T.rows && gx >= 0 && gx < T.cols && T.grid[gy][gx] >= 0) return T.pieces[T.grid[gy][gx]];
+  // kaldırımdaki (yarı boy, geniş dokunma payı)
+  let best = null, bd = 1e9;
+  for (const p of T.pieces) { if (p.placed) continue; const [w, h] = dims(p.cells);
+    if (Math.abs(x - p.x) < w * TRAY_CELL / 2 + 10 && Math.abs(y - p.y) < h * TRAY_CELL / 2 + 10) { const d = Math.hypot(x - p.x, y - p.y); if (d < bd) { bd = d; best = p; } } }
+  return best;
+}
+cv.addEventListener('pointerdown', e => {
+  if (!S.running || DRAG || S.carAnim.st !== 'idle') return; e.preventDefault(); SFX.init();
+  const [x, y] = toL(e), p = pieceAt(x, y); if (!p) return;
+  DRAG = { id: e.pointerId, p, sx: x, sy: y, x, y, moved: false, wasPlaced: p.placed };
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+});
+cv.addEventListener('pointermove', e => {
+  if (!DRAG || e.pointerId !== DRAG.id) return; const [x, y] = toL(e); DRAG.x = x; DRAG.y = y;
+  if (!DRAG.moved && Math.hypot(x - DRAG.sx, y - DRAG.sy) > 8) {
+    DRAG.moved = true; SFX.pick(); buzz(6);
+    if (DRAG.p.placed) { unplace(DRAG.p); HUD.dirty = true; }
+    layoutTray();
+  }
+});
+function endDrag(e) {
+  if (!DRAG || (e && e.pointerId !== DRAG.id)) return;
+  const d = DRAG, p = d.p; DRAG = null;
+  if (!d.moved) {   // dokunma: çevir (bagajdaysa yerinde çevirmeyi dene)
+    if (p.placed) { const nc = rot(p.cells); unplace(p);
+      if (fits(S.trunk, nc, p.gx, p.gy, p.id)) { p.cells = nc; p.rotA = -Math.PI / 2; place(p, p.gx, p.gy); SFX.rotate(); }
+      else { p.cells.forEach(([cx, cy]) => S.trunk.grid[p.gy + cy][p.gx + cx] = p.id); p.placed = true; SFX.bad(); p.pop = 0.5; } }
+    else { p.cells = rot(p.cells); p.rotA = -Math.PI / 2; SFX.rotate(); buzz(5); if (S.hint && S.hint.id === p.id) S.hint = null; layoutTray(); }
+    return;
+  }
+  const spot = dropResolve(p, d.x, d.y - DRAG_LIFT);
+  if (spot) { p.scale = 1; if (spot.turned) { p.cells = spot.cells; p.rotA = -Math.PI / 2; } place(p, spot.gx, spot.gy); }
+  else { if (d.y < TRAY_Y0 - 20) SFX.bad(); p.x = d.x; p.y = d.y - DRAG_LIFT; layoutTray(); HUD.dirty = true; }
+}
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+
+/* ---------------- EFEKT ---------------- */
+function dust(x, y, col, n) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, s = 40 + Math.random() * 130;
+  S.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 0, life: 0.35 + Math.random() * 0.25, r: 2 + Math.random() * 3, col }); } }
+function popText(txt, x, y, col, size) { S.pops.push({ txt, x, y, col, size: size || 18, t: 0 }); }
+
+/* ---------------- ADIM ---------------- */
+function step(dt) {
+  S.t += dt;
+  const A = S.carAnim; A.t += dt;
+  if (A.st === 'in' && A.t > 0.55) { A.st = 'idle'; A.t = 0; }
+  if (A.st === 'close') {
+    A.lid = ease(Math.min(1, A.t / 0.28));
+    if (A.t > 0.28 && !A.slammed) { A.slammed = true; SFX.slam(); buzz([30, 20, 40]); popText(['Tam oturdu!', 'Mükemmel!', 'Tıklım tıklım!', 'Yola hazır!'][S.cars % 4], W / 2, TRUNK_CY - 20, '#2F9E6B', 26); dust(W / 2, TRUNK_CY + 120, '#FFFFFF', 18); SFX.cheer(); }
+    if (A.t > 0.75) { A.st = 'out'; A.t = 0; SFX.engine(); }
+  }
+  if (A.st === 'out' && A.t > 0.7) {
+    if (S.running) spawnCar();
+    else { A.st = 'gone'; if (S.won && !S.over) { S.over = true; SFX.win(); setTimeout(showWin, 350); } }
+  }
+  if (S.hint) S.hint.t += dt;
+  if (S.running) {
+    S.left -= dt;
+    const sec = Math.ceil(S.left);
+    if (sec !== S.lastSec) { S.lastSec = sec; HUD.dirty = true; if (sec <= HONK_AT && sec > 0) { if (sec % 2 === 0) SFX.honk(); else SFX.tick(); } }
+    if (S.left <= 0) { S.left = 0; S.running = false; S.over = true; DRAG = null; SFX.bad(); SFX.honk(); buzz([60, 40, 60]); setTimeout(showFail, 900); }
+  }
+  for (const p of S.trunk.pieces) {
+    if (DRAG && DRAG.p === p && DRAG.moved) { p.x = lerp(p.x, DRAG.x, 1 - Math.exp(-30 * dt)); p.y = lerp(p.y, DRAG.y - DRAG_LIFT, 1 - Math.exp(-30 * dt)); p.scale = lerp(p.scale, 1.02, 1 - Math.exp(-18 * dt)); }
+    else { const k = 1 - Math.exp(-16 * dt); p.x = lerp(p.x, p.tx, k); p.y = lerp(p.y, p.ty, k); p.scale = lerp(p.scale, p.placed ? 1 : TRAY_CELL / CELL, k); }
+    p.pop *= Math.exp(-7 * dt); p.rotA *= Math.exp(-14 * dt);
+  }
+  for (let i = S.parts.length - 1; i >= 0; i--) { const q = S.parts[i]; q.t += dt; q.vx *= 0.93; q.vy *= 0.93; q.x += q.vx * dt; q.y += q.vy * dt; if (q.t > q.life) S.parts.splice(i, 1); }
+  for (let i = S.pops.length - 1; i >= 0; i--) { S.pops[i].t += dt; if (S.pops[i].t > 1) S.pops.splice(i, 1); }
+}
+
+/* ---------------- ÇİZİM ---------------- */
+function fitCanvas() {
+  const box = $('stage'), availW = box.clientWidth || 360, chrome = $('cab').offsetHeight - cv.offsetHeight || 120;
+  const availH = Math.max(440, innerHeight - chrome - 18), sc = Math.min(availW / W, availH / H), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); cv.style.width = Math.round(W * sc) + 'px'; cv.style.height = Math.round(H * sc) + 'px';
+  ctx.setTransform(sc * dpr, 0, 0, sc * dpr, 0, 0);
+}
+function rr(x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16), f = v => clamp(Math.round(v * k), 0, 255); return `rgb(${f(n >> 16)},${f(n >> 8 & 255)},${f(n & 255)})`; }
+/* eşyayı hücrelerin birleşimi olarak çiz: tek parça gibi görünsün */
+function drawPiece(p, cx, cy, cell, ghost) {
+  const [w, h] = dims(p.cells), c = p.look.c, pad = cell * 0.07, has = (x, y) => p.cells.some(q => q[0] === x && q[1] === y);
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(p.rotA); const s = 1 + p.pop * 0.12; ctx.scale(s, s); ctx.translate(-w * cell / 2, -h * cell / 2);
+  if (!ghost) { ctx.fillStyle = 'rgba(0,0,0,.22)'; for (const [x, y] of p.cells) { rr(x * cell + pad + 3, y * cell + pad + 5, cell - pad * 2, cell - pad * 2, cell * 0.22); ctx.fill(); } }
+  const body = ghost ? (typeof ghost === 'string' ? ghost : 'rgba(47,158,107,.35)') : c;
+  ctx.fillStyle = body;
+  for (const [x, y] of p.cells) {
+    rr(x * cell + pad, y * cell + pad, cell - pad * 2, cell - pad * 2, cell * 0.22); ctx.fill();
+    if (has(x + 1, y)) ctx.fillRect(x * cell + cell / 2, y * cell + pad, cell, cell - pad * 2);   // komşuya köprü
+    if (has(x, y + 1)) ctx.fillRect(x * cell + pad, y * cell + cell / 2, cell - pad * 2, cell);
+  }
+  if (!ghost) {
+    // üst ışık + kenar dikişi
+    ctx.fillStyle = 'rgba(255,255,255,.22)';
+    for (const [x, y] of p.cells) if (!has(x, y - 1)) { rr(x * cell + pad + 3, y * cell + pad + 2, cell - pad * 2 - 6, cell * 0.18, 3); ctx.fill(); }
+    ctx.strokeStyle = shade(c, 0.7); ctx.lineWidth = Math.max(1, cell * 0.04); ctx.setLineDash([cell * 0.12, cell * 0.1]);
+    for (const [x, y] of p.cells) { const x0 = x * cell + pad * 2.2, y0 = y * cell + pad * 2.2, x1 = (x + 1) * cell - pad * 2.2, y1 = (y + 1) * cell - pad * 2.2;
+      ctx.beginPath(); if (!has(x, y - 1)) { ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); } if (!has(x, y + 1)) { ctx.moveTo(x0, y1); ctx.lineTo(x1, y1); }
+      if (!has(x - 1, y)) { ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); } if (!has(x + 1, y)) { ctx.moveTo(x1, y0); ctx.lineTo(x1, y1); } ctx.stroke(); }
+    ctx.setLineDash([]);
+    // valiz sapı / simge
+    const mid = p.cells[Math.floor(p.cells.length / 2)];
+    if (p.key === 'R6' || p.key === 'P5' || p.key === 2) { ctx.strokeStyle = shade(c, 0.55); ctx.lineWidth = cell * 0.09; const hx = w * cell / 2;
+      ctx.beginPath(); ctx.moveTo(hx - cell * 0.28, pad + cell * 0.06); ctx.quadraticCurveTo(hx, -cell * 0.18, hx + cell * 0.28, pad + cell * 0.06); ctx.stroke(); }
+    ctx.font = `${Math.round(cell * 0.62)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.look.e, (mid[0] + 0.5) * cell, (mid[1] + 0.55) * cell);
+  }
+  ctx.restore();
+}
+function drawCar(T, offY, lid) {
+  const car = CARS[T.carIdx], o = trunkOrigin(T), tw = T.cols * CELL, th = T.rows * CELL;
+  ctx.save(); ctx.translate(0, offY);
+  const bx = o.x - 26, bw = tw + 52;
+  // gövde (üstten görünüş, burnu yukarı)
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; rr(bx + 6, o.y - 130 + 10, bw, th + 180, 40); ctx.fill();
+  ctx.fillStyle = car.body; rr(bx, o.y - 130, bw, th + 176, 38); ctx.fill();
+  ctx.fillStyle = shade(car.body, 0.8); rr(bx + 16, o.y - 112, bw - 32, 76, 22); ctx.fill();   // tavan
+  ctx.fillStyle = 'rgba(190,225,240,.75)'; rr(bx + 26, o.y - 124, bw - 52, 20, 8); ctx.fill();   // ön cam
+  ctx.fillStyle = 'rgba(190,225,240,.6)'; rr(bx + 26, o.y - 32, bw - 52, 14, 6); ctx.fill();    // arka cam
+  ctx.fillStyle = '#1D2226'; for (const sx of [bx - 6, bx + bw - 6]) for (const sy of [o.y - 100, o.y + th - 10]) { rr(sx, sy, 12, 40, 5); ctx.fill(); }
+  // bagaj içi
+  ctx.fillStyle = '#3B3330'; rr(o.x - 8, o.y - 8, tw + 16, th + 16, 10); ctx.fill();
+  for (let y = 0; y < T.rows; y++) for (let x = 0; x < T.cols; x++) {
+    const X = o.x + x * CELL, Y = o.y + y * CELL;
+    if (T.mask[y][x] === '#') { ctx.fillStyle = shade(car.body, 0.55); rr(X + 2, Y + 2, CELL - 4, CELL - 4, 8); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X + CELL / 2, Y + CELL / 2, CELL * 0.26, 0, 7); ctx.stroke(); }
+    else { ctx.fillStyle = (x + y) % 2 ? '#4A403B' : '#51463F'; rr(X + 2, Y + 2, CELL - 4, CELL - 4, 6); ctx.fill(); }
+  }
+  // arka tampon + plaka
+  ctx.fillStyle = shade(car.body, 0.7); rr(bx + 10, o.y + th + 22, bw - 20, 16, 8); ctx.fill();
+  ctx.fillStyle = '#F4F1EA'; rr(W / 2 - 24, o.y + th + 24, 48, 12, 3); ctx.fill();
+  ctx.fillStyle = '#333'; ctx.font = '800 8px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('34 DB ' + (100 + S.lv + 1), W / 2, o.y + th + 30.5);
+  ctx.restore();
+  return { o, tw, th };
+}
+function drawLid(T, offY, lid) {
+  if (lid <= 0) return;
+  const car = CARS[T.carIdx], o = trunkOrigin(T), tw = T.cols * CELL, th = T.rows * CELL, h = (th + 16) * lid;
+  ctx.fillStyle = car.body; rr(o.x - 10, o.y - 8 + offY, tw + 20, h, 10); ctx.fill();
+  ctx.fillStyle = shade(car.body, 0.85); ctx.fillRect(o.x - 10, o.y - 8 + offY + h - 8, tw + 20, 6);
+}
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  // yol
+  ctx.fillStyle = '#56616A'; ctx.fillRect(0, 0, W, TRAY_Y0);
+  const A = S.carAnim, scroll = A.st === 'out' ? ease(Math.min(1, A.t / 0.7)) * 520 : 0;
+  ctx.fillStyle = '#F2E6C9'; for (let y = -40 + (S.t * 30 + scroll) % 60; y < TRAY_Y0; y += 60) { ctx.fillRect(18, y, 6, 30); ctx.fillRect(W - 24, y, 6, 30); }
+  // kaldırım
+  ctx.fillStyle = '#CDBFA8'; ctx.fillRect(0, TRAY_Y0, W, H - TRAY_Y0);
+  ctx.fillStyle = '#B7A68B'; ctx.fillRect(0, TRAY_Y0, W, 8);
+  ctx.fillStyle = 'rgba(0,0,0,.05)'; for (let x = 0; x < W; x += 40) ctx.fillRect(x, TRAY_Y0 + 8, 2, H);
+  const T = S.trunk;
+  let offY = 0; if (A.st === 'in') offY = (1 - ease(Math.min(1, A.t / 0.55))) * 420; if (A.st === 'out') offY = -scroll;
+  const lid = A.st === 'close' ? A.lid : A.st === 'out' || A.st === 'gone' ? 1 : 0;
+  if (A.st !== 'gone') {
+    drawCar(T, offY, lid);
+    // bagajdaki eşyalar
+    for (const p of T.pieces) if (p.placed && !(DRAG && DRAG.p === p && DRAG.moved)) drawPiece(p, p.x, p.y + offY, CELL);
+    // bırakma önizlemesi
+    // ipucu: yanıp sönen hedef
+    if (S.hint && A.st === 'idle') { const hp = T.pieces[S.hint.id], o = trunkOrigin(T), [w, h] = dims(hp.cells);
+      ctx.globalAlpha = 0.55 + 0.35 * Math.sin(S.hint.t * 7); drawPiece({ ...hp, rotA: 0, pop: 0 }, o.x + (S.hint.gx + w / 2) * CELL, o.y + (S.hint.gy + h / 2) * CELL, CELL, 'rgba(242,178,51,.85)');
+      ctx.globalAlpha = 1; }
+    if (DRAG && DRAG.moved) { const spot = dropResolve(DRAG.p, DRAG.x, DRAG.y - DRAG_LIFT);
+      if (spot) { const o = trunkOrigin(T), [w, h] = dims(spot.cells); drawPiece({ ...DRAG.p, cells: spot.cells, rotA: 0, pop: 0 }, o.x + (spot.gx + w / 2) * CELL, o.y + (spot.gy + h / 2) * CELL, CELL, true); } }
+    drawLid(T, offY, lid);
+  }
+  // kaldırımdaki eşyalar
+  if (S.hint && A.st === 'idle') { const hp = T.pieces[S.hint.id]; if (!hp.placed && !(DRAG && DRAG.p === hp)) { const [w, h] = dims(hp.cells), k = 1 + 0.08 * Math.sin(S.hint.t * 7);
+    ctx.strokeStyle = '#F2B233'; ctx.lineWidth = 3; rr(hp.x - w * TRAY_CELL / 2 * k - 6, hp.y - h * TRAY_CELL / 2 * k - 6, w * TRAY_CELL * k + 12, h * TRAY_CELL * k + 12, 10); ctx.stroke(); } }
+  for (const p of T.pieces) if (!p.placed && !(DRAG && DRAG.p === p && DRAG.moved)) drawPiece(p, p.x, p.y, CELL * p.scale);
+  if (DRAG && DRAG.moved) drawPiece(DRAG.p, DRAG.p.x, DRAG.p.y, CELL * DRAG.p.scale);
+  for (const q of S.parts) { ctx.globalAlpha = 1 - q.t / q.life; ctx.fillStyle = q.col; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const q of S.pops) { const k = q.t; ctx.globalAlpha = 1 - k * k; ctx.font = '800 ' + q.size + 'px "Baloo 2",sans-serif'; ctx.lineWidth = 5; ctx.strokeStyle = '#fff';
+    ctx.strokeText(q.txt, q.x, q.y - k * 40); ctx.fillStyle = q.col; ctx.fillText(q.txt, q.x, q.y - k * 40); }
+  ctx.globalAlpha = 1;
+  if (S.running && S.lv === 0 && S.cars === 0 && S.placed === 0) { ctx.fillStyle = 'rgba(58,46,38,.85)'; rr(W / 2 - 128, TRAY_Y0 - 36, 256, 26, 13); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '800 13px "Baloo 2",sans-serif'; ctx.fillText('Sürükle → bagaja koy · dokun → çevir', W / 2, TRAY_Y0 - 23); }
+}
+
+/* ---------------- HUD / EKRAN / DÖNGÜ ---------------- */
+const HUD = { dirty: true, update() { if (!this.dirty) return; this.dirty = false;
+  $('hLv').textContent = 'Bölüm'; $('hCars').textContent = S.lv + 1;
+  $('hFill').textContent = Math.round(fillPct() * 100) + '%'; $('hTime').textContent = Math.ceil(S.left);
+  $('hTimeBox').className = 'stat r' + (S.left <= HONK_AT ? ' warn' : '');
+  $('hHints').textContent = S.hints; $('bHint').disabled = S.hints <= 0; $('bHint').style.opacity = S.hints > 0 ? 1 : 0.45; } };
+function hideOv() { const o = $('ov'); if (o) o.remove(); }
+function overlay(html) { hideOv(); const d = document.createElement('div'); d.className = 'ov'; d.id = 'ov'; d.innerHTML = html; $('cab').appendChild(d); return d; }
+/* bölüme gir: özet ekranı → Başla */
+function startLevel(lv) {
+  newRun(lv); HUD.dirty = true;
+  const c = S.cfg, news = [];
+  // bu bölümde ilk kez görülen şeyleri duyur (önceki bölümlerle karşılaştır)
+  const prev = Array.from({ length: Math.min(lv, LEVELS.length) }, (_, i) => levelCfg(i)), first = f => !prev.some(f);
+  const blocked = cfg => CARS.find(x => x.name === cfg.car).mask.some(r => r.includes('#'));
+  if (lv === 0) news.push('Eşyaları <b>sürükleyip</b> bagaja yerleştir, <b>dokunarak çevir</b>.');
+  if (c.rotate && first(p => p.rotate)) news.push('Yeni: eşyalar artık <b>karışık yönde</b> geliyor.');
+  if (c.valiz > 0 && first(p => p.valiz > 0)) news.push('Yeni: <b>büyük valizler</b>.');
+  if (blocked(c) && first(blocked)) news.push('Yeni: <b>stepne yuvalı</b> bagaj — koyu hücreler dolmaz.');
+  if (c.singles && first(p => p.singles)) news.push('Yeni: <b>küçük eşyalar</b> (top, şapka kutusu).');
+  overlay('<div style="font-size:46px">' + (lv === 0 ? '🚗💼' : '🚙') + '</div><h2>' + (lv === 0 ? 'Bagaj Ustası' : 'Bölüm ' + (lv + 1)) + '</h2>'
+    + '<p><b>' + c.car + '</b> tatile çıkıyor: bagajını <b>90 saniyede</b> doldur.<br>' + news.join('<br>') + '</p>'
+    + '<div class="row"><button class="go" id="bGo">▶ ' + (lv === 0 ? 'Başla' : 'Bölüm ' + (lv + 1)) + '</button></div>');
+  $('bGo').onclick = () => { SFX.init(); hideOv(); S.running = true; };
+  try { history.replaceState(null, '', '#' + (lv + 1)); } catch (e) {}
+}
+function showWin() {
+  const stars = S.left >= 60 ? 3 : S.left >= 30 ? 2 : 1, best = loadBest();
+  best.lv = Math.max(best.lv, S.lv + 1); best.stars[S.lv] = Math.max(best.stars[S.lv] || 0, stars); saveBest(best);
+  overlay('<div style="font-size:46px">🏁</div><h2>Bölüm ' + (S.lv + 1) + ' tamam!</h2><div class="stars" id="stars"><span>★</span><span>★</span><span>★</span></div>'
+    + '<p>' + Math.ceil(S.left) + ' saniye kala bitirdin.<br>★★ 30 sn · ★★★ 60 sn kala</p>'
+    + '<div class="row"><button class="go" id="bNx">▶ Sonraki bölüm</button><button id="bAg">↻ Tekrar oyna</button></div>');
+  [...$('stars').children].forEach((s, i) => { if (i < stars) setTimeout(() => s.classList.add('on'), 300 + i * 250); });
+  $('bNx').onclick = () => startLevel(S.lv + 1);
+  $('bAg').onclick = () => { startLevel(S.lv); $('bGo').click(); };
+}
+function showFail() {
+  overlay('<div style="font-size:46px">⏰</div><h2>Süre doldu!</h2><p>' + S.cars + '/' + S.goal + ' araba yola çıktı.<br>Az kaldı, bir daha dene!</p>'
+    + '<div class="row"><button class="go" id="bAg">↻ Tekrar dene</button></div>');
+  $('bAg').onclick = () => { startLevel(S.lv); $('bGo').click(); };
+}
+$('bRe').onclick = () => { startLevel(S.lv); $('bGo').click(); };
+$('bHint').onclick = () => { SFX.init(); useHint(); };
+const syncAuto = () => { $('bAuto').textContent = '🔄 Oto ' + (AUTO_ROT ? 'açık' : 'kapalı'); $('bAuto').className = AUTO_ROT ? 'go' : ''; };
+$('bAuto').onclick = () => { SFX.init(); AUTO_ROT = !AUTO_ROT; try { localStorage.setItem(AUTO_KEY, AUTO_ROT ? '1' : '0'); } catch (e) {} syncAuto(); SFX.rotate(); };
+syncAuto();
+let lastTs = 0;
+function loop(ts) { requestAnimationFrame(loop); const dt = Math.min(0.033, lastTs ? (ts - lastTs) / 1000 : 0); lastTs = ts;
+  step(dt); if (S.trunk) HUD.dirty = true; HUD.update(); draw(); }
+fitCanvas(); fitCanvas(); addEventListener('resize', () => { fitCanvas(); fitCanvas(); });
+const hashLv = parseInt(location.hash.slice(1), 10);   // #N ile bölüm seç (test için)
+startLevel(hashLv > 0 ? hashLv - 1 : loadBest().lv); requestAnimationFrame(loop); $('boot').remove();
+</script>
