@@ -1,0 +1,591 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1F4E6B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Liman Vinci">
+<title>Liman Vinci</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap">
+<style>
+:root{ --bg:#1F4E6B; --panel:#FFF7EA; --line:#E5D3B8; --ink:#3A2E26; --ink-dim:#A08C78; --go:#2F9E6B; --bad:#D6423A; --gold:#F2B233; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Baloo 2",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;touch-action:none;
+  user-select:none;-webkit-user-select:none;background-image:radial-gradient(640px 360px at 50% 0%,rgba(140,210,255,.18),transparent 72%)}
+#app{min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;padding:6px 5px 10px}
+.cab{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:8px 9px 9px;box-shadow:0 20px 50px rgba(0,0,0,.45);position:relative;overflow:hidden}
+.hud{display:flex;align-items:center;justify-content:space-between;padding:0 4px 7px;border-bottom:1px solid var(--line)}
+.stat{line-height:1}.stat small{display:block;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:2px}
+.stat b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}.stat.r{text-align:right}
+.stat.warn b{color:var(--bad)}
+.stage{position:relative;margin-top:7px;border-radius:13px;overflow:hidden;border:1px solid var(--line);touch-action:none}
+#cv{display:block;margin:0 auto}
+.row{display:flex;gap:7px;margin-top:8px}
+button{flex:1;appearance:none;border:1px solid var(--line);background:#F2E6D2;color:var(--ink);font:inherit;font-size:14px;font-weight:800;padding:10px 6px;border-radius:12px;cursor:pointer;white-space:nowrap}
+button.go{background:var(--go);color:#fff;border-color:#237A52}
+button:disabled{opacity:.45}
+.ov{position:absolute;inset:0;background:rgba(255,247,234,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;z-index:20}
+.ov h2{font-size:30px;margin:0 0 4px;line-height:1.1}.ov p{color:#7A6656;font-size:14px;line-height:1.45;margin:4px 0 12px;max-width:310px}
+.ov .row{width:100%;max-width:280px;flex-direction:column}
+.stars{font-size:44px;letter-spacing:6px;margin:4px 0}
+.stars span{display:inline-block;color:#E8D9C2;transform:scale(.5);transition:transform .35s cubic-bezier(.3,1.8,.5,1),color .2s}
+.stars span.on{color:var(--gold);transform:scale(1)}
+.boot{position:fixed;left:10px;right:10px;top:10px;z-index:9999;padding:12px 14px;border-radius:10px;background:#3B1512;color:#FFD9D2;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+</style>
+
+<div class="boot" id="boot"><b>Oyun başlatılamadı — JavaScript çalışmıyor.</b></div>
+<script>window.addEventListener("error", function(e){ var b=document.getElementById("boot"); if(b) b.innerHTML="<b>Oyun hata verdi</b><br>"+(e.message||"?")+" satır "+(e.lineno||"?"); });</script>
+
+<div id="app"><div class="cab" id="cab">
+  <div class="hud">
+    <span class="stat"><small>Bölüm</small><b id="hLv">1</b></span>
+    <span class="stat" id="hRampBox" style="text-align:center"><small>Rampa</small><b id="hRamp">0/4</b></span>
+    <span class="stat r"><small>Kazanç</small><b id="hCoins">💰 0</b></span>
+  </div>
+  <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+  <div class="row"><button id="bUndo">↶ Geri al</button><button id="bRe">↻ Tekrarla</button><button id="bReset">⏮ Baştan</button></div>
+</div></div>
+
+<script>
+'use strict';
+/* ============================================================
+   LİMAN VİNCİ — gemideki konteyner yığınlarını renklerine göre kamyonlara indir
+   En üstteki konteynere dokun → vinç alır: rıhtımda aynı renk kamyon varsa ona, yoksa bekleme rampasına.
+   Kamyon 3 birimle dolunca gider, sıradaki gelir; rampadaki uygun konteynerler kendiliğinden yüklenir.
+   Gemi boşalınca kazanırsın; rampa taşarsa kaybedersin.
+   Engeller: ❓ gizli · 🧊 buz (2 dokunuş) · 🔒 kilit + 🔑 anahtar · ⚓ ağır (kamyonda 2 birim) · 💣 bomba (N hamlede indir) · ⚖ gemi yatışı
+   Mantık anlık ve saf (applyMove), görseller arkadan yetişir: vinç animasyonu oyuncuyu bekletmez.
+   ============================================================ */
+const W = 360, H = 640;
+const TRUCK_CAP = 3, CW = 46, CH = 28, COL_GAP = 52;     // kamyon kapasitesi · konteyner boyu · yığın aralığı
+const SHIP = { x: 180, y: 318 };                          // güverte merkezi (yığın tabanı)
+const RAMP_Y = 424, DOCK_Y = 540, FLY_DUR = 0.42;
+const COLORS = { R: { n: 'kırmızı', c: '#E5484D' }, B: { n: 'mavi', c: '#3E7BFA' }, Y: { n: 'sarı', c: '#F2B233' }, G: { n: 'yeşil', c: '#2F9E6B' }, P: { n: 'mor', c: '#9B5FD6' } };
+/* Bölümler — stacks: yığınlar (alttan üste), jeton: renk + bayraklar  ? gizli  * buz  L kilit  K anahtar  H ağır  1-9 bomba hamlesi
+   queue: kamyon sırası · dock: aynı anda rıhtımda duran kamyon · ramp: rampa yeri · tilt: gemi yatış sınırı (0 = yok)
+   3–10. bölümler üretici + çözücüyle seçildi: hepsi çözülebilir; rastgele / açgözlü bot kazanma oranları yorumda */
+const LEVELS = [
+  { stacks:['R B', 'B R', 'R B'], queue:'RB', dock:2, ramp:4 },
+  { stacks:['R Y B', 'B R Y', 'Y B R'], queue:'RBY', dock:2, ramp:4 },
+  { stacks:['B? R? R R R', 'R Y', 'Y', 'R? Y? B B'], queue:'BYRR', dock:2, ramp:4 },                                   // ❓ · rastgele %68 · açgözlü %100
+  { stacks:['R? R R Y Y', 'G B R', 'R? G B G R', 'B Y? B B B'], queue:'GBRYBR', dock:2, ramp:3 },                         // rampa 3 · %28 · %69
+  { stacks:['Y Y G R R', 'Y', 'G B* B R* R', 'B G? R? R*'], queue:'RBYRG', dock:2, ramp:4 },                              // 🧊 · %46 · %86
+  { stacks:['BL G B YK', 'R Y R B BL', 'G G Y B', 'B R'], queue:'BBRGY', dock:2, ramp:4 },                                // 🔒🔑 · %38 · %75
+  { stacks:['B Y RH R', 'BH Y', 'B? R', 'RH', 'Y? B B'], queue:'BBRRY', dock:2, ramp:4 },                                 // ⚓ · %36 · %39
+  { stacks:['R G', 'G Y7 G R', 'B Y B Y', 'Y B Y R Y'], queue:'YGYBR', dock:2, ramp:4 },                                  // 💣 · %22 · %27
+  { stacks:['Y G G Y', 'B B', 'G R R R R', 'Y', 'R B R'], queue:'GYRRB', dock:2, ramp:4, tilt:6 },                        // ⚖ · %10 · %100
+  { stacks:['G* B B?H7 Y G', 'B R R? R*', 'R G? PL', 'B R P? B? RK', 'Y Y? P'], queue:'RGYBPBR', dock:2, ramp:4, tilt:8 }, // karma · %0 · %9
+];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => 1 - Math.pow(1 - t, 3);
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+
+/* ---------------- MANTIK (saf) ---------------- */
+let NEXT_ID = 1;
+function parseLevel(L) {
+  const stacks = L.stacks.map(s => s.split(' ').filter(Boolean).map(tok => {
+    const c = { id: NEXT_ID++, c: tok[0], hidden: false, ice: 0, lock: false, key: false, heavy: false, bomb: 0 };
+    for (const f of tok.slice(1)) { if (f === '?') c.hidden = true; else if (f === '*') c.ice = 1; else if (f === 'L') c.lock = true; else if (f === 'K') c.key = true; else if (f === 'H') c.heavy = true; else if (/\d/.test(f)) c.bomb = +f; }
+    return c; }));
+  for (const s of stacks) if (s.length) s[s.length - 1].hidden = false;   // en üsttekiler görünür
+  const st = { stacks, ramp: [], queue: [...L.queue], docks: Array(L.dock).fill(null), rampCap: L.ramp, tilt: L.tilt || 0, moves: 0, coins: 0, over: null, truckId: 1 };
+  for (let k = 0; k < L.dock; k++) arrive(st, k, []);
+  return st;
+}
+const units = c => c.heavy ? 2 : 1;
+const keysLeft = st => st.stacks.some(s => s.some(c => c.key));
+const torque = st => { const mid = (st.stacks.length - 1) / 2; return st.stacks.reduce((a, s, i) => a + s.reduce((u, c) => u + units(c), 0) * (i - mid), 0); };
+const shipEmpty = st => st.stacks.every(s => !s.length);
+function arrive(st, k, ev) {
+  if (!st.queue.length) { st.docks[k] = null; return; }
+  st.docks[k] = { id: st.truckId++, color: st.queue.shift(), load: [], units: 0 };
+  ev.push({ type: 'arrive', dock: k, truck: st.docks[k].id, color: st.docks[k].color });   // renk olayda: aynı hamlede dolup gidebilir
+}
+function loadInto(st, c, ev, from) {
+  const k = st.docks.findIndex(d => d && d.color === c.c && d.units + units(c) <= TRUCK_CAP);
+  if (k < 0) return false;
+  const d = st.docks[k]; d.load.push(c); d.units += units(c);
+  ev.push({ type: from === 'ramp' ? 'auto' : 'move', id: c.id, to: 'truck', dock: k, truck: d.id });
+  if (d.units >= TRUCK_CAP) { ev.push({ type: 'depart', dock: k, truck: d.id, load: d.load.map(x => x.id), color: d.color }); st.coins += 10; arrive(st, k, ev); autoLoad(st, ev); }
+  return true;
+}
+function autoLoad(st, ev) {
+  let changed = true;
+  while (changed) { changed = false;
+    for (let i = 0; i < st.ramp.length; i++) { const c = st.ramp[i]; if (st.docks.some(d => d && d.color === c.c && d.units + units(c) <= TRUCK_CAP)) { st.ramp.splice(i, 1); loadInto(st, c, ev, 'ramp'); changed = true; break; } } }
+}
+function canTap(st, i) {
+  const s = st.stacks[i]; if (!s || !s.length || st.over) return false;
+  const top = s[s.length - 1];
+  return !(top.lock && keysLeft(st));
+}
+/* bir hamle: yığın i'nin tepesine dokun. durum yerinde değişir, olay listesi döner */
+function applyMove(st, i) {
+  const ev = [], s = st.stacks[i];
+  if (!s || !s.length || st.over) return ev;
+  const top = s[s.length - 1];
+  if (top.lock && keysLeft(st)) { ev.push({ type: 'locked', id: top.id }); return ev; }
+  st.moves++;
+  if (top.ice > 0) { top.ice--; ev.push({ type: 'crack', id: top.id }); }
+  else {
+    s.pop();
+    if (s.length && s[s.length - 1].hidden) { s[s.length - 1].hidden = false; ev.push({ type: 'reveal', id: s[s.length - 1].id }); }
+    top.bomb = 0;
+    const hadKeys = top.key; top.key = false;
+    if (hadKeys && !keysLeft(st)) ev.push({ type: 'unlock' });
+    if (!loadInto(st, top, ev, 'ship')) {
+      st.ramp.push(top); ev.push({ type: 'move', id: top.id, to: 'ramp', slot: st.ramp.length - 1 });
+      if (st.ramp.length > st.rampCap) { st.over = 'ramp'; ev.push({ type: 'fail', why: 'ramp' }); return ev; }
+    }
+  }
+  // bomba: gemide kalanların sayacı düşer
+  for (const ss of st.stacks) for (const c of ss) if (c.bomb > 0) { c.bomb--; if (c.bomb === 0) { st.over = 'bomb'; ev.push({ type: 'fail', why: 'bomb', id: c.id }); return ev; } }
+  if (st.tilt && Math.abs(torque(st)) > st.tilt) { st.over = 'tilt'; ev.push({ type: 'fail', why: 'tilt' }); return ev; }
+  if (shipEmpty(st) && !st.ramp.length) { st.over = 'win'; ev.push({ type: 'win' }); return ev; }
+  if (!shipEmpty(st) && !st.stacks.some((_, j) => canTap(st, j))) { st.over = 'stuck'; ev.push({ type: 'fail', why: 'stuck' }); }
+  return ev;
+}
+const cloneState = st => JSON.parse(JSON.stringify(st));
+
+/* ---------------- SES ---------------- */
+const SFX = (() => {
+  let ac = null, master = null, noise = null;
+  function init() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ac = new AC(); master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
+    noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function tone(t0, dur, f0, f1, g, type) { const o = ac.createOscillator(), gg = ac.createGain(); o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+    gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + 0.006); gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gg); gg.connect(master); o.start(t0); o.stop(t0 + dur + 0.02); }
+  function burst(t0, dur, f, q, g, type) { const s = ac.createBufferSource(); s.buffer = noise; const bp = ac.createBiquadFilter(); bp.type = type || 'bandpass';
+    bp.frequency.value = f; bp.Q.value = q; const gg = ac.createGain(); gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + 0.005);
+    gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); s.connect(bp); bp.connect(gg); gg.connect(master); s.start(t0, Math.random()); s.stop(t0 + dur + 0.02); }
+  const w = fn => (...a) => { if (!ac) return; fn(ac.currentTime, ...a); };
+  return { init,
+    grab: w(t => { tone(t, 0.08, 300, 520, 0.08, 'triangle'); burst(t, 0.12, 2200, 3, 0.05); }),
+    tunk: w((t, heavy) => { tone(t, 0.14, heavy ? 120 : 180, heavy ? 60 : 90, heavy ? 0.3 : 0.22); burst(t, 0.08, 600, 0.8, 0.12, 'lowpass'); }),
+    ramp: w(t => { tone(t, 0.1, 240, 150, 0.14, 'square'); burst(t, 0.06, 900, 1, 0.06); }),
+    horn: w(t => { tone(t, 0.28, 330, 320, 0.09, 'sawtooth'); tone(t, 0.28, 415, 405, 0.07, 'sawtooth'); }),
+    arrive: w(t => { burst(t, 0.3, 300, 0.6, 0.06, 'lowpass'); }),
+    crack: w(t => { burst(t, 0.1, 5000, 2, 0.12); tone(t, 0.06, 2400, 1400, 0.05, 'triangle'); }),
+    locked: w(t => { tone(t, 0.06, 800, 800, 0.08, 'square'); tone(t + 0.08, 0.08, 600, 600, 0.08, 'square'); }),
+    unlock: w(t => { [0, 5, 9].forEach((s, i) => tone(t + i * 0.06, 0.15, 880 * Math.pow(2, s / 12), 880 * Math.pow(2, s / 12), 0.08, 'triangle')); }),
+    reveal: w(t => { tone(t, 0.1, 600, 900, 0.05, 'sine'); }),
+    tick: w(t => tone(t, 0.05, 1400, 1400, 0.06, 'square')),
+    boom: w(t => { burst(t, 0.6, 300, 0.5, 0.5, 'lowpass'); tone(t, 0.5, 120, 40, 0.35, 'sawtooth'); }),
+    splash: w(t => { burst(t, 0.5, 1200, 0.7, 0.25); tone(t, 0.3, 300, 100, 0.12); }),
+    bad: w(t => { tone(t, 0.14, 240, 160, 0.14, 'square'); }),
+    undo: w(t => { tone(t, 0.1, 700, 950, 0.08, 'triangle'); }),
+    gull: w(t => { tone(t, 0.18, 1800, 1300, 0.02, 'sine'); tone(t + 0.2, 0.2, 1900, 1200, 0.02, 'sine'); }),
+    shipHorn: w(t => { tone(t, 1.1, 98, 96, 0.22, 'sawtooth'); tone(t, 1.1, 147, 145, 0.12, 'sawtooth'); burst(t, 1.1, 300, 0.5, 0.05, 'lowpass'); }),
+    siren: w(t => { tone(t, 0.25, 700, 950, 0.05, 'triangle'); tone(t + 0.25, 0.25, 950, 700, 0.05, 'triangle'); }),
+    streak: w((t, n) => { const f = 523 * Math.pow(2, Math.min(n, 10) * 2 / 12); tone(t, 0.12, f, f, 0.08, 'triangle'); tone(t + 0.07, 0.14, f * 1.5, f * 1.5, 0.06, 'triangle'); }),
+    coin: w(t => { tone(t, 0.06, 1800, 2400, 0.04, 'square'); }),
+    toot: w(t => { tone(t, 0.08, 520, 520, 0.05, 'square'); tone(t + 0.12, 0.08, 520, 520, 0.05, 'square'); }),
+    win: w(t => { [0, 4, 7, 12, 16].forEach((s, i) => tone(t + i * 0.09, 0.35, 523 * Math.pow(2, s / 12), 523 * Math.pow(2, s / 12), 0.14, 'triangle')); }),
+  };
+})();
+const buzz = ms => { try { const ua = navigator.userActivation; if (navigator.vibrate && (!ua || ua.hasBeenActive)) navigator.vibrate(ms); } catch (e) {} };
+
+/* ---------------- GÖRSEL DURUM ---------------- */
+let S = null;
+const SAVE_KEY = 'dbg.liman.v1';
+const loadBest = () => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || { lv: 0, stars: {} }; } catch (e) { return { lv: 0, stars: {} }; } };
+const saveBest = b => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(b)); } catch (e) {} };
+function newRun(lv) {
+  const L = LEVELS[lv], st = parseLevel(L);
+  S = { lv, L, st, history: [], undos: 0, vis: {}, trucks: {}, leaving: [], crane: { x: W / 2, y: 70, carry: null }, flies: {}, parts: [], pops: [], shake: 0, t: 0,
+    running: false, phase: 'play', tilt: 0, gullT: 5, splashT: 0, overT: 0,
+    bob: 0, shipX: 0, sail: 0, streak: 0, colFlash: {}, confetti: [], smokeT: 0, fuseT: 0, sirenT: 0, craneIdleX: W / 2, coinsShown: 0 };
+  st.docks.forEach((d, k) => { if (d) S.trucks[d.id] = { id: d.id, color: d.color, dock: k, x: dockX(k), state: 'idle', bounce: 0 }; });
+  syncVis(true);
+}
+const dockX = k => W / 2 + (k - (S.st.docks.length - 1) / 2) * 172;
+const rampX = j => W / 2 + (j - (S.st.rampCap - 1) / 2) * 54;
+const colX = i => SHIP.x + (i - (S.st.stacks.length - 1) / 2) * COL_GAP;
+/* mantıktaki yere göre konteynerin hedef ekran konumu (gemi yatışıyla döner) */
+function targets() {
+  const T = {}, st = S.st, a = S.tilt, ca = Math.cos(a), sa = Math.sin(a);
+  st.stacks.forEach((s, i) => s.forEach((c, h) => { const lx = colX(i) - SHIP.x, ly = -CH / 2 - h * CH;
+    T[c.id] = { x: SHIP.x + S.shipX + lx * ca - ly * sa, y: SHIP.y + S.bob + lx * sa + ly * ca, rot: a, sc: 1, where: 'ship', c }; }));
+  st.ramp.forEach((c, j) => T[c.id] = { x: rampX(j), y: RAMP_Y, rot: 0, sc: 0.9, where: 'ramp', c });
+  st.docks.forEach((d, k) => { if (!d) return; const tr = S.trucks[d.id]; let off = 0;
+    d.load.forEach(c => { const u = units(c); T[c.id] = { x: (tr ? tr.x : dockX(k)) - 38 + (off + u / 2) * 30, y: DOCK_Y - 22 - (tr ? tr.bounce * 6 : 0), rot: 0, sc: 0.62, where: 'truck', c, wide: u }; off += u; }); });
+  for (const lv of S.leaving) { let off = 0; lv.load.forEach(c => { const u = units(c); T[c.id] = { x: lv.x - 38 + (off + u / 2) * 30, y: DOCK_Y - 22, rot: 0, sc: 0.62, where: 'truck', c, wide: u }; off += u; }); }
+  return T;
+}
+function syncVis(snap) {
+  const T = targets();
+  for (const id in T) { if (!S.vis[id] || snap) S.vis[id] = { x: T[id].x, y: T[id].y, rot: T[id].rot, sc: T[id].sc, pop: 0, shake: 0 }; }
+  for (const id in S.vis) if (!T[id]) delete S.vis[id];
+}
+
+/* ---------------- OYUNCU HAMLESİ ---------------- */
+function tapStack(i) {
+  if (!S.running || S.phase !== 'play') return;
+  const st = S.st, s = st.stacks[i]; if (!s || !s.length) return;
+  const top = s[s.length - 1];
+  const before = cloneState(st);
+  S.colFlash[i] = 1; S.craneIdleX = colX(i);
+  const ev = applyMove(st, i);
+  if (ev.length && ev[0].type === 'locked') { SFX.locked(); buzz(20); S.vis[top.id].shake = 1; popText('🔒 Önce 🔑 anahtarı indir', W / 2, 120, '#B3261E', 16); return; }
+  S.history.push({ st: before, trucks: JSON.parse(JSON.stringify(S.trucks)) });
+  handleEvents(ev);
+  HUD.dirty = true;
+}
+function handleEvents(ev) {
+  let delay = 0;
+  for (const e of ev) {
+    if (e.type === 'crack') { SFX.crack(); buzz(12); const v = S.vis[e.id]; v.shake = 1; shards(v.x, v.y, '#DFF4FF', 10); popText('Çatladı!', v.x, v.y - 26, '#3E7BFA', 15); }
+    else if (e.type === 'move' || e.type === 'auto') {
+      // rampadan yeni gelen kamyona otomatik yükleme: kamyon rıhtıma varınca uçsun
+      const tr = S.trucks[e.truck]; if (e.type === 'auto' && tr && tr.state === 'arrive') delay = Math.max(delay, tr.wait + 0.35);
+      const v = S.vis[e.id]; S.flies[e.id] = { t: -delay, x0: v.x, y0: v.y, auto: e.type === 'auto' };
+      if (e.type === 'move') { SFX.grab(); buzz(8); S.crane.carry = e.id;
+        // seri: rampaya düşmeden art arda kamyona (sadece his, puanı değiştirmez)
+        if (e.to === 'truck') { S.streak++; if (S.streak >= 3) { const n = S.streak; setTimeout(() => { SFX.streak(n); popText('Seri ×' + n + '!', W / 2, 206, n >= 6 ? '#E0A100' : '#2F9E6B', 18 + Math.min(n, 8) * 1.5); }, FLY_DUR * 1000); } }
+        else S.streak = 0; }
+      delay += e.type === 'auto' ? 0.12 : 0;
+      const id = e.id, heavy = (findCont(e.id) || {}).heavy; setTimeout(() => { if (!S.vis[id]) return; e.to === 'ramp' ? SFX.ramp() : SFX.tunk(heavy); }, (FLY_DUR + Math.max(0, delay)) * 1000);
+    }
+    else if (e.type === 'depart') {
+      const tr = S.trucks[e.truck];
+      // ayrılan kamyonun yükü mantıkta kaldırıldı: görsel listede tut
+      const conts = e.load.map(id => findCont(id)).filter(Boolean);
+      S.leaving.push({ id: e.truck, color: e.color, x: tr ? tr.x : dockX(e.dock), load: conts, t: -(FLY_DUR + delay + 0.15), dock: e.dock });
+      delete S.trucks[e.truck];
+      const dx = tr ? tr.x : dockX(e.dock);
+      setTimeout(() => { SFX.horn(); buzz([15, 30, 15]); popText('+10 💰', dx, DOCK_Y - 60, '#C98A10', 18);
+        for (let i = 0; i < 6; i++) S.parts.push({ x: dx + (Math.random() - 0.5) * 40, y: DOCK_Y - 40, vx: (Math.random() - 0.5) * 120, vy: -120 - Math.random() * 80, t: -i * 0.05, life: 1.2, r: 6, col: '#F2B233', coin: true });
+        for (let i = 0; i < 8; i++) S.parts.push({ x: dx - 60, y: DOCK_Y + 8, vx: -40 - Math.random() * 60, vy: -10 - Math.random() * 20, g: -20, t: 0, life: 0.8, r: 4 + Math.random() * 5, col: 'rgba(120,120,120,.5)', smoke: true }); }, (FLY_DUR + delay + 0.1) * 1000);
+    }
+    else if (e.type === 'arrive') { S.trucks[e.truck] = { id: e.truck, color: e.color, dock: e.dock, x: -140, state: 'arrive', bounce: 0, wait: FLY_DUR + delay + 0.3 }; setTimeout(() => { SFX.arrive(); SFX.toot(); }, (FLY_DUR + delay + 0.3) * 1000); }
+    else if (e.type === 'reveal') { SFX.reveal(); const v = S.vis[e.id]; if (v) { v.pop = 1; v.flip = 1; setTimeout(() => { const c2 = findCont(e.id); if (c2 && S.vis[e.id]) { shards(S.vis[e.id].x, S.vis[e.id].y, COLORS[c2.c].c, 10); popText('❓→' + COLORS[c2.c].n, S.vis[e.id].x, S.vis[e.id].y - 24, COLORS[c2.c].c, 14); } }, 160); } }
+    else if (e.type === 'unlock') { SFX.unlock(); buzz(20); popText('🔓 Kilitler açıldı!', W / 2, 120, '#2F9E6B', 22);
+      for (const s of S.st.stacks) for (const c of s) if (c.lock && S.vis[c.id]) { const v = S.vis[c.id]; v.pop = 1; shards(v.x, v.y, '#FFD54F', 14); } }
+    else if (e.type === 'fail') { S.phase = 'fail'; S.running = false; S.failWhy = e.why; failFx(e); }
+    else if (e.type === 'win') { S.phase = 'win'; S.running = false; const at = (FLY_DUR + delay) * 1000;
+      setTimeout(() => { SFX.win(); SFX.shipHorn(); buzz([20, 30, 40]); popText('Gemi boşaldı!', W / 2, 120, '#2F9E6B', 28); S.sail = 0.001; confettiBurst(); }, at);
+      setTimeout(showWin, at + 2100); }
+  }
+}
+/* mantıkta her yerde (gemi, rampa, kamyon, ayrılan kamyon) konteyneri bul */
+function findCont(id) {
+  const st = S.st;
+  for (const s of st.stacks) for (const c of s) if (c.id === id) return c;
+  for (const c of st.ramp) if (c.id === id) return c;
+  for (const d of st.docks) if (d) for (const c of d.load) if (c.id === id) return c;
+  for (const l of S.leaving) for (const c of l.load) if (c.id === id) return c;
+  if (S.history.length) { const h = S.history[S.history.length - 1].st; for (const d of h.docks) if (d) for (const c of d.load) if (c.id === id) return c; for (const s of h.stacks) for (const c of s) if (c.id === id) return c; for (const c of h.ramp) if (c.id === id) return c; }
+  return null;
+}
+function failFx(e) {
+  const d = (FLY_DUR + 0.05) * 1000;
+  if (e.why === 'ramp') setTimeout(() => { SFX.bad(); buzz([40, 30, 40]); S.shake = 6; popText('Rampa taştı!', W / 2, RAMP_Y - 40, '#D6423A', 26); }, d);
+  if (e.why === 'bomb') { const v = S.vis[e.id]; SFX.boom(); buzz([80, 40, 120]); S.shake = 14; if (v) { shards(v.x, v.y, '#FF8A3D', 30); shards(v.x, v.y, '#555', 20); } popText('Bomba patladı!', W / 2, 120, '#D6423A', 28); }
+  if (e.why === 'tilt') { SFX.splash(); buzz([60, 30, 60]); S.shake = 8; popText('Gemi yattı!', W / 2, 120, '#D6423A', 28); S.splashT = 1; }
+  if (e.why === 'stuck') { SFX.bad(); popText('Hamle kalmadı!', W / 2, 120, '#D6423A', 26); }
+  setTimeout(showFail, d + 1100);
+}
+function undo() {
+  if (!S.history.length || S.phase === 'win') return;
+  const h = S.history.pop(); S.st = h.st; S.trucks = h.trucks; S.leaving = []; S.flies = {}; S.undos++; S.streak = 0; S.crane.carry = null;
+  for (const id in S.trucks) { S.trucks[id].state = 'idle'; S.trucks[id].x = dockX(S.trucks[id].dock); }
+  S.phase = 'play'; S.running = true; hideOv();
+  syncVis(false); SFX.undo(); buzz(8); HUD.dirty = true;
+}
+function confettiBurst() { const cols = ['#E5484D', '#F2B233', '#2F9E6B', '#3E7BFA', '#9B5FD6', '#FF8A65'];
+  for (let i = 0; i < 90; i++) S.confetti.push({ x: Math.random() * W, y: -20 - Math.random() * 220, vx: (Math.random() - 0.5) * 80, vy: 40 + Math.random() * 120, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 12, col: cols[i % cols.length], w: 5 + Math.random() * 5, h: 3 + Math.random() * 4 }); }
+function shipPt(lx, ly) { const a = S.tilt, ca = Math.cos(a), sa = Math.sin(a); return [SHIP.x + S.shipX + lx * ca - ly * sa, SHIP.y + S.bob + lx * sa + ly * ca]; }
+function shards(x, y, col, n) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = 60 + Math.random() * 180; S.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, g: 500, t: 0, life: 0.5 + Math.random() * 0.3, r: 1.5 + Math.random() * 2.5, col }); } }
+function popText(txt, x, y, col, size) { S.pops.push({ txt, x, y, col, size: size || 18, t: 0 }); }
+
+/* ---------------- ADIM ---------------- */
+function step(dt) {
+  S.t += dt; S.shake *= Math.exp(-10 * dt);
+  const st = S.st;
+  // gemi yatışı (yatış kuralı yoksa hafif sallanma)
+  const tq = torque(st), tgt = st.tilt ? clamp(tq / st.tilt, -1.4, 1.4) * 0.09 : tq * 0.006;
+  S.tilt = lerp(S.tilt, tgt + Math.sin(S.t * 1.3) * 0.008 + (S.splashT > 0 ? Math.sign(tq) * 0.2 * S.splashT : 0), 1 - Math.exp(-4 * dt));
+  S.splashT = Math.max(0, S.splashT - dt * 0.3);
+  S.bob = Math.sin(S.t * 1.2) * 2;
+  if (S.sail > 0) { S.sail += dt; S.shipX = Math.pow(S.sail, 2.2) * 160; }   // kazanınca gemi limandan ayrılır
+  for (const k in S.colFlash) S.colFlash[k] *= Math.exp(-7 * dt);
+  // baca dumanı
+  S.smokeT -= dt; if (S.smokeT <= 0) { S.smokeT = 0.18; const hw = (st.stacks.length * COL_GAP) / 2 + 26, [px, py] = shipPt(hw + 10, -60);
+    S.parts.push({ x: px, y: py, vx: -12 - Math.random() * 10, vy: -22 - Math.random() * 10, g: 0, t: 0, life: 1.6, r: 4 + Math.random() * 3, col: 'rgba(230,230,230,.55)', smoke: true }); }
+  // bombanın fitili, tik sesi, rampa sireni, yatış sıçraması
+  S.fuseT -= dt;
+  if (S.fuseT <= 0) { S.fuseT = 0.08;
+    for (const s of st.stacks) for (const c of s) if (c.bomb > 0 && S.vis[c.id]) { const v = S.vis[c.id]; S.parts.push({ x: v.x - CW / 2 + 8, y: v.y - 10, vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 50, g: 200, t: 0, life: 0.3, r: 1.5, col: Math.random() < 0.5 ? '#FFD36B' : '#FF7A3D' }); } }
+  if (S.running && st.ramp.length >= st.rampCap - 1) { S.sirenT -= dt; if (S.sirenT <= 0) { S.sirenT = 1.6; SFX.siren(); } } else S.sirenT = 0;
+  if (st.tilt && S.running && Math.abs(torque(st)) >= st.tilt && Math.random() < 0.4) { const side = Math.sign(torque(st)), hw = (st.stacks.length * COL_GAP) / 2 + 20, [px, py] = shipPt(side * hw, 40);
+    S.parts.push({ x: px, y: py, vx: side * (20 + Math.random() * 60), vy: -60 - Math.random() * 60, g: 400, t: 0, life: 0.5, r: 2 + Math.random() * 2, col: 'rgba(220,240,255,.9)' }); }
+  for (const c of S.confetti) { c.t = (c.t || 0) + dt; c.vy += 260 * dt; c.vx *= 0.99; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt; }
+  S.confetti = S.confetti.filter(c => c.y < H + 20);
+  // kamyonlar
+  for (const id in S.trucks) { const tr = S.trucks[id];
+    if (tr.state === 'arrive') { tr.wait -= dt; if (tr.wait <= 0) { tr.x = lerp(tr.x, dockX(tr.dock), 1 - Math.exp(-7 * dt)); if (Math.abs(tr.x - dockX(tr.dock)) < 1) { tr.x = dockX(tr.dock); tr.state = 'idle'; tr.bounce = 1; } } }
+    tr.bounce *= Math.exp(-6 * dt); }
+  for (const l of S.leaving) { l.t += dt; if (l.t > 0) { l.x += dt * (120 + l.t * 900); if (Math.random() < 0.5) S.parts.push({ x: l.x - 62, y: DOCK_Y + 6, vx: -30, vy: -15, g: -10, t: 0, life: 0.6, r: 3 + Math.random() * 4, col: 'rgba(110,110,110,.45)', smoke: true }); } }
+  S.leaving = S.leaving.filter(l => l.x < W + 200);
+  // konteynerler: uçuş (kaldır → taşı → indir) ya da hedefe yumuşak geçiş
+  const T = targets();
+  for (const id in T) {
+    let v = S.vis[id]; if (!v) v = S.vis[id] = { x: T[id].x, y: T[id].y, rot: T[id].rot, sc: T[id].sc, pop: 0, shake: 0 };
+    const f = S.flies[id], tg = T[id];
+    if (f) { f.t += dt;
+      const k = clamp(f.t / FLY_DUR, 0, 1), top = Math.min(f.y0, tg.y) - (f.auto ? 50 : 90);
+      if (k < 0.3) { const e = ease(k / 0.3); v.x = f.x0; v.y = lerp(f.y0, top, e); }
+      else if (k < 0.7) { const e = ease((k - 0.3) / 0.4); v.x = lerp(f.x0, tg.x, e); v.y = top + Math.sin(e * Math.PI) * -6; }
+      else { const e = ease((k - 0.7) / 0.3); v.x = tg.x; v.y = lerp(top, tg.y, e); }
+      v.rot = lerp(v.rot, 0, 0.3) + Math.sin(f.t * 20) * 0.03 * (1 - k); v.sc = lerp(v.sc, tg.sc, 0.15);
+      if (f.t >= 0 && !f.auto) { S.crane.x = v.x; S.crane.y = v.y - CH / 2 * v.sc; }
+      if (k >= 1) { delete S.flies[id]; v.pop = 1; if (S.crane.carry == id) S.crane.carry = null;
+        for (let i = 0; i < 6; i++) S.parts.push({ x: tg.x + (Math.random() - 0.5) * CW * tg.sc, y: tg.y + CH / 2 * tg.sc, vx: (Math.random() - 0.5) * 90, vy: -20 - Math.random() * 30, g: 120, t: 0, life: 0.4, r: 2 + Math.random() * 2, col: 'rgba(200,190,170,.7)' });   // iniş tozu
+        if (tg.where === 'truck') { const tr = Object.values(S.trucks).find(t => Math.abs(t.x - tg.x) < 60); if (tr) tr.bounce = 0.6; } }
+    } else { const kk = 1 - Math.exp(-14 * dt); v.x = lerp(v.x, tg.x, kk); v.y = lerp(v.y, tg.y, kk); v.rot = lerp(v.rot, tg.rot, kk); v.sc = lerp(v.sc, tg.sc, kk); }
+    v.pop *= Math.exp(-7 * dt); v.shake *= Math.exp(-8 * dt); if (v.flip) v.flip = Math.max(0, v.flip - dt * 3.2);
+  }
+  for (const id in S.vis) if (!T[id]) delete S.vis[id];
+  if (!S.crane.carry) { S.crane.y = lerp(S.crane.y, 64, 1 - Math.exp(-5 * dt)); S.crane.x = lerp(S.crane.x, S.craneIdleX, 1 - Math.exp(-4 * dt)); }
+  for (const q of S.parts) { q.t += dt; if (q.t < 0) continue;
+    if (q.coin) { const k = clamp(q.t / q.life, 0, 1); if (k > 0.35) { const e = (k - 0.35) / 0.65; q.x = lerp(q.x, W - 30, e * 0.25); q.y = lerp(q.y, 4, e * 0.25); if (k > 0.97 && !q.done) { q.done = true; SFX.coin(); } } else { q.vy += 300 * dt; q.x += q.vx * dt; q.y += q.vy * dt; } continue; }
+    q.vx *= 0.96; q.vy = q.vy * 0.97 + (q.g || 0) * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.smoke) q.r += dt * 6; }
+  S.parts = S.parts.filter(q => q.t < q.life);
+  for (const q of S.pops) q.t += dt; S.pops = S.pops.filter(q => q.t < 1.2);
+  if (S.running) { S.gullT -= dt; if (S.gullT <= 0) { S.gullT = 9 + Math.random() * 8; SFX.gull(); } }
+}
+
+/* ---------------- GİRDİ ---------------- */
+function toL(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+cv.addEventListener('pointerdown', e => {
+  if (!S.running || S.phase !== 'play') return; e.preventDefault(); SFX.init();
+  const [x, y] = toL(e); if (y < 90 || y > SHIP.y + 30) return;
+  let best = -1, bd = 1e9; S.st.stacks.forEach((s, i) => { const d = Math.abs(colX(i) - x); if (d < COL_GAP / 2 && d < bd) { bd = d; best = i; } });
+  if (best >= 0) tapStack(best);
+});
+
+/* ---------------- ÇİZİM ---------------- */
+let BASE_T = null;
+function fitCanvas() {
+  const box = $('stage'), availW = box.clientWidth || 360, chrome = $('cab').offsetHeight - cv.offsetHeight || 120;
+  const availH = Math.max(440, innerHeight - chrome - 18), sc = Math.min(availW / W, availH / H), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); cv.style.width = Math.round(W * sc) + 'px'; cv.style.height = Math.round(H * sc) + 'px';
+  ctx.setTransform(sc * dpr, 0, 0, sc * dpr, 0, 0); BASE_T = ctx.getTransform();
+}
+function rr(x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16), f = v => clamp(Math.round(v * k), 0, 255); return `rgb(${f(n >> 16)},${f(n >> 8 & 255)},${f(n & 255)})`; }
+const emoji = (e, x, y, size) => { ctx.font = size + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#3A2E26'; ctx.fillText(e, x, y); };
+function drawContainer(c, v, wide) {
+  const flipping = v.flip > 0, hid = c.hidden || (flipping && v.flip > 0.5), base = hid ? '#8A9199' : COLORS[c.c].c, w = CW * (wide || 1) + (wide > 1 ? 6 : 0), h = CH - 3;
+  ctx.save(); ctx.translate(v.x + (v.shake ? Math.sin(S.t * 60) * 3 * v.shake : 0), v.y); ctx.rotate(v.rot);
+  const s = v.sc, sq = v.pop; ctx.scale(s * (1 + sq * 0.1) * (flipping ? Math.abs(Math.cos(v.flip * Math.PI)) + 0.02 : 1), s * (1 - sq * 0.1));   // iniş ezilmesi · açılırken dönme
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; rr(-w / 2 + 2, -h / 2 + 3, w, h, 3); ctx.fill();
+  ctx.fillStyle = base; rr(-w / 2, -h / 2, w, h, 3); ctx.fill();
+  ctx.strokeStyle = shade(base, 0.72); ctx.lineWidth = 1.5;
+  for (let xx = -w / 2 + 6; xx < w / 2 - 12; xx += 5) { ctx.beginPath(); ctx.moveTo(xx, -h / 2 + 3); ctx.lineTo(xx, h / 2 - 3); ctx.stroke(); }
+  // kapı + kilit kolları (sağ uç)
+  ctx.fillStyle = shade(base, 0.85); ctx.fillRect(w / 2 - 12, -h / 2 + 2, 10, h - 4);
+  ctx.strokeStyle = shade(base, 0.5); ctx.lineWidth = 1.2; for (const bx of [w / 2 - 9, w / 2 - 5]) { ctx.beginPath(); ctx.moveTo(bx, -h / 2 + 3); ctx.lineTo(bx, h / 2 - 3); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(-w / 2 + 2, -h / 2 + 1, w - 4, 3);
+  if (!hid && !c.heavy && !c.key && !(c.lock && keysLeft(S.st))) { ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.font = '800 7px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('DAWN', -5, 1); }
+  ctx.strokeStyle = shade(base, 0.55); ctx.lineWidth = 2; rr(-w / 2, -h / 2, w, h, 3); ctx.stroke();
+  if (hid) emoji('❓', 0, 1, 15);
+  if (c.heavy) { ctx.fillStyle = 'rgba(0,0,0,.35)'; rr(-12, -8, 24, 16, 4); ctx.fill(); emoji('⚓', 0, 1, 12); }
+  if (c.key) { ctx.fillStyle = 'rgba(255,255,255,.85)'; rr(-11, -9, 22, 18, 5); ctx.fill(); emoji('🔑', 0, 1, 13); }
+  if (c.lock && keysLeft(S.st)) { ctx.strokeStyle = '#3A3A3A'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(w / 2, h / 2); ctx.moveTo(w / 2, -h / 2); ctx.lineTo(-w / 2, h / 2); ctx.stroke(); emoji('🔒', 0, 0, 14); }
+  if (c.ice > 0) { ctx.fillStyle = 'rgba(210,240,255,.72)'; rr(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4, 4); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-w / 2 + 6, -h / 2 + 4); ctx.lineTo(-w / 2 + 14, -h / 2 + 10); ctx.moveTo(w / 2 - 10, h / 2 - 4); ctx.lineTo(w / 2 - 4, h / 2 - 12); ctx.stroke(); emoji('🧊', w / 2 - 6, -h / 2 + 4, 10); }
+  if (c.bomb > 0) { const urgent = c.bomb <= 2, pulse = urgent ? 1 + Math.sin(S.t * 14) * 0.12 : 1;
+    ctx.save(); ctx.translate(w / 2 - 4, -h / 2 + 2); ctx.scale(pulse, pulse); ctx.fillStyle = urgent ? '#D6423A' : '#222'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '800 11px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(c.bomb, 0, 1); ctx.restore(); emoji('💣', -w / 2 + 8, 0, 12); }
+  ctx.restore();
+}
+function drawTruck(x, color, bounce) {
+  const y = DOCK_Y - bounce * 6, col = COLORS[color].c;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x + 6, DOCK_Y + 24, 70, 7, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#4A5560'; rr(x - 56, y - 8, 102, 16, 4); ctx.fill();              // kasa
+  ctx.fillStyle = col; rr(x + 46, y - 30, 30, 38, 7); ctx.fill();                      // kabin
+  ctx.fillStyle = 'rgba(200,235,255,.9)'; rr(x + 55, y - 25, 16, 13, 3); ctx.fill();
+  ctx.fillStyle = shade(col, 0.7); ctx.fillRect(x + 46, y - 2, 30, 4);
+  const spin = x * 0.11;   // tekerlekler kat edilen yola göre döner
+  for (const wx of [x - 38, x - 10, x + 60]) { ctx.fillStyle = '#1D2226'; ctx.beginPath(); ctx.arc(wx, y + 12, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#9AA3AB'; ctx.beginPath(); ctx.arc(wx, y + 12, 3.5, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#9AA3AB'; ctx.lineWidth = 1.5; for (let i = 0; i < 3; i++) { const aa = spin + i * 2.09; ctx.beginPath(); ctx.moveTo(wx, y + 12); ctx.lineTo(wx + Math.cos(aa) * 7, y + 12 + Math.sin(aa) * 7); ctx.stroke(); } }
+  ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1; for (let i = 1; i < TRUCK_CAP; i++) { ctx.beginPath(); ctx.moveTo(x - 56 + i * 30 + 6, y - 8); ctx.lineTo(x - 56 + i * 30 + 6, y + 8); ctx.stroke(); }
+  emoji('🧔', x + 63, y - 19, 11);   // şoför
+  ctx.fillStyle = '#FFE082'; ctx.beginPath(); ctx.arc(x + 76, y - 2, 2.5, 0, 7); ctx.fill();   // far
+}
+function draw() {
+  ctx.setTransform(BASE_T); ctx.clearRect(0, 0, W, H);
+  const st = S.st, shx = (Math.random() - 0.5) * S.shake, shy = (Math.random() - 0.5) * S.shake;
+  ctx.save(); ctx.translate(shx, shy);
+  // gökyüzü, deniz
+  const sky = ctx.createLinearGradient(0, 0, 0, 250); sky.addColorStop(0, '#7EC8F0'); sky.addColorStop(1, '#CDEBFA'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 250);
+  const sun = ctx.createRadialGradient(64, 150, 4, 64, 150, 60); sun.addColorStop(0, 'rgba(255,245,200,1)'); sun.addColorStop(0.3, 'rgba(255,230,150,.6)'); sun.addColorStop(1, 'rgba(255,230,150,0)'); ctx.fillStyle = sun; ctx.fillRect(4, 90, 120, 120);
+  ctx.fillStyle = 'rgba(255,255,255,.85)'; for (const [cx, cy, r] of [[60, 110, 16], [80, 104, 12], [290, 150, 14], [308, 146, 10]]) { ctx.beginPath(); ctx.arc((cx + S.t * 4) % (W + 40) - 20, cy, r, 0, 7); ctx.fill(); }
+  // ufuk: uzak vinç siluetleri + deniz feneri
+  ctx.fillStyle = 'rgba(70,100,120,.35)';
+  for (const [bx, hh] of [[18, 70], [52, 58], [86, 64]]) { ctx.fillRect(bx, 250 - hh, 4, hh); ctx.fillRect(bx - 10, 250 - hh, 34, 4); ctx.fillRect(bx + 20, 250 - hh + 4, 1.5, 18); }
+  ctx.fillStyle = '#F4F1EA'; ctx.beginPath(); ctx.moveTo(322, 250); ctx.lineTo(328, 200); ctx.lineTo(336, 200); ctx.lineTo(342, 250); ctx.fill();
+  ctx.fillStyle = '#D6423A'; ctx.fillRect(325, 222, 14, 8); ctx.fillRect(327, 206, 10, 6); ctx.fillStyle = '#34495E'; ctx.fillRect(326, 194, 12, 6);
+  const beam = (S.t * 1.4) % (Math.PI * 2); ctx.fillStyle = `rgba(255,240,160,${0.25 + 0.25 * Math.max(0, Math.cos(beam))})`; ctx.beginPath(); ctx.moveTo(332, 197); ctx.lineTo(332 + Math.cos(beam) * 60, 190); ctx.lineTo(332 + Math.cos(beam) * 60, 204); ctx.fill();
+  const sea = ctx.createLinearGradient(0, 250, 0, 380); sea.addColorStop(0, '#2E86C1'); sea.addColorStop(1, '#1B5E8A'); ctx.fillStyle = sea; ctx.fillRect(0, 250, W, 140);
+  ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 2; for (let r = 0; r < 5; r++) { ctx.beginPath(); for (let x = 0; x <= W; x += 12) { const y = 262 + r * 24 + Math.sin(x * 0.05 + S.t * 2 + r) * 3; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; for (let i = 0; i < 12; i++) { const x = (i * 53 + S.t * 10) % W, y = 270 + (i * 37) % 100; ctx.fillRect(x, y + Math.sin(S.t * 3 + i) * 2, 6, 1.5); }
+  // martılar
+  for (let i = 0; i < 2; i++) { const gx = ((S.t * (18 + i * 6) + i * 170) % (W + 60)) - 30, gy = 120 + i * 40 + Math.sin(S.t * 2 + i) * 6, f = Math.sin(S.t * 8 + i) * 4;
+    ctx.strokeStyle = '#34495E'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(gx - 8, gy + f); ctx.quadraticCurveTo(gx - 4, gy - 4, gx, gy); ctx.quadraticCurveTo(gx + 4, gy - 4, gx + 8, gy + f); ctx.stroke(); }
+  // gemi gövdesi
+  const a = S.tilt, n = st.stacks.length, hw = (n * COL_GAP) / 2 + 26;
+  ctx.save(); ctx.translate(SHIP.x + S.shipX, SHIP.y + S.bob); ctx.rotate(a);
+  ctx.fillStyle = '#B7412F'; ctx.beginPath(); ctx.moveTo(-hw - 14, 0); ctx.lineTo(hw + 24, 0); ctx.lineTo(hw, 48); ctx.lineTo(-hw + 8, 48); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#8E3024'; ctx.beginPath(); ctx.moveTo(-hw + 2, 30); ctx.lineTo(hw + 10, 30); ctx.lineTo(hw, 48); ctx.lineTo(-hw + 8, 48); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2C3E50'; ctx.fillRect(-hw - 14, -6, hw * 2 + 38, 8);
+  ctx.fillStyle = '#F4F1EA'; ctx.fillRect(-hw + 8, 18, hw * 2 - 8, 5);
+  ctx.fillStyle = '#F4D03F'; for (let x = -hw + 14; x < hw; x += 26) { ctx.beginPath(); ctx.arc(x, 10, 3, 0, 7); ctx.fill(); }   // lomboz
+  ctx.fillStyle = '#ECF0F1'; rr(hw - 12, -52, 32, 46, 5); ctx.fill(); ctx.fillStyle = '#5DADE2'; for (let i = 0; i < 3; i++) ctx.fillRect(hw - 7 + i * 9, -44, 6, 6);   // köprü üstü
+  ctx.fillStyle = '#34495E'; ctx.fillRect(hw + 4, -66, 12, 16); ctx.fillStyle = '#D6423A'; ctx.fillRect(hw + 4, -62, 12, 4);   // baca
+  ctx.strokeStyle = '#5D6D7E'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-hw - 8, -6); ctx.lineTo(-hw - 8, -40); ctx.stroke();   // bayrak direği
+  ctx.fillStyle = '#E5484D'; ctx.beginPath(); ctx.moveTo(-hw - 8, -40); for (let i = 0; i <= 6; i++) ctx.lineTo(-hw - 8 - i * 3.5, -40 + Math.sin(S.t * 6 + i) * 2); ctx.lineTo(-hw - 29, -30 + Math.sin(S.t * 6 + 6) * 2); for (let i = 6; i >= 0; i--) ctx.lineTo(-hw - 8 - i * 3.5, -30 + Math.sin(S.t * 6 + i) * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = '800 10px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('DAWN · 34', 0, 42);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(46,134,193,.55)'; ctx.fillRect(0, SHIP.y + 30, W, 18);   // su hattı gövdeyi örtsün
+  // köpük
+  ctx.fillStyle = 'rgba(255,255,255,.75)'; for (let x = SHIP.x + S.shipX - hw - 20; x < SHIP.x + S.shipX + hw + 30; x += 9) { const y = SHIP.y + 31 + S.bob * 0.5 + Math.sin(x * 0.3 + S.t * 4) * 2; ctx.beginPath(); ctx.ellipse(x, y, 5, 2.2, 0, 0, 7); ctx.fill(); }
+  // dokunulan yığın parlaması
+  for (const k in S.colFlash) { const f = S.colFlash[k]; if (f < 0.05 || !st.stacks[k]) continue; const [px, py] = shipPt(colX(+k) - SHIP.x, -80);
+    ctx.save(); ctx.translate(px, py); ctx.rotate(a); ctx.fillStyle = `rgba(255,255,255,${0.22 * f})`; rr(-COL_GAP / 2 + 2, -80, COL_GAP - 4, 160, 10); ctx.fill(); ctx.restore(); }
+  // yığın dokunma ipuçları (sadece dokunulabilir tepe)
+  st.stacks.forEach((s, i) => { if (!s.length || !S.running) return; const top = s[s.length - 1], v = S.vis[top.id]; if (!v || S.flies[top.id]) return;
+    if (top.lock && keysLeft(st)) return; ctx.strokeStyle = `rgba(255,255,255,${0.35 + 0.25 * Math.sin(S.t * 4 + i)})`; ctx.lineWidth = 2; ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.rot); rr(-CW / 2 - 3, -CH / 2 - 3, CW + 6, CH, 5); ctx.stroke(); ctx.restore(); });
+  // rıhtım
+  ctx.fillStyle = '#9E9A91'; ctx.fillRect(0, 388, W, H - 388);
+  ctx.fillStyle = '#7F7B73'; ctx.fillRect(0, 388, W, 8);
+  for (let x = 0; x < W; x += 24) { ctx.fillStyle = (x / 24) % 2 ? '#2B2B2B' : '#F2B233'; ctx.fillRect(x, 396, 12, 5); }
+  ctx.fillStyle = 'rgba(0,0,0,.06)'; for (let x = 0; x < W; x += 60) ctx.fillRect(x, 400, 2, H);
+  // babalar + lambalar
+  for (const bx of [26, 334]) { ctx.fillStyle = '#2C2C2C'; rr(bx - 7, 380, 14, 12, 4); ctx.fill(); ctx.fillStyle = '#444'; ctx.beginPath(); ctx.ellipse(bx, 380, 9, 3.5, 0, 0, 7); ctx.fill(); }
+  for (const lx of [14, 346]) { ctx.fillStyle = '#4A5560'; ctx.fillRect(lx - 1.5, 470, 3, 70); ctx.fillRect(lx - 8, 470, 16, 3); ctx.fillStyle = '#FFE082'; ctx.beginPath(); ctx.arc(lx + (lx < 180 ? 7 : -7), 476, 3.5, 0, 7); ctx.fill(); }
+  // rampa
+  ctx.fillStyle = '#6E6A63'; rr(W / 2 - st.rampCap * 27 - 8, RAMP_Y - 24, st.rampCap * 54 + 16, 48, 10); ctx.fill();
+  for (let j = 0; j < st.rampCap; j++) { ctx.strokeStyle = j < st.ramp.length ? 'rgba(255,255,255,.1)' : 'rgba(255,255,255,.45)'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); rr(rampX(j) - 24, RAMP_Y - 16, 48, 32, 5); ctx.stroke(); ctx.setLineDash([]); }
+  const rampFull = st.ramp.length >= st.rampCap - 1, rl = 'BEKLEME RAMPASI ' + st.ramp.length + '/' + st.rampCap + (rampFull ? ' ⚠' : '');
+  ctx.font = '800 10px "Baloo 2",sans-serif'; const rlw = ctx.measureText(rl).width + 14;
+  ctx.fillStyle = rampFull ? '#D6423A' : 'rgba(40,44,48,.85)'; rr(W / 2 - rlw / 2, RAMP_Y + 26, rlw, 16, 8); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(rl, W / 2, RAMP_Y + 34.5);
+  // rampa dolmak üzere: döner uyarı lambası
+  { const lx = W / 2 - st.rampCap * 27 - 18, ly = RAMP_Y - 14; ctx.fillStyle = '#555'; rr(lx - 6, ly + 4, 12, 8, 2); ctx.fill();
+    if (rampFull && S.phase === 'play') { const ang = S.t * 8; ctx.fillStyle = 'rgba(255,60,40,.35)'; ctx.beginPath(); ctx.moveTo(lx, ly); ctx.arc(lx, ly, 40, ang, ang + 0.7); ctx.fill(); ctx.beginPath(); ctx.moveTo(lx, ly); ctx.arc(lx, ly, 40, ang + Math.PI, ang + Math.PI + 0.7); ctx.fill(); }
+    ctx.fillStyle = rampFull && S.phase === 'play' ? '#FF3B2F' : '#8B2A22'; ctx.beginPath(); ctx.arc(lx, ly, 6, Math.PI, 0); ctx.fill(); }
+  // kamyonlar
+  for (const id in S.trucks) { const tr = S.trucks[id]; drawTruck(tr.x, tr.color, tr.bounce); }
+  for (const l of S.leaving) drawTruck(l.x, l.color, 0);
+  // sıradaki kamyonlar
+  ctx.fillStyle = 'rgba(0,0,0,.22)'; rr(10, 596, W - 20, 36, 12); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '800 10px "Baloo 2",sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('SIRADAKİ', 20, 614);
+  st.queue.slice(0, 7).forEach((c, i) => { const x = 86 + i * 36; ctx.fillStyle = COLORS[c].c; rr(x, 604, 26, 18, 4); ctx.fill(); ctx.fillStyle = shade(COLORS[c].c, 0.7); rr(x + 18, 606, 10, 14, 3); ctx.fill(); });
+  if (!st.queue.length) { ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillText('— son kamyonlar rıhtımda —', 86, 614); }
+  // konteynerler (gemi → rampa → kamyon → uçanlar en üstte)
+  const T = targets(), order = Object.keys(T).sort((a2, b2) => (S.flies[a2] ? 1 : 0) - (S.flies[b2] ? 1 : 0));
+  for (const id of order) { const v = S.vis[id]; if (!v) continue; drawContainer(T[id].c, v, T[id].wide); }
+  // vinç: köprü + araba + halat
+  ctx.fillStyle = '#F2B233'; ctx.fillRect(0, 24, W, 10); ctx.fillStyle = '#2B2B2B'; for (let x = 0; x < W; x += 20) ctx.fillRect(x, 24, 10, 3);
+  ctx.fillStyle = '#C98A10'; ctx.fillRect(8, 34, 10, 60); ctx.fillRect(W - 18, 34, 10, 60);
+  const cx = S.crane.x, cy = S.crane.y, grip = S.crane.carry ? 1 : 0;
+  ctx.fillStyle = '#34495E'; rr(cx - 18, 20, 36, 18, 4); ctx.fill(); ctx.fillStyle = S.crane.carry ? '#2F9E6B' : '#F2B233'; ctx.beginPath(); ctx.arc(cx + 12, 26, 2.5, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(cx - 5, 40, 2, cy - 46);   // halat gölgesi
+  ctx.strokeStyle = '#2C3E50'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - 7, 38); ctx.lineTo(cx - 14, cy - 8); ctx.moveTo(cx + 7, 38); ctx.lineTo(cx + 14, cy - 8); ctx.stroke();
+  // konteyner kıskacı (spreader): tutarken kollar kapanır
+  ctx.fillStyle = '#F2B233'; rr(cx - 24, cy - 11, 48, 6, 2); ctx.fill(); ctx.fillStyle = '#2B2B2B'; for (let x = -20; x < 20; x += 8) ctx.fillRect(cx + x, cy - 11, 4, 2);
+  ctx.fillStyle = '#5D6D7E'; for (const sgn of [-1, 1]) { ctx.save(); ctx.translate(cx + sgn * 22, cy - 6); ctx.rotate(sgn * (0.5 - grip * 0.5)); ctx.fillRect(-1.5, 0, 3, 8); ctx.restore(); }
+  ctx.restore();
+  // yatış göstergesi
+  if (st.tilt) { const tq = torque(st), k = clamp(tq / st.tilt, -1.3, 1.3), danger = Math.abs(tq) >= st.tilt;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; rr(W - 118, 94, 108, 28, 10); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '800 9px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('⚖ YATIŞ ' + Math.abs(tq) + '/' + st.tilt, W - 64, 102);
+    ctx.fillStyle = '#2F9E6B'; rr(W - 108, 108, 88, 8, 4); ctx.fill(); ctx.fillStyle = '#D6423A'; rr(W - 108, 108, 6, 8, 3); ctx.fill(); rr(W - 26, 108, 6, 8, 3); ctx.fill();
+    ctx.fillStyle = danger ? '#FFD36B' : '#fff'; ctx.beginPath(); ctx.arc(W - 64 + k * 38, 112, 5 + (danger ? Math.sin(S.t * 12) : 0), 0, 7); ctx.fill(); }
+  for (const q of S.parts) { if (q.t < 0) continue;
+    if (q.coin) { ctx.globalAlpha = 1; ctx.fillStyle = '#C98A10'; ctx.beginPath(); ctx.arc(q.x, q.y + 1, q.r, 0, 7); ctx.fill(); ctx.fillStyle = '#F2C94C'; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * Math.abs(Math.cos(q.t * 9)) + 1, q.r, 0, 0, 7); ctx.fill(); continue; }
+    ctx.globalAlpha = Math.max(0, 1 - q.t / q.life) * (q.smoke ? 0.8 : 1); ctx.fillStyle = q.col; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  for (const c of S.confetti) { ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot); ctx.fillStyle = c.col; ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h); ctx.restore(); }
+  // bomba yaklaşıyor: kenarlar kızarır
+  const minBomb = Math.min(99, ...st.stacks.flat().filter(c => c.bomb > 0).map(c => c.bomb));
+  if (minBomb <= 2 && S.phase === 'play') { const vg = ctx.createRadialGradient(W / 2, H / 2, 180, W / 2, H / 2, 420); vg.addColorStop(0, 'rgba(214,66,58,0)'); vg.addColorStop(1, `rgba(214,66,58,${0.35 + 0.15 * Math.sin(S.t * 10)})`); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H); }
+  for (const q of S.pops) { const k = q.t / 1.2; ctx.globalAlpha = 1 - k * k; ctx.font = '800 ' + q.size + 'px "Baloo 2",sans-serif'; ctx.lineWidth = 5; ctx.strokeStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeText(q.txt, q.x, q.y - k * 26); ctx.fillStyle = q.col; ctx.fillText(q.txt, q.x, q.y - k * 26); }
+  ctx.globalAlpha = 1;
+  if (S.running && S.lv === 0 && st.moves === 0) { const top = st.stacks[0][st.stacks[0].length - 1], v = S.vis[top.id];
+    ctx.fillStyle = 'rgba(58,46,38,.85)'; rr(W / 2 - 132, 140, 264, 26, 13); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '800 13px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('En üstteki konteynere dokun', W / 2, 154);
+    emoji('👆', v.x + 10, v.y + 26 + Math.sin(S.t * 6) * 4, 30); }
+}
+
+/* ---------------- HUD / EKRAN / DÖNGÜ ---------------- */
+const HUD = { dirty: true, update() { if (!this.dirty) return; this.dirty = false; const st = S.st;
+  $('hLv').textContent = S.lv + 1; $('hRamp').textContent = st.ramp.length + '/' + st.rampCap; $('hCoins').textContent = '💰 ' + st.coins;
+  $('hRampBox').className = 'stat' + (st.ramp.length >= st.rampCap - 1 ? ' warn' : ''); $('hRampBox').style.textAlign = 'center';
+  $('bUndo').disabled = !(S.history.length && S.phase !== 'win'); } };
+function hideOv() { const o = $('ov'); if (o) o.remove(); }
+function overlay(html) { hideOv(); const d = document.createElement('div'); d.className = 'ov'; d.id = 'ov'; d.innerHTML = html; $('cab').appendChild(d); return d; }
+function startLevel(lv) {
+  lv = clamp(lv, 0, LEVELS.length - 1); newRun(lv); HUD.dirty = true;
+  const L = S.L, all = L.stacks.join(' '), prev = LEVELS.slice(0, lv).map(p => p.stacks.join(' ')).join(' '), news = [];
+  const first = re => re.test(all) && !re.test(prev);
+  if (lv === 0) news.push('En üstteki konteynere <b>dokun</b>: vinç aynı renkteki <b>kamyona</b> taşır.<br>Uygun kamyon yoksa <b>rampaya</b> koyar. Rampa taşarsa kaybedersin!');
+  if (lv === 1) news.push('Alttaki <b>sıradaki kamyonlara</b> bak, rampayı idareli kullan.');
+  if (first(/\?/)) news.push('Yeni: <b>❓ gizli</b> konteyner — üstü kalkınca rengi görünür.');
+  if (first(/\*/)) news.push('Yeni: <b>🧊 buzlu</b> — önce bir dokunuşla kır.');
+  if (first(/K/)) news.push('Yeni: <b>🔒 kilit</b> — gemideki tüm <b>🔑 anahtarlar</b> inince açılır.');
+  if (first(/H/)) news.push('Yeni: <b>⚓ ağır</b> — kamyonda <b>2 yer</b> kaplar.');
+  if (first(/\d/)) news.push('Yeni: <b>💣 bomba</b> — sayı her hamlede azalır, sıfırlanmadan indir!');
+  if (L.tilt && !LEVELS.slice(0, lv).some(p => p.tilt)) news.push('Yeni: <b>⚖ gemi yatışı</b> — hep aynı taraftan boşaltırsan gemi yatar!');
+  if (lv === LEVELS.length - 1) news.push('Son gemi: <b>hepsi bir arada</b>. ❓ 🧊 🔒 ⚓ 💣 ⚖<br>Acele etme, önce sıradaki kamyonlara bak.');
+  overlay('<div style="font-size:46px">🚢🏗</div><h2>' + (lv === 0 ? 'Liman Vinci' : 'Bölüm ' + (lv + 1)) + '</h2>'
+    + '<p>' + news.join('<br>') + '</p><div class="row"><button class="go" id="bGo">▶ ' + (lv === 0 ? 'Başla' : 'Boşalt!') + '</button></div>');
+  $('bGo').onclick = () => { SFX.init(); hideOv(); S.running = true; HUD.dirty = true; };
+  try { history.replaceState(null, '', '#' + (lv + 1)); } catch (e) {}
+}
+function showWin() {
+  const stars = S.undos === 0 ? 3 : S.undos <= 2 ? 2 : 1, best = loadBest(), last = S.lv >= LEVELS.length - 1;
+  best.lv = Math.max(best.lv, Math.min(S.lv + 1, LEVELS.length - 1)); best.stars[S.lv] = Math.max(best.stars[S.lv] || 0, stars); saveBest(best);
+  overlay('<div style="font-size:46px">⚓</div><h2>' + (last ? 'Liman tamam!' : 'Bölüm ' + (S.lv + 1) + ' tamam!') + '</h2><div class="stars" id="stars"><span>★</span><span>★</span><span>★</span></div>'
+    + '<p>💰 ' + S.st.coins + ' kazandın · ' + S.st.moves + ' hamle<br>' + (stars === 3 ? 'Hiç geri almadan! ⚓' : '★★★ için geri almadan bitir') + '</p>'
+    + '<div class="row">' + (last ? '' : '<button class="go" id="bNx">▶ Sonraki bölüm</button>') + '<button id="bAg">↻ Tekrar oyna</button></div>');
+  [...$('stars').children].forEach((s, i) => { if (i < stars) setTimeout(() => s.classList.add('on'), 250 + i * 230); });
+  if (!last) $('bNx').onclick = () => startLevel(S.lv + 1);
+  $('bAg').onclick = () => { startLevel(S.lv); $('bGo').click(); };
+}
+function showFail() {
+  const why = S.failWhy, msg = { ramp: ['Rampa taştı!', 'Sıradaki kamyonlara bak: rengi hemen gelmeyecek konteyneri gemide bırak.'],
+    bomb: ['Bomba patladı!', 'Bombalı konteynerin üstünü önce boşalt.'], tilt: ['Gemi yattı!', 'Yığınları sırayla iki taraftan boşalt.'],
+    stuck: ['Hamle kalmadı!', 'Kilitliler için önce 🔑 anahtarları indir.'] }[why] || ['Olmadı', ''];
+  overlay('<div style="font-size:46px">' + { ramp: '📦', bomb: '💥', tilt: '🌊', stuck: '🔒' }[why] + '</div><h2>' + msg[0] + '</h2><p>' + msg[1] + '</p>'
+    + '<div class="row"><button class="go" id="bUn">↶ Son hamleyi geri al</button><button id="bAg">↻ Baştan dene</button></div>');
+  $('bUn').onclick = () => undo();
+  $('bAg').onclick = () => { startLevel(S.lv); $('bGo').click(); };
+}
+$('bUndo').onclick = () => { SFX.init(); if (S.phase === 'play' && S.running) undo(); };
+$('bRe').onclick = () => { const lv = S.lv; startLevel(lv); $('bGo').click(); };
+$('bReset').onclick = () => {
+  const wasRunning = S.running; S.running = false;
+  overlay('<div style="font-size:46px">⏮</div><h2>Baştan başla?</h2><p>İlerlemen ve yıldızların silinir, <b>1. bölüme</b> dönersin.</p>'
+    + '<div class="row"><button class="go" id="bYes">Evet, baştan başla</button><button id="bNo">Vazgeç</button></div>');
+  $('bYes').onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} startLevel(0); };
+  $('bNo').onclick = () => { if (wasRunning) { hideOv(); S.running = true; } else startLevel(S.lv); };
+};
+let lastTs = 0;
+function loop(ts) { requestAnimationFrame(loop); const dt = Math.min(0.033, lastTs ? (ts - lastTs) / 1000 : 0); lastTs = ts;
+  step(dt); HUD.update(); draw(); }
+fitCanvas(); fitCanvas(); addEventListener('resize', () => { fitCanvas(); fitCanvas(); });
+const hashLv = parseInt(location.hash.slice(1), 10);
+startLevel(hashLv > 0 ? hashLv - 1 : loadBest().lv); requestAnimationFrame(loop); $('boot').remove();
+</script>
