@@ -1,0 +1,625 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#3E6B2E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bahçe Hortumu">
+<title>Bahçe Hortumu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap">
+<style>
+:root{ --bg:#3E6B2E; --panel:#FFF7EA; --line:#E5D3B8; --ink:#3A2E26; --ink-dim:#A08C78; --go:#2F9E6B; --bad:#D6423A; --gold:#F2B233; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Baloo 2",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;touch-action:none;
+  user-select:none;-webkit-user-select:none;background-image:radial-gradient(640px 360px at 50% 0%,rgba(255,240,150,.16),transparent 72%)}
+#app{min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;padding:6px 5px 10px}
+.cab{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:8px 9px 9px;box-shadow:0 20px 50px rgba(0,0,0,.45);position:relative;overflow:hidden}
+.hud{display:flex;align-items:center;justify-content:space-between;padding:0 4px 7px;border-bottom:1px solid var(--line)}
+.stat{line-height:1}.stat small{display:block;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:2px}
+.stat b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;display:inline-block;transition:transform .12s}.stat.r{text-align:right}
+.stat.warn b{color:var(--bad)}
+.stat b.bump{transform:scale(1.25)}
+.stage{position:relative;margin-top:7px;border-radius:13px;overflow:hidden;border:1px solid var(--line);touch-action:none}
+#cv{display:block;margin:0 auto}
+.row{display:flex;gap:7px;margin-top:8px}
+button{flex:1;appearance:none;border:1px solid var(--line);background:#F2E6D2;color:var(--ink);font:inherit;font-size:14px;font-weight:800;padding:10px 6px;border-radius:12px;cursor:pointer;white-space:nowrap}
+button.go{background:var(--go);color:#fff;border-color:#237A52}
+button:disabled{opacity:.45}
+.ov{position:absolute;inset:0;background:rgba(255,247,234,.97);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;z-index:20}
+.ov h2{font-size:30px;margin:0 0 4px;line-height:1.1}.ov p{color:#7A6656;font-size:14px;line-height:1.45;margin:4px 0 12px;max-width:310px}
+.ov .row{width:100%;max-width:280px;flex-direction:column}
+.ov .order{display:flex;gap:10px;justify-content:center;margin:6px 0 2px}
+.ov .order span{background:#F2E6D2;border:1px solid var(--line);border-radius:12px;padding:4px 10px;font-weight:800;font-size:18px}
+.stars{font-size:44px;letter-spacing:6px;margin:4px 0}
+.stars span{display:inline-block;color:#E8D9C2;transform:scale(.5);transition:transform .35s cubic-bezier(.3,1.8,.5,1),color .2s}
+.stars span.on{color:var(--gold);transform:scale(1)}
+.boot{position:fixed;left:10px;right:10px;top:10px;z-index:9999;padding:12px 14px;border-radius:10px;background:#3B1512;color:#FFD9D2;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+</style>
+
+<div class="boot" id="boot"><b>Oyun başlatılamadı — JavaScript çalışmıyor.</b></div>
+<script>window.addEventListener("error", function(e){ var b=document.getElementById("boot"); if(b) b.innerHTML="<b>Oyun hata verdi</b><br>"+(e.message||"?")+" satır "+(e.lineno||"?"); });</script>
+
+<div id="app"><div class="cab" id="cab">
+  <div class="hud">
+    <span class="stat"><small>Bölüm</small><b id="hLv">1</b></span>
+    <span class="stat" id="hShovBox" style="text-align:center"><small>Kürek</small><b id="hShov">0</b></span>
+    <span class="stat r"><small>Hedef ★★★</small><b id="hPar">0</b></span>
+  </div>
+  <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+  <div class="row"><button id="bUndo">↶ Geri al</button><button id="bRe">↻ Tekrarla</button><button id="bReset">⏮ Baştan</button></div>
+</div></div>
+
+<script>
+'use strict';
+/* ============================================================
+   BAHÇE HORTUMU — kanal kaz, su canlı aksın, bitkiler büyüsün, siparişi topla
+   Sulu kanaldan (ya da kaynaktan) parmakla sürükle → kanal kazılır (toprak 1, çamur 2 kürek). Su hemen akar.
+   Kanala komşu bitki sulanır ve ürün verir. Büyüyen bitkiye dokun → sulama, hızlanır (yıldızı etkilemez).
+   HER KAYNAK EN FAZLA 3 TÜKETİCİ BESLER (bitki 1, kirpi 2): fazlası olursa o ağda hiçbir şey büyümez.
+   Vana: dokun aç/kapa. Zehirli kaynağın suyu filtreden geçmeden bitkiyi soldurur.
+   Engeller birbirine bağlı: çamur (pahalı+yavaş), çukur (bedava kanal ama önce dolar), vana, kirpi, zehir+filtre.
+   ============================================================ */
+const W = 360, H = 640;
+const COLS = 8, ROWS = 11, T = 40, BX = 20, BY = 92;   // bahçe ızgarası
+const CAP = 3, GROW = 2.0;                             // kaynak başı tüketici sınırı · tek bitkinin büyüme hızı (ürün/sn)
+const BOOST = 0.22, BOOST_CD = 0.12;                   // bitkiye dokununca eklenen büyüme · dokunuşlar arası en az süre
+const SPEED = { soil: 12, chan: 12, mud: 3, pit: 0.9, valve: 12, filter: 8 };   // kanal dolma hızı (1/sn)
+const PLANTS = { t: { e: '🍅', n: 'domates', c: '#E5484D' }, c: { e: '🥕', n: 'havuç', c: '#F28C28' }, k: { e: '🌽', n: 'mısır', c: '#F2C94C' } };
+/* Bölümler — harita: . toprak  # kaya  ~ çamur  o çukur  = hazır kanal  S kaynak  P zehirli kaynak  V/v vana açık/kapalı
+   F filtre  M kirpi  t/c/k bitki · shovels: kürek hakkı · par: ★★★ için en az kürek (elle çözülüp doğrulanmış yol) · tip: bahçıvanın ilk sözü */
+const LEVELS = [
+  { order:{ t:3 }, shovels:8, par:4, tip:'Kaynaktan 🚰 domatese kadar sürükle!', map:[
+    '...S....','........','........','........','........','...t....','........','........','........','........','........'] },
+  { order:{ t:2, c:2 }, shovels:13, par:9, tip:'Tek kanalı dallandır: iki bitki de su içsin.', map:[
+    '...S....','........','........','.t......','........','........','......c.','........','........','........','........'] },
+  { order:{ c:3 }, shovels:18, par:15, tip:'Kayalar kazılmaz, etrafından dolaş.', map:[
+    'S.......','........','#######.','........','........','...c....','........','........','........','........','........'] },
+  { order:{ t:2, k:2 }, shovels:14, par:13, tip:'Çamur 2 kürek ama yol kısa. Dolambaç yetmez!', map:[
+    '...S....','........','###~~##.','###~~##.','........','........','.t....k.','........','........','........','........'] },
+  { order:{ t:2, c:2 }, shovels:11, par:9, tip:'Çukurlar bedava kanal. Su önce onları doldurur.', map:[
+    'S.......','........','.o......','........','..o.....','.t......','....o...','........','.....c..','........','........'] },
+  { order:{ c:3 }, shovels:13, par:10, tip:'Kaynak en fazla 3 bitki besler. Domatesleri vanayla kapat!', map:[
+    '...S....','...=....','...V....','..t=t...','...=t...','........','........','........','.c......','........','........'] },
+  { order:{ t:2, c:2, k:2 }, shovels:15, par:12, tip:'Kirpi yanından geçen suyu içer ve 2 kişilik yer kaplar.', map:[
+    '...S....','........','........','...M....','........','.t.c.k..','........','........','........','........','........'] },
+  { order:{ t:2, c:2 }, shovels:15, par:13, tip:'Zehirli su! Önce filtreden 🧪 geçir.', map:[
+    '...P....','........','........','......F.','........','..t.....','........','.....c..','........','........','........'] },
+  { order:{ t:2, k:2 }, shovels:15, par:13, tip:'Çamur, çukur, kirpi… en ucuz yolu bul.', map:[
+    '...S....','........','#~~~~~~#','#......#','o..M....','........','.t....k.','........','........','........','........'] },
+  { order:{ t:2, c:2, k:2 }, shovels:12, par:9, tip:'İki kaynak var. Ağları sakın birleştirme!', map:[
+    'S.....P.','......=.','##....V.','......=.','..t...=M','......=.','.c....F.','......=.','....k.=.','......=.','........'] },
+];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => 1 - Math.pow(1 - t, 3);
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const hash = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };   // kareye sabit rastgelelik (süs)
+
+/* ---------------- SES ---------------- */
+const SFX = (() => {
+  let ac = null, master = null, noise = null;
+  function init() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ac = new AC(); master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
+    noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function tone(t0, dur, f0, f1, g, type) { const o = ac.createOscillator(), gg = ac.createGain(); o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+    gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + 0.006); gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gg); gg.connect(master); o.start(t0); o.stop(t0 + dur + 0.02); }
+  function burst(t0, dur, f, q, g, type) { const s = ac.createBufferSource(); s.buffer = noise; const bp = ac.createBiquadFilter(); bp.type = type || 'bandpass';
+    bp.frequency.value = f; bp.Q.value = q; const gg = ac.createGain(); gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + 0.005);
+    gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); s.connect(bp); bp.connect(gg); gg.connect(master); s.start(t0, Math.random()); s.stop(t0 + dur + 0.02); }
+  const w = fn => (...a) => { if (!ac) return; fn(ac.currentTime, ...a); };
+  let lastDig = 0, lastSplash = 0, lastBoost = 0;
+  return { init,
+    dig: w((t, mud) => { if (t - lastDig < 0.04) return; lastDig = t; burst(t, 0.09, mud ? 350 : 700, 0.9, 0.16, 'lowpass'); tone(t, 0.06, mud ? 120 : 190, 90, 0.08); if (mud) burst(t + 0.03, 0.12, 250, 2, 0.08); }),
+    splash: w((t, d) => { if (t - lastSplash < 0.07) return; lastSplash = t; const f = 700 + Math.min(d || 0, 20) * 45; burst(t, 0.14, 1600 + f, 1.4, 0.05); tone(t, 0.07, f * 1.3, f, 0.035, 'sine'); }),
+    boost: w(t => { if (t - lastBoost < 0.05) return; lastBoost = t; burst(t, 0.12, 4000, 1.5, 0.06); tone(t, 0.05, 1300, 1700, 0.03, 'sine'); }),
+    harvest: w((t, i) => { const f = 660 * Math.pow(2, (i % 8) * 2 / 12); tone(t, 0.12, f, f * 1.5, 0.1, 'triangle'); tone(t + 0.05, 0.1, f * 2, f * 2, 0.04); }),
+    land: w(t => { tone(t, 0.06, 1400, 1100, 0.05, 'triangle'); }),
+    ding: w(t => { tone(t, 0.35, 1568, 1568, 0.09, 'sine'); tone(t + 0.08, 0.4, 2093, 2093, 0.06, 'sine'); }),
+    bad: w(t => { tone(t, 0.12, 240, 170, 0.12, 'square'); }),
+    valve: w((t, open) => { tone(t, 0.08, open ? 500 : 700, open ? 800 : 400, 0.1, 'triangle'); burst(t, 0.05, 2500, 3, 0.05); burst(t + 0.06, 0.2, open ? 1200 : 400, 1, 0.05); }),
+    undo: w(t => { tone(t, 0.1, 700, 950, 0.08, 'triangle'); }),
+    thirst: w(t => { tone(t, 0.18, 400, 300, 0.07, 'sine'); tone(t + 0.16, 0.2, 300, 220, 0.07, 'sine'); }),
+    slurp: w(t => { burst(t, 0.2, 900, 4, 0.07); tone(t, 0.18, 300, 600, 0.04, 'sine'); }),
+    poison: w(t => { tone(t, 0.3, 200, 120, 0.1, 'sawtooth'); }),
+    chirp: w(t => { const f = 2600 + Math.random() * 900; [0, 0.09, 0.2].forEach(d => tone(t + d, 0.06, f, f * 1.25, 0.018, 'sine')); }),
+    win: w(t => { [0, 4, 7, 12, 16].forEach((s, i) => tone(t + i * 0.09, 0.35, 523 * Math.pow(2, s / 12), 523 * Math.pow(2, s / 12), 0.14, 'triangle')); }),
+  };
+})();
+const buzz = ms => { try { const ua = navigator.userActivation; if (navigator.vibrate && (!ua || ua.hasBeenActive)) navigator.vibrate(ms); } catch (e) {} };
+
+/* ---------------- DURUM ---------------- */
+let S = null, STROKE = null;
+const SAVE_KEY = 'dbg.bahce.v1';
+const loadBest = () => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || { lv: 0, stars: {} }; } catch (e) { return { lv: 0, stars: {} }; } };
+const saveBest = b => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(b)); } catch (e) {} };
+function parseTile(ch, r, c) {
+  const t = { r, c, ch, kind: 'soil', trench: false, dug: false, w: 0, poison: false, open: true, net: -1, reach: false, dist: 0, carve: 1, spin: 0 };
+  if (ch === '#') t.kind = 'rock';
+  else if (ch === '~') t.kind = 'mud';
+  else if (ch === 'o') { t.kind = 'pit'; t.trench = true; }
+  else if (ch === '=') { t.kind = 'chan'; t.trench = true; }
+  else if (ch === 'S') { t.kind = 'src'; t.trench = true; t.w = 1; }
+  else if (ch === 'P') { t.kind = 'psrc'; t.trench = true; t.w = 1; }
+  else if (ch === 'V' || ch === 'v') { t.kind = 'valve'; t.trench = true; t.open = ch === 'V'; }
+  else if (ch === 'F') { t.kind = 'filter'; t.trench = true; }
+  else if (ch === 'M') { t.kind = 'mole'; t.drink = false; t.peek = 0; }
+  else if (PLANTS[ch]) { t.kind = 'plant'; t.plant = { k: ch, g: 0, hp: 1, dead: false, pop: 0, squash: 0, cd: 0, state: 'dry' }; }
+  return t;
+}
+function newRun(lv) {
+  const L = LEVELS[lv];
+  S = { lv, L, grid: L.map.map((row, r) => [...row].map((ch, c) => parseTile(ch, r, c))), shovels: L.shovels, used: 0, strokes: [],
+    got: Object.fromEntries(Object.keys(L.order).map(k => [k, 0])), bump: {}, flies: [], parts: [], pops: [], ripples: [], confetti: [], nets: [], t: 0,
+    running: false, over: false, phase: 'play', idleT: 0, harvests: 0, shake: 0, fountainT: 0, chirpT: 6 + Math.random() * 5, boosts: 0, dance: 0 };
+  STROKE = null;
+  simWater(0);
+}
+const tileAt = (r, c) => r >= 0 && r < ROWS && c >= 0 && c < COLS ? S.grid[r][c] : null;
+const passable = t => t && t.trench && !(t.kind === 'valve' && !t.open);
+const digCost = t => t.kind === 'soil' ? 1 : t.kind === 'mud' ? 2 : 0;
+const diggable = t => t && !t.trench && (t.kind === 'soil' || t.kind === 'mud');
+const nextToTrench = t => N4.some(([dr, dc]) => { const n = tileAt(t.r + dr, t.c + dc); return n && n.trench; });
+const tcx = t => BX + t.c * T + T / 2, tcy = t => BY + t.r * T + T / 2;
+
+/* ---------------- SU ---------------- */
+function simWater(dt) {
+  const G = S.grid, all = G.flat();
+  for (const t of all) { t.reach = false; t.net = -1; t.pReach = false; }
+  // ağlar: kaynaklardan geçilebilir kanal boyunca (genişlik öncelikli → dist: akış dalgası için kaynağa uzaklık)
+  S.nets = [];
+  for (const src of all) {
+    if ((src.kind !== 'src' && src.kind !== 'psrc') || src.reach) continue;
+    const id = S.nets.length, net = { id, Q: 0, cons: 0, src, plants: 0, moles: 0 }, q = [src]; src.reach = true; src.net = id; src.dist = 0;
+    for (let qi = 0; qi < q.length; qi++) { const u = q[qi]; if (u.kind === 'src' || u.kind === 'psrc') net.Q++;
+      for (const [dr, dc] of N4) { const v = tileAt(u.r + dr, u.c + dc); if (passable(v) && !v.reach) { v.reach = true; v.net = id; v.dist = u.dist + 1; q.push(v); } } }
+    S.nets.push(net);
+  }
+  // zehir: zehirli kaynaktan filtreye girmeden ulaşılan kanallar
+  const pst = all.filter(t => t.kind === 'psrc'); pst.forEach(t => t.pReach = true);
+  while (pst.length) { const u = pst.pop(); for (const [dr, dc] of N4) { const v = tileAt(u.r + dr, u.c + dc); if (passable(v) && !v.pReach && v.kind !== 'filter') { v.pReach = true; pst.push(v); } } }
+  // yayılma (önceki karenin değerleriyle)
+  const prev = all.map(t => t.w);
+  all.forEach((t, i) => {
+    if (!t.trench) { t.w = 0; return; }
+    if (t.kind === 'src' || t.kind === 'psrc') { t.w = 1; return; }
+    if (!passable(t) || !t.reach) { t.w = Math.max(0, prev[i] - dt * 1.5); return; }
+    const feed = N4.some(([dr, dc]) => { const n = tileAt(t.r + dr, t.c + dc); return passable(n) && n.reach && prev[n.r * COLS + n.c] >= 1; });
+    if (feed) { const before = t.w; t.w = Math.min(1, prev[i] + dt * (SPEED[t.kind] || 12));
+      if (before < 0.05 && t.w >= 0.05 && dt > 0) waterArrives(t); }
+  });
+  for (const t of all) t.poison = t.trench && t.pReach && t.w > 0.05;
+}
+function waterArrives(t) {
+  SFX.splash(t.dist);
+  S.ripples.push({ x: tcx(t), y: tcy(t), t: 0, poison: t.pReach });
+  for (let i = 0; i < 5; i++) { const a = Math.random() * 6.28, v = 30 + Math.random() * 70;
+    S.parts.push({ x: tcx(t), y: tcy(t), vx: Math.cos(a) * v, vy: Math.sin(a) * v - 50, g: 420, t: 0, life: 0.35 + Math.random() * 0.2, r: 1.5 + Math.random() * 1.8, col: t.pReach ? '#C48BF2' : '#B3E5FC' }); }
+}
+const wetNeighbors = t => N4.map(([dr, dc]) => tileAt(t.r + dr, t.c + dc)).filter(n => passable(n) && n.reach && n.w >= 0.6);
+function simPlants(dt) {
+  const all = S.grid.flat();
+  for (const n of S.nets) { n.cons = 0; n.plants = 0; n.moles = 0; }
+  for (const t of all) {
+    if (t.kind === 'plant') {
+      const p = t.plant; p.net = -1; p.poisoned = false;
+      if (p.dead) continue;
+      const wn = wetNeighbors(t);
+      if (!wn.length) { p.state = 'dry'; continue; }
+      if (wn.some(n => n.poison)) { p.poisoned = true; p.state = 'poison'; continue; }
+      p.net = wn[0].net; S.nets[p.net].cons += 1; S.nets[p.net].plants++;
+    } else if (t.kind === 'mole') {
+      const wn = wetNeighbors(t), was = t.drink; t.drink = wn.length > 0; t.net = t.drink ? wn[0].net : -1;
+      if (t.drink) { S.nets[t.net].cons += 2; S.nets[t.net].moles++; if (!was && S.running) { SFX.slurp(); popText('Şlurp!', tcx(t), tcy(t) - 22, '#6D4C2F', 15); } }
+    }
+  }
+  let growing = 0;
+  for (const t of all) {
+    if (t.kind !== 'plant') continue;
+    const p = t.plant; p.pop *= Math.exp(-6 * dt); p.squash *= Math.exp(-10 * dt); p.cd = Math.max(0, p.cd - dt);
+    if (p.dead) continue;
+    if (p.poisoned) { p.hp -= dt * 0.7; if (p.hp <= 0) { p.hp = 0; p.dead = true; SFX.poison(); buzz([30, 30, 60]); popText('Soldu!', tcx(t), tcy(t) - 20, '#8E44AD', 18); } continue; }
+    if (p.net < 0) continue;
+    const net = S.nets[p.net];
+    if (net.cons > CAP * net.Q) { if (p.state !== 'thirsty') { p.state = 'thirsty'; if (S.running) SFX.thirst(); } continue; }
+    p.state = 'grow'; growing++;
+    p.g += dt * GROW * net.Q / net.cons;
+    if (p.g >= 1) { p.g -= 1; harvest(t); }
+  }
+  return growing;
+}
+function harvest(t) {
+  const k = t.plant.k, need = S.L.order[k] || 0, counted = S.got[k] !== undefined && S.got[k] + S.flies.filter(f => f.k === k && f.counted && !f.done).length < need;
+  t.plant.pop = 1; t.plant.squash = 1; S.harvests++;
+  const slot = slotXY(k), tx = counted ? slot.x - 18 : tcx(t), ty = counted ? slot.y : tcy(t) - 44;
+  S.flies.push({ k, x0: tcx(t), y0: tcy(t) - 6, x1: tx, y1: ty, t: 0, counted });
+  for (let i = 0; i < 7; i++) { const a = -Math.PI * Math.random(), v = 60 + Math.random() * 90;   // yaprak saçılır
+    S.parts.push({ x: tcx(t), y: tcy(t), vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 300, t: 0, life: 0.6, r: 2.5, col: i % 2 ? '#66BB6A' : PLANTS[k].c, leaf: true, rot: Math.random() * 6 }); }
+  if (S.running) { SFX.harvest(S.harvests); buzz(6); }
+}
+function slotXY(k) { const kinds = Object.keys(S.L.order), i = kinds.indexOf(k); return { x: W / 2 - (kinds.length - 1) * 50 + i * 100, y: 598 }; }
+
+/* ---------------- KAZMA / DOKUNMA ---------------- */
+function dig(t) {
+  const cost = digCost(t);
+  if (S.shovels < cost) { SFX.bad(); popText('Kürek yok!', tcx(t), tcy(t) - 16, '#D6423A', 18); STROKE.blocked = true; return false; }
+  t.trench = true; t.dug = true; t.w = 0; t.carve = 0; t.wasMud = t.kind === 'mud';
+  S.shovels -= cost; S.used += cost; STROKE.tiles.push(t);
+  SFX.dig(t.kind === 'mud'); buzz(5); bumpHud();
+  for (let i = 0; i < 8; i++) { const a = Math.random() * 6.28, v = 50 + Math.random() * 110;
+    S.parts.push({ x: tcx(t), y: tcy(t), vx: Math.cos(a) * v, vy: Math.sin(a) * v - 70, g: 700, t: 0, life: 0.45, r: 2 + Math.random() * 3, col: t.kind === 'mud' ? '#5D4037' : ['#8D6E4A', '#A1887F', '#6D4C2F'][i % 3], clod: true }); }
+  popText('−' + cost, tcx(t) + 12, tcy(t) - 10, '#6D4C2F', 13);
+  HUD.dirty = true;
+  return true;
+}
+/* parmak bir kareye girdi: kanal ise imleç oraya taşınır; kazılabilir ve kanala bitişikse kazılır */
+function enterTile(t) {
+  if (!t || STROKE.last === t) return;
+  if (t.trench) { STROKE.last = t; return; }
+  if (!diggable(t)) return;
+  const adjLast = STROKE.last && Math.abs(STROKE.last.r - t.r) + Math.abs(STROKE.last.c - t.c) === 1;
+  if (!(adjLast ? STROKE.last.trench : nextToTrench(t))) return;
+  if (dig(t)) STROKE.last = t;
+}
+/* büyüyen bitkiye dokun: sulama, biraz hızlanır */
+function boostPlant(t) {
+  const p = t.plant;
+  if (p.dead || p.cd > 0) return;
+  if (p.state !== 'grow') { p.squash = 0.6; SFX.bad(); popText(p.state === 'dry' ? 'Su yok!' : p.state === 'thirsty' ? 'Su yetmiyor!' : 'Zehir!', tcx(t), tcy(t) - 22, '#D6423A', 15); return; }
+  p.cd = BOOST_CD; p.squash = 1; S.boosts++;
+  SFX.boost(); buzz(4);
+  for (let i = 0; i < 6; i++) S.parts.push({ x: tcx(t) + (Math.random() - 0.5) * 24, y: tcy(t) - 26, vx: (Math.random() - 0.5) * 30, vy: 60 + Math.random() * 60, g: 500, t: 0, life: 0.35, r: 2, col: '#81D4FA' });
+  p.g += BOOST; if (p.g >= 1) { p.g -= 1; harvest(t); }
+}
+function undoStroke() {
+  if (!S.running || S.phase !== 'play') return;
+  const s = S.strokes.pop(); if (!s) return;
+  for (const t of s.slice().reverse()) { t.trench = false; t.dug = false; t.w = 0; const cost = t.kind === 'mud' ? 2 : 1; S.shovels += cost; S.used -= cost; }
+  SFX.undo(); buzz(8); HUD.dirty = true; bumpHud();
+}
+function bumpHud() { const b = $('hShov'); b.classList.add('bump'); clearTimeout(bumpHud.t); bumpHud.t = setTimeout(() => b.classList.remove('bump'), 110); }
+
+/* ---------------- ADIM ---------------- */
+function step(dt) {
+  S.t += dt; S.shake *= Math.exp(-10 * dt); S.dance *= Math.exp(-0.6 * dt);
+  simWater(dt);
+  const growing = simPlants(S.running ? dt : 0);
+  for (const row of S.grid) for (const t of row) { t.carve = Math.min(1, t.carve + dt * 7); t.spin *= Math.exp(-8 * dt); if (t.kind === 'mole') t.peek = lerp(t.peek, t.drink ? 1 : 0.55, 1 - Math.exp(-8 * dt)); }
+  // uçan ürünler: parıltı izi, varınca sepet zıplar
+  for (const f of S.flies) {
+    f.t += dt * 2.1;
+    if (f.t < 1 && Math.random() < 0.6) { const p = flyPos(f); S.parts.push({ x: p.x, y: p.y, vx: 0, vy: 10, t: 0, life: 0.3, r: 1.8, col: '#FFE082' }); }
+    if (f.t >= 1 && !f.done) { f.done = true;
+      if (f.counted) { S.got[f.k]++; S.bump[f.k] = 1; HUD.dirty = true; SFX.land();
+        const s = slotXY(f.k); popText('+1', s.x + 22, s.y - 22, '#2F9E6B', 16);
+        if (S.got[f.k] === S.L.order[f.k]) { SFX.ding(); popText('✓', s.x, s.y - 30, '#2F9E6B', 30); for (let i = 0; i < 14; i++) { const a = Math.random() * 6.28; S.parts.push({ x: s.x, y: s.y, vx: Math.cos(a) * 120, vy: Math.sin(a) * 120, g: 200, t: 0, life: 0.5, r: 2.5, col: '#FFD54F' }); } } } }
+  }
+  S.flies = S.flies.filter(f => f.t < 1.25);
+  for (const k in S.bump) S.bump[k] *= Math.exp(-8 * dt);
+  // kaynak çeşmesi / zehir fokurtusu
+  S.fountainT -= dt;
+  if (S.fountainT <= 0) { S.fountainT = 0.07;
+    for (const t of S.grid.flat()) {
+      if (t.kind === 'src') S.parts.push({ x: tcx(t) + (Math.random() - 0.5) * 6, y: tcy(t) - 8, vx: (Math.random() - 0.5) * 70, vy: -90 - Math.random() * 50, g: 380, t: 0, life: 0.55, r: 1.8, col: 'rgba(179,229,252,.95)' });
+      if (t.kind === 'psrc') S.parts.push({ x: tcx(t) + (Math.random() - 0.5) * 18, y: tcy(t) + 6, vx: 0, vy: -25 - Math.random() * 20, g: 0, t: 0, life: 0.8, r: 2 + Math.random() * 2.5, col: 'rgba(196,139,242,.8)', bubble: true });
+    } }
+  for (const q of S.parts) { q.t += dt; q.vx *= 0.96; q.vy = q.vy * 0.97 + (q.g || 0) * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.rot !== undefined) q.rot += dt * 8; }
+  S.parts = S.parts.filter(q => q.t < q.life);
+  for (const r of S.ripples) r.t += dt; S.ripples = S.ripples.filter(r => r.t < 0.6);
+  for (const c of S.confetti) { c.t += dt; c.vy += 260 * dt; c.vx *= 0.99; c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt; }
+  S.confetti = S.confetti.filter(c => c.y < H + 20);
+  for (const q of S.pops) q.t += dt; S.pops = S.pops.filter(q => q.t < 1.1);
+  if (S.running) { S.chirpT -= dt; if (S.chirpT <= 0) { S.chirpT = 8 + Math.random() * 7; SFX.chirp(); } }
+  if (S.phase !== 'play' || !S.running) return;
+  // kazanma: sipariş tamam
+  if (Object.keys(S.L.order).every(k => S.got[k] >= S.L.order[k])) { win(); return; }
+  // kaybetme: gereken türden yaşayan bitki kalmadı
+  for (const k of Object.keys(S.L.order)) {
+    if (S.got[k] + S.flies.filter(f => f.k === k && f.counted && !f.done).length >= S.L.order[k]) continue;
+    if (!S.grid.flat().some(t => t.kind === 'plant' && t.plant.k === k && !t.plant.dead)) { lose('dead', k); return; }
+  }
+  // kaybetme: kürek bitti ve hiçbir şey büyümüyor
+  S.idleT = growing === 0 && S.shovels === 0 && !STROKE ? S.idleT + dt : 0;
+  if (S.idleT > 2.5) lose('shovel');
+}
+const flyPos = f => { const k = clamp(f.t, 0, 1), e2 = ease(k); return { x: lerp(f.x0, f.x1, e2), y: lerp(f.y0, f.y1, e2) - Math.sin(k * Math.PI) * 70, k }; };
+function win() {
+  S.phase = 'won'; S.running = false; S.dance = 1; SFX.win(); buzz([20, 30, 40]); popText('Sipariş tamam!', W / 2, 140, '#2F9E6B', 30);
+  const cols = ['#E5484D', '#F2B233', '#2F9E6B', '#3E7BFA', '#9B5FD6', '#FF8A65'];
+  for (let i = 0; i < 90; i++) S.confetti.push({ x: Math.random() * W, y: -20 - Math.random() * 200, vx: (Math.random() - 0.5) * 80, vy: 40 + Math.random() * 120, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 12, col: cols[i % cols.length], w: 5 + Math.random() * 5, h: 3 + Math.random() * 4 });
+  setTimeout(showWin, 1700);
+}
+function lose(why, k) { S.phase = 'lost'; S.running = false; SFX.bad(); buzz([40, 30, 40]); setTimeout(() => showFail(why, k), 700); }
+function popText(txt, x, y, col, size) { S.pops.push({ txt, x, y, col, size: size || 18, t: 0 }); }
+
+/* ---------------- GİRDİ ---------------- */
+function toL(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+const tileFromXY = (x, y) => tileAt(Math.floor((y - BY) / T), Math.floor((x - BX) / T));
+cv.addEventListener('pointerdown', e => {
+  if (!S.running || S.phase !== 'play' || STROKE) return; e.preventDefault(); SFX.init();
+  const [x, y] = toL(e), t = tileFromXY(x, y); if (!t) return;
+  if (t.kind === 'valve') { t.open = !t.open; t.spin = t.open ? -1 : 1; SFX.valve(t.open); buzz(12); popText(t.open ? 'Açık' : 'Kapalı', tcx(t), tcy(t) - 20, t.open ? '#2F9E6B' : '#D6423A', 16); return; }
+  if (t.kind === 'plant') { boostPlant(t); return; }
+  STROKE = { id: e.pointerId, tiles: [], last: null, x, y };
+  enterTile(t);
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+});
+cv.addEventListener('pointermove', e => {
+  if (!STROKE || e.pointerId !== STROKE.id) return;
+  const [x, y] = toL(e);
+  const steps = Math.ceil(Math.hypot(x - STROKE.x, y - STROKE.y) / (T / 3));   // hızlı kaydırmada ara kareleri atlama
+  for (let i = 1; i <= steps; i++) enterTile(tileFromXY(lerp(STROKE.x, x, i / steps), lerp(STROKE.y, y, i / steps)));
+  STROKE.x = x; STROKE.y = y;
+});
+function endStroke(e) {
+  if (!STROKE || (e && e.pointerId !== STROKE.id)) return;
+  if (STROKE.tiles.length) S.strokes.push(STROKE.tiles);
+  STROKE = null; HUD.dirty = true;
+}
+cv.addEventListener('pointerup', endStroke); cv.addEventListener('pointercancel', endStroke);
+
+/* ---------------- BAHÇIVANIN SÖZÜ (duruma göre) ---------------- */
+function hintText() {
+  const all = S.grid.flat(), plants = all.filter(t => t.kind === 'plant');
+  if (S.phase === 'won') return ['Harika! Sepet doldu 🧺', ''];
+  if (plants.some(t => !t.plant.dead && t.plant.state === 'poison')) return ['☠ Zehir bitkiye ulaştı!', 'Vanayı kapat ya da geri al, filtreden geçir.'];
+  const over = S.nets.find(n => n.cons > CAP * n.Q);
+  if (over) return ['Kaynak ' + CAP * over.Q + ' tüketiciden fazlasına yetmez!', (over.moles ? 'Kirpi 2 kişilik su içiyor. ' : '') + 'Gereksiz bitkiyi kapat / yolu değiştir.'];
+  if (all.some(t => t.kind === 'mole' && t.drink)) return ['🦔 Kirpi suyunu içiyor (2 tüketici)', 'Kapasiteyi yiyor, dikkat.'];
+  if (S.shovels === 0 && !plants.some(t => t.plant.state === 'grow')) return ['Kürek bitti ve hiçbir şey büyümüyor', '↶ Geri al ile başka yol dene.'];
+  if (plants.some(t => t.plant.state === 'grow') && S.boosts < 3) return ['Su ulaştı! 🌱', 'Büyüyen bitkiye dokun → daha hızlı büyür.'];
+  if (!S.strokes.length) return [S.L.tip, 'Sulu kanaldan sürükleyerek kaz · ⛏ ' + S.L.par + ' kürekle ★★★'];
+  return [S.L.tip, 'Kaynak başına en fazla ' + CAP + ' tüketici (bitki 1 · kirpi 2)'];
+}
+
+/* ---------------- ÇİZİM ---------------- */
+let BASE_T = null;
+function fitCanvas() {
+  const box = $('stage'), availW = box.clientWidth || 360, chrome = $('cab').offsetHeight - cv.offsetHeight || 120;
+  const availH = Math.max(440, innerHeight - chrome - 18), sc = Math.min(availW / W, availH / H), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); cv.style.width = Math.round(W * sc) + 'px'; cv.style.height = Math.round(H * sc) + 'px';
+  ctx.setTransform(sc * dpr, 0, 0, sc * dpr, 0, 0); BASE_T = ctx.getTransform();
+}
+function rr(x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+const emoji = (e, x, y, size) => { ctx.font = size + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#3A2E26'; ctx.fillText(e, x, y); };
+/* kanal: merkez daire + kanal komşularına köprü (tek parça görünür); carve ile oyularak açılır */
+function channelShape(t, inset) {
+  const x = BX + t.c * T, y = BY + t.r * T, cx = x + T / 2, cy = y + T / 2, k = ease(t.carve), h = (T / 2 - inset) * k;
+  if (h <= 0.5) return;
+  ctx.beginPath(); ctx.arc(cx, cy, h, 0, 7); ctx.fill();
+  for (const [dr, dc] of N4) { const n = tileAt(t.r + dr, t.c + dc); if (!n || !n.trench) continue;
+    const hh = Math.min(h, (T / 2 - inset) * ease(n.carve));
+    if (dc) ctx.fillRect(dc > 0 ? cx : x - 1, cy - hh, T / 2 + 1, hh * 2); else ctx.fillRect(cx - hh, dr > 0 ? cy : y - 1, hh * 2, T / 2 + 1); }
+}
+function drawGround() {
+  // arka bahçe + çit
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#6FA044'); g.addColorStop(1, '#4E7F30'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 40; i++) { const x = hash(i, 3) * W, y = hash(i, 9) * H; if (x > BX - 12 && x < BX + COLS * T + 12 && y > BY - 12 && y < BY + ROWS * T + 12) continue;
+    ctx.fillStyle = ['#FFF59D', '#F8BBD0', '#FFFFFF'][i % 3]; for (let p = 0; p < 5; p++) { const a = p / 5 * 6.28; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 2.6, y + Math.sin(a) * 2.6, 1.8, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#F9A825'; ctx.beginPath(); ctx.arc(x, y, 1.4, 0, 7); ctx.fill(); }
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; rr(BX - 9, BY - 5, COLS * T + 18, ROWS * T + 16, 10); ctx.fill();
+  ctx.fillStyle = '#A1683A'; rr(BX - 10, BY - 10, COLS * T + 20, ROWS * T + 20, 10); ctx.fill();
+  ctx.fillStyle = '#C08552'; rr(BX - 7, BY - 7, COLS * T + 14, ROWS * T + 14, 8); ctx.fill();
+  ctx.fillStyle = '#8B5A2B';   // çit direkleri
+  for (let c = 0; c <= COLS; c++) { rr(BX + c * T - 4, BY - 13, 8, 9, 3); ctx.fill(); rr(BX + c * T - 4, BY + ROWS * T + 4, 8, 9, 3); ctx.fill(); }
+  for (let r = 0; r <= ROWS; r++) { rr(BX - 13, BY + r * T - 4, 9, 8, 3); ctx.fill(); rr(BX + COLS * T + 4, BY + r * T - 4, 9, 8, 3); ctx.fill(); }
+  // çimen kareleri (kareye sabit ton, çiçek, ot)
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const x = BX + c * T, y = BY + r * T, h1 = hash(r, c), t = S.grid[r][c];
+    ctx.fillStyle = (r + c) % 2 ? `rgb(${136 + h1 * 12},${196 + h1 * 8},${76 + h1 * 10})` : `rgb(${122 + h1 * 12},${181 + h1 * 8},${66 + h1 * 10})`; ctx.fillRect(x, y, T, T);
+    if (t.trench || t.kind !== 'soil') continue;
+    if (h1 > 0.72) { ctx.fillStyle = 'rgba(46,100,24,.4)'; for (const [ox, oy, a] of [[12, 28, -0.3], [16, 26, 0], [20, 28, 0.3]]) { ctx.save(); ctx.translate(x + ox + h1 * 8, y + oy); ctx.rotate(a + Math.sin(S.t * 1.5 + r + c) * 0.08); ctx.beginPath(); ctx.ellipse(0, -4, 1.5, 5, 0, 0, 7); ctx.fill(); ctx.restore(); } }
+    else if (h1 < 0.08) { const fx = x + 10 + hash(c, r) * 20, fy = y + 10 + hash(c + 5, r) * 20; ctx.fillStyle = h1 < 0.04 ? '#FFFFFF' : '#FFF176';
+      for (let p = 0; p < 5; p++) { const a = p / 5 * 6.28; ctx.beginPath(); ctx.arc(fx + Math.cos(a) * 3, fy + Math.sin(a) * 3, 2.1, 0, 7); ctx.fill(); } ctx.fillStyle = '#F9A825'; ctx.beginPath(); ctx.arc(fx, fy, 1.8, 0, 7); ctx.fill(); }
+  }
+}
+function draw() {
+  ctx.setTransform(BASE_T); ctx.clearRect(0, 0, W, H);
+  const shx = (Math.random() - 0.5) * S.shake, shy = (Math.random() - 0.5) * S.shake;
+  ctx.save(); ctx.translate(shx, shy);
+  drawGround();
+  const G = S.grid, all = G.flat();
+  // ıslak çimen gölgesi
+  for (const t of all) { if (!t.trench || t.w < 0.2) continue;
+    const gr = ctx.createRadialGradient(tcx(t), tcy(t), 6, tcx(t), tcy(t), 34); gr.addColorStop(0, t.poison ? `rgba(90,40,110,${0.28 * t.w})` : `rgba(30,90,40,${0.3 * t.w})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr; ctx.fillRect(tcx(t) - 34, tcy(t) - 34, 68, 68); }
+  // çamur
+  for (const t of all) { if (t.kind !== 'mud' && !t.wasMud) continue; const x = BX + t.c * T, y = BY + t.r * T;
+    ctx.fillStyle = '#7B5E4A'; rr(x + 1, y + 1, T - 2, T - 2, 7); ctx.fill(); ctx.fillStyle = 'rgba(40,25,15,.3)';
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(x + 8 + hash(t.r + i, t.c) * 24, y + 8 + hash(t.c + i, t.r) * 24, 3.5, 2, 0, 0, 7); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.ellipse(x + 14, y + 12, 5, 2, -0.4, 0, 7); ctx.fill(); }
+  // kanal oluğu (kenar + iç)
+  ctx.fillStyle = '#7A5230'; for (const t of all) if (t.trench) channelShape(t, 5);
+  ctx.fillStyle = '#4E3420'; for (const t of all) if (t.trench) channelShape(t, 9);
+  // su + akış dalgası
+  for (const t of all) {
+    if (!t.trench || t.w <= 0.02) continue;
+    ctx.globalAlpha = clamp(t.w * 1.4, 0, 1);
+    ctx.fillStyle = t.poison ? '#9B5FD6' : '#39A9E8'; channelShape(t, 10 + (1 - t.w) * 6);   // zehir mor: çimen yeşiliyle karışmasın
+    if (t.w > 0.8) { const wave = Math.max(0, Math.sin(t.dist * 1.1 - S.t * 7)); ctx.globalAlpha = 0.45 * wave;
+      ctx.fillStyle = t.poison ? '#E1BEFF' : '#B3E5FC'; channelShape(t, 13); }
+    ctx.globalAlpha = 1;
+    const ph = (S.t * 1.6 + hash(t.r, t.c)) % 1; ctx.fillStyle = t.poison ? 'rgba(210,255,150,.7)' : 'rgba(255,255,255,.7)';
+    ctx.beginPath(); ctx.ellipse(tcx(t) + Math.sin(ph * 6.28) * 6, tcy(t) + Math.cos(ph * 6.28) * 5, 3, 1.3, ph * 3, 0, 7); ctx.fill();
+  }
+  for (const r of S.ripples) { const k = r.t / 0.6; ctx.strokeStyle = r.poison ? `rgba(225,190,255,${1 - k})` : `rgba(255,255,255,${1 - k})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(r.x, r.y, 6 + k * 16, 0, 7); ctx.stroke(); }
+  // nesneler
+  for (const t of all) {
+    const x = BX + t.c * T, y = BY + t.r * T, cx = x + T / 2, cy = y + T / 2;
+    if (t.kind === 'rock') { ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(cx + 2, cy + 8, 16, 7, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#7D8388'; ctx.beginPath(); ctx.ellipse(cx, cy + 2, 16, 13, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#A3A9AE'; ctx.beginPath(); ctx.ellipse(cx - 3, cy - 2, 11, 8, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#6FA044'; ctx.beginPath(); ctx.ellipse(cx + 6, cy - 8, 5, 2.5, 0.4, 0, 7); ctx.fill(); }
+    else if (t.kind === 'pit') { ctx.strokeStyle = '#3E2A1A'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.stroke();
+      if (t.reach && t.w < 1) { ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(cx, cy, 19, 0, 7); ctx.stroke();
+        ctx.strokeStyle = '#4FC3F7'; ctx.beginPath(); ctx.arc(cx, cy, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * t.w); ctx.stroke(); } }
+    else if (t.kind === 'src' || t.kind === 'psrc') {
+      const ps = t.kind === 'psrc';
+      ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(cx + 2, cy + 9, 15, 6, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = ps ? '#5E3A8C' : '#90A4AE'; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.fill();
+      ctx.fillStyle = ps ? '#9B5FD6' : '#4FC3F7'; ctx.beginPath(); ctx.arc(cx, cy, 11, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(cx, cy, 5 + Math.sin(S.t * 6) * 1.5, 0, 7); ctx.fill();
+      if (ps) emoji('☠', cx, cy + 1, 14);
+      const net = S.nets[t.net]; if (net) { const over = net.cons > CAP * net.Q, txt = '💧 ' + net.cons + '/' + CAP * net.Q;
+        ctx.font = '800 11px "Baloo 2",sans-serif'; const tw = ctx.measureText(txt).width + 10, bxp = clamp(cx - tw / 2, 4, W - tw - 4), sc = over ? 1 + Math.sin(S.t * 12) * 0.08 : 1;
+        ctx.save(); ctx.translate(bxp + tw / 2, y - 3); ctx.scale(sc, sc);
+        ctx.fillStyle = over ? '#D6423A' : 'rgba(30,40,50,.85)'; rr(-tw / 2, -8, tw, 16, 8); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 0.5); ctx.restore(); }
+    }
+    else if (t.kind === 'valve') { ctx.fillStyle = '#546E7A'; rr(x + 8, cy - 5, T - 16, 10, 4); ctx.fill();
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate((t.open ? 0 : Math.PI / 2) + t.spin * 1.6);
+      ctx.strokeStyle = t.open ? '#2F9E6B' : '#D6423A'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.stroke();
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-12, 0); ctx.lineTo(12, 0); ctx.moveTo(0, -12); ctx.lineTo(0, 12); ctx.stroke();
+      ctx.fillStyle = t.open ? '#2F9E6B' : '#D6423A'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, 7); ctx.fill(); ctx.restore(); }
+    else if (t.kind === 'filter') { ctx.fillStyle = 'rgba(230,240,245,.9)'; rr(x + 7, y + 7, T - 14, T - 14, 6); ctx.fill(); ctx.strokeStyle = '#7A8B96'; ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(x + 7 + i * 6.5, y + 7); ctx.lineTo(x + 7 + i * 6.5, y + T - 7); ctx.moveTo(x + 7, y + 7 + i * 6.5); ctx.lineTo(x + T - 7, y + 7 + i * 6.5); ctx.stroke(); }
+      ctx.strokeStyle = '#546E7A'; ctx.lineWidth = 2; rr(x + 7, y + 7, T - 14, T - 14, 6); ctx.stroke(); emoji('🧪', cx + 12, y + 7, 12); }
+    else if (t.kind === 'mole') {
+      ctx.fillStyle = '#5D4037'; ctx.beginPath(); ctx.ellipse(cx, cy + 11, 16, 6, 0, 0, 7); ctx.fill();
+      ctx.save(); ctx.beginPath(); ctx.rect(x, y - 10, T, T / 2 + 21); ctx.clip();   // yuvadan çıkıyor
+      const bob = t.drink ? Math.sin(S.t * 14) * 2 : Math.sin(S.t * 2) * 1; emoji('🦔', cx, cy + 11 - t.peek * 12 + bob, 26); ctx.restore();
+      if (t.drink) emoji('💧', cx + 13, y + 5 + Math.sin(S.t * 8) * 2, 12);
+    }
+  }
+  // bitkiler (üstte, sallanarak)
+  for (const t of all) {
+    if (t.kind !== 'plant') continue;
+    const x = BX + t.c * T, y = BY + t.r * T, cx = x + T / 2, cy = y + T / 2, p = t.plant, pk = PLANTS[p.k];
+    ctx.fillStyle = p.state === 'grow' ? '#5D4037' : '#8D6E4A'; ctx.beginPath(); ctx.ellipse(cx, cy + 11, 16, 7, 0, 0, 7); ctx.fill();
+    if (p.dead) { emoji('🥀', cx, cy + 2, 24); continue; }
+    const dance = S.dance > 0.05 ? Math.sin(S.t * 10 + t.c) * 0.25 * S.dance : 0;
+    const sway = Math.sin(S.t * 2.2 + t.c * 0.8 + t.r) * (p.state === 'grow' ? 0.08 : 0.03) + dance;
+    const droop = p.state === 'dry' ? 0.35 : p.state === 'thirsty' ? 0.25 : 0;
+    const shiver = p.state === 'poison' ? (Math.random() - 0.5) * 2 : 0;
+    const sq = p.squash, sx = 1 + sq * 0.18, sy = 1 - sq * 0.14;
+    ctx.save(); ctx.translate(cx + shiver, cy + 11); ctx.rotate(sway); ctx.scale(sx, sy);
+    // yapraklar
+    // yapraklar çimenden koyu + kenarlı (yoksa bitki kaybolur)
+    const leaf = p.state === 'grow' ? '#2E7D32' : p.state === 'poison' ? '#6A3FA0' : p.state === 'thirsty' ? '#689F38' : '#AFB42B', lsz = p.state === 'dry' ? 0.8 : 1.15;
+    ctx.fillStyle = leaf; ctx.strokeStyle = 'rgba(20,50,10,.45)'; ctx.lineWidth = 1.5;
+    for (const s of [-1, 1]) { ctx.save(); ctx.rotate(s * (0.75 + droop)); ctx.beginPath(); ctx.ellipse(0, -11 * lsz, 5.5 * lsz, 11 * lsz, 0, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(0, -2 * lsz); ctx.lineTo(0, -19 * lsz); ctx.stroke(); ctx.restore(); ctx.strokeStyle = 'rgba(20,50,10,.45)'; }
+    ctx.fillStyle = p.state === 'grow' ? '#1B5E20' : leaf; ctx.fillRect(-1.5, -18 * lsz, 3, 18 * lsz);
+    // meyve büyüdükçe büyür
+    if (p.state !== 'dry') { const fs = (0.6 + 0.5 * p.g) + p.pop * 0.3; ctx.save(); ctx.translate(0, -20); ctx.scale(fs, fs); if (p.state === 'poison') ctx.globalAlpha = 0.6 + 0.4 * Math.sin(S.t * 12); emoji(pk.e, 0, 0, 24); ctx.restore(); ctx.globalAlpha = 1; }
+    ctx.restore();
+    if (p.state === 'grow') { ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy + 1, 18, 0, 7); ctx.stroke();
+      ctx.strokeStyle = '#FFE066'; ctx.beginPath(); ctx.arc(cx, cy + 1, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.g); ctx.stroke(); }
+    else if (p.state === 'thirsty') { emoji('💦', cx + 13, y + 4 + Math.sin(S.t * 5) * 2, 12); ctx.fillStyle = '#D6423A'; rr(cx - 15, y + T - 9, 30, 12, 6); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '800 8px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('SU AZ', cx, y + T - 3); }
+    else if (p.state === 'poison') { ctx.strokeStyle = '#9B5FD6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy + 1, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p.hp); ctx.stroke(); emoji('☠', cx + 13, y + 5, 11); }
+    else if (p.state === 'dry' && S.running && Math.sin(S.t * 3 + t.c) > 0.6) emoji('💧', cx + 13, y + 6, 10);
+    if ((S.L.order[p.k] || 0) === 0 && p.state !== 'dry') { ctx.fillStyle = 'rgba(0,0,0,.5)'; rr(cx - 18, y - 2, 36, 11, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = '800 7px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('LAZIM DEĞİL', cx, y + 3.5); }
+  }
+  // kazma imleci
+  if (STROKE && STROKE.last) { const l = STROKE.last; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2.5; ctx.setLineDash([5, 4]); rr(BX + l.c * T + 3, BY + l.r * T + 3, T - 6, T - 6, 8); ctx.stroke(); ctx.setLineDash([]);
+    emoji('⛏', STROKE.x + 16, STROKE.y - 22, 22); }
+  // kelebekler
+  for (let i = 0; i < 2; i++) { const bx = W / 2 + Math.sin(S.t * 0.31 + i * 2.1) * 150, by = 300 + Math.sin(S.t * 0.47 + i * 3.3) * 190, flap = 0.4 + 0.6 * Math.abs(Math.sin(S.t * 11 + i));
+    ctx.save(); ctx.translate(bx, by); ctx.scale(flap, 1); ctx.globalAlpha = 0.85; emoji('🦋', 0, 0, 16); ctx.restore(); ctx.globalAlpha = 1; }
+  ctx.restore();
+  // bahçıvanın balonu
+  const [h1, h2] = hintText(), warn = /yetmez|Zehir|bitti/.test(h1);
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; rr(14, 14, W - 28, 64, 16); ctx.fill();
+  ctx.fillStyle = warn ? '#FFE9E6' : '#FFFDF6'; rr(14, 10, W - 28, 64, 16); ctx.fill();
+  ctx.fillStyle = warn ? '#FFE9E6' : '#FFFDF6'; ctx.beginPath(); ctx.moveTo(60, 74); ctx.lineTo(74, 74); ctx.lineTo(62, 84); ctx.fill();
+  emoji('👩‍🌾', 40, 42 + Math.sin(S.t * 3) * 1.5, 30);
+  ctx.fillStyle = warn ? '#B3261E' : '#3A2E26'; ctx.font = '800 13px "Baloo 2",sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(h1, 64, 32, W - 92);
+  ctx.fillStyle = '#7A6656'; ctx.font = '600 11px "Baloo 2",sans-serif'; ctx.fillText(h2, 64, 52, W - 92);
+  // sipariş sepeti
+  const kinds = Object.keys(S.L.order);
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; rr(14, 552, W - 28, 80, 16); ctx.fill();
+  ctx.fillStyle = '#C8955B'; rr(14, 548, W - 28, 80, 16); ctx.fill();
+  ctx.strokeStyle = 'rgba(110,70,30,.35)'; ctx.lineWidth = 2; for (let yy = 560; yy < 626; yy += 10) { ctx.beginPath(); ctx.moveTo(22, yy); ctx.lineTo(W - 22, yy); ctx.stroke(); }
+  ctx.fillStyle = '#FFF4E0'; ctx.font = '800 10px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🧺 SİPARİŞ SEPETİ', W / 2, 560);
+  kinds.forEach(k => { const s = slotXY(k), done = S.got[k] >= S.L.order[k], b = S.bump[k] || 0;
+    ctx.fillStyle = done ? '#E3F6EA' : '#FFF8EC'; rr(s.x - 44, s.y - 26, 88, 50, 12); ctx.fill();
+    if (done) { ctx.strokeStyle = '#2F9E6B'; ctx.lineWidth = 2.5; rr(s.x - 44, s.y - 26, 88, 50, 12); ctx.stroke(); }
+    ctx.save(); ctx.translate(s.x - 20, s.y); ctx.scale(1 + b * 0.35, 1 - b * 0.15); emoji(PLANTS[k].e, 0, 0, 28); ctx.restore();
+    ctx.fillStyle = done ? '#2F9E6B' : '#3A2E26'; ctx.font = '800 19px "Baloo 2",sans-serif'; ctx.textAlign = 'center'; ctx.fillText(Math.min(S.got[k], S.L.order[k]) + '/' + S.L.order[k], s.x + 18, s.y + 1); });
+  // uçan ürünler
+  for (const f of S.flies) { const p = flyPos(f); ctx.globalAlpha = f.counted ? 1 : clamp(1.2 - f.t, 0, 1);
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.k * 6.28 * (f.counted ? 1 : 0.3)); emoji(PLANTS[f.k].e, 0, 0, f.counted ? 24 + Math.sin(p.k * Math.PI) * 8 : 18); ctx.restore(); ctx.globalAlpha = 1; }
+  // parçacıklar
+  for (const q of S.parts) { ctx.globalAlpha = Math.max(0, 1 - q.t / q.life); ctx.fillStyle = q.col;
+    if (q.leaf) { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.beginPath(); ctx.ellipse(0, 0, q.r * 1.6, q.r * 0.8, 0, 0, 7); ctx.fill(); ctx.restore(); }
+    else if (q.bubble) { ctx.strokeStyle = q.col; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 7); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 7); ctx.fill(); } }
+  ctx.globalAlpha = 1;
+  for (const c of S.confetti) { ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot); ctx.fillStyle = c.col; ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h); ctx.restore(); }
+  for (const q of S.pops) { const k = q.t / 1.1; ctx.globalAlpha = 1 - k * k; ctx.font = '800 ' + q.size + 'px "Baloo 2",sans-serif'; ctx.lineWidth = 5; ctx.strokeStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const sc = 1 + Math.max(0, 0.25 - q.t) * 2; ctx.save(); ctx.translate(q.x, q.y - k * 24); ctx.scale(sc, sc); ctx.strokeText(q.txt, 0, 0); ctx.fillStyle = q.col; ctx.fillText(q.txt, 0, 0); ctx.restore(); }
+  ctx.globalAlpha = 1;
+  // öğretici el: kaynaktan domatese hayali yol
+  if (S.running && S.lv === 0 && !S.strokes.length && !STROKE) {
+    const k = (S.t % 2.2) / 1.5, yy = lerp(BY + T * 0.5, BY + T * 4.5, clamp(k, 0, 1));
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.setLineDash([2, 10]); ctx.beginPath(); ctx.moveTo(BX + 3.5 * T, BY + T * 0.5); ctx.lineTo(BX + 3.5 * T, BY + T * 4.5); ctx.stroke(); ctx.setLineDash([]);
+    if (k <= 1) emoji('👆', BX + 3.5 * T + 10, yy + 16, 32);
+  }
+}
+
+/* ---------------- HUD / EKRAN / DÖNGÜ ---------------- */
+const HUD = { dirty: true, update() { if (!this.dirty) return; this.dirty = false;
+  $('hLv').textContent = S.lv + 1; $('hShov').textContent = '⛏ ' + S.shovels; $('hPar').textContent = '⛏ ' + S.L.par;
+  $('hShovBox').className = 'stat' + (S.shovels <= 2 ? ' warn' : ''); $('hShovBox').style.textAlign = 'center';
+  $('bUndo').disabled = !(S.strokes.length && S.running && S.phase === 'play'); } };
+function hideOv() { const o = $('ov'); if (o) o.remove(); }
+function overlay(html) { hideOv(); const d = document.createElement('div'); d.className = 'ov'; d.id = 'ov'; d.innerHTML = html; $('cab').appendChild(d); return d; }
+function startLevel(lv) {
+  lv = clamp(lv, 0, LEVELS.length - 1); newRun(lv); HUD.dirty = true;
+  const L = S.L, has = ch => L.map.some(r => r.includes(ch)), first = ch => has(ch) && !LEVELS.slice(0, lv).some(p => p.map.some(r => r.includes(ch))), news = [];
+  if (lv === 0) news.push('<b>Kaynaktan sürükleyerek</b> kanal kaz, su hemen akar.<br>Kanala komşu bitki büyür. <b>Büyüyen bitkiye dokun</b>: hızlanır!');
+  if (lv === 1) news.push('Her kare 1 kürek. <b>Kısa yol</b> = daha çok yıldız.');
+  if (first('#')) news.push('Yeni: <b>kaya</b> 🪨 — kazılamaz.');
+  if (first('~')) news.push('Yeni: <b>çamur</b> — 2 kürek, su yavaş geçer.');
+  if (first('o')) news.push('Yeni: <b>çukur</b> — bedava kanal, ama önce dolar.');
+  if (first('V')) news.push('Yeni: <b>vana</b> — dokun aç/kapa.<br><b>Kaynak en fazla 3 tüketici besler!</b>');
+  if (first('M')) news.push('Yeni: <b>kirpi</b> 🦔 — yanından geçen suyu içer, <b>2 tüketici</b> sayılır.');
+  if (first('P')) news.push('Yeni: <b>zehirli kaynak</b> ☠ — mor suyu <b>filtreden</b> 🧪 geçir.');
+  if (lv === 9) news.push('Hepsi bir arada. <b>Ağları karıştırma!</b>');
+  overlay('<div style="font-size:46px">' + (lv === 0 ? '🌱💧' : '👩‍🌾') + '</div><h2>' + (lv === 0 ? 'Bahçe Hortumu' : 'Bölüm ' + (lv + 1)) + '</h2>'
+    + '<div class="order">' + Object.entries(L.order).map(([k, n]) => '<span>' + PLANTS[k].e + ' ×' + n + '</span>').join('') + '</div>'
+    + '<p>⛏ ' + L.shovels + ' kürek · ★★★ için ' + L.par + '<br>' + news.join('<br>') + '</p>'
+    + '<div class="row"><button class="go" id="bGo">▶ ' + (lv === 0 ? 'Başla' : 'Kaz!') + '</button></div>');
+  $('bGo').onclick = () => { SFX.init(); hideOv(); S.running = true; HUD.dirty = true; };
+  try { history.replaceState(null, '', '#' + (lv + 1)); } catch (e) {}
+}
+function showWin() {
+  const stars = S.used <= S.L.par ? 3 : S.used <= S.L.par + 2 ? 2 : 1, best = loadBest(), last = S.lv >= LEVELS.length - 1;
+  best.lv = Math.max(best.lv, Math.min(S.lv + 1, LEVELS.length - 1)); best.stars[S.lv] = Math.max(best.stars[S.lv] || 0, stars); saveBest(best);
+  overlay('<div style="font-size:46px">🧺</div><h2>' + (last ? 'Bahçe tamam!' : 'Bölüm ' + (S.lv + 1) + ' tamam!') + '</h2><div class="stars" id="stars"><span>★</span><span>★</span><span>★</span></div>'
+    + '<p><b>' + S.used + '</b> kürek kullandın · ★★★ için ' + S.L.par + (stars < 3 ? '<br>Daha kısa bir kanal yolu var!' : '<br>Usta bahçıvan! 🌻') + '</p>'
+    + '<div class="row">' + (last ? '' : '<button class="go" id="bNx">▶ Sonraki bölüm</button>') + '<button id="bAg">↻ Daha az kürekle dene</button></div>');
+  [...$('stars').children].forEach((s, i) => { if (i < stars) setTimeout(() => s.classList.add('on'), 250 + i * 230); });
+  if (!last) $('bNx').onclick = () => startLevel(S.lv + 1);
+  $('bAg').onclick = () => { startLevel(S.lv); $('bGo').click(); };
+}
+function showFail(why, k) {
+  const lv = S.lv;
+  const txt = why === 'dead' ? '<div style="font-size:46px">🥀</div><h2>' + PLANTS[k].e + ' soldu!</h2><p>Zehirli su bitkiye ulaştı. Suyu önce <b>filtreden</b> geçir ya da <b>vanayı</b> kapat.</p>'
+    : '<div style="font-size:46px">⛏</div><h2>Kürek bitti!</h2><p>Hiçbir bitki büyümüyor. Daha kısa kanal kaz; kaynağın <b>3 tüketici</b> sınırına dikkat et.</p>';
+  overlay(txt + '<div class="row"><button class="go" id="bAg">↻ Tekrar dene</button></div>');
+  $('bAg').onclick = () => { startLevel(lv); $('bGo').click(); };
+}
+$('bUndo').onclick = () => { SFX.init(); undoStroke(); };
+$('bRe').onclick = () => { const lv = S.lv; startLevel(lv); $('bGo').click(); };
+$('bReset').onclick = () => {
+  const wasRunning = S.running; S.running = false; STROKE = null;
+  overlay('<div style="font-size:46px">⏮</div><h2>Baştan başla?</h2><p>İlerlemen ve yıldızların silinir, <b>1. bölüme</b> dönersin.</p>'
+    + '<div class="row"><button class="go" id="bYes">Evet, baştan başla</button><button id="bNo">Vazgeç</button></div>');
+  $('bYes').onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} startLevel(0); };
+  $('bNo').onclick = () => { if (wasRunning) { hideOv(); S.running = true; } else startLevel(S.lv); };
+};
+let lastTs = 0;
+function loop(ts) { requestAnimationFrame(loop); const dt = Math.min(0.033, lastTs ? (ts - lastTs) / 1000 : 0); lastTs = ts;
+  step(dt); HUD.update(); draw(); }
+fitCanvas(); fitCanvas(); addEventListener('resize', () => { fitCanvas(); fitCanvas(); });
+const hashLv = parseInt(location.hash.slice(1), 10);
+startLevel(hashLv > 0 ? hashLv - 1 : loadBest().lv); requestAnimationFrame(loop); $('boot').remove();
+</script>
