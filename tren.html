@@ -1,0 +1,689 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1E3B2A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ray Ustası">
+<title>Ray Ustası</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap">
+<style>
+:root{ --bg:#14261B; --panel:#1E3526; --line:#335440; --ink:#F2FFF3; --ink-dim:#9CC2A6; --go:#FF8A3D; --bad:#FF5A5F; --gold:#FFC93C; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Baloo 2",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;touch-action:none;
+  user-select:none;-webkit-user-select:none;background-image:radial-gradient(640px 360px at 50% 0%,rgba(255,170,80,.16),transparent 72%)}
+#app{min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;padding:6px 5px 10px}
+.cab{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:8px 9px 9px;box-shadow:0 20px 50px rgba(0,0,0,.6);position:relative;overflow:hidden}
+.hud{display:flex;align-items:center;justify-content:space-between;padding:0 4px 7px;border-bottom:1px solid var(--line)}
+.stat{line-height:1}.stat small{display:block;font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:2px}
+.stat b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}.stat.r{text-align:right}.stat.c{text-align:center}
+.stat.warn b{color:var(--bad)}
+.stage{position:relative;margin-top:7px;border-radius:13px;overflow:hidden;border:1px solid var(--line);touch-action:none}
+#cv{display:block;margin:0 auto}
+.row{display:flex;gap:7px;margin-top:8px}
+button{flex:1;appearance:none;border:1px solid var(--line);background:#29462F;color:var(--ink);font:inherit;font-size:14px;font-weight:800;padding:10px 6px;border-radius:12px;cursor:pointer;white-space:nowrap}
+button.go{background:var(--go);color:#fff;border-color:#D9661E}
+button.on{background:#FFE6A8;color:#5A3A10;border-color:#C28E12}
+button:disabled{opacity:.4}
+.ov{position:absolute;inset:0;background:rgba(15,30,20,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;z-index:20}
+.ov h2{font-size:30px;margin:0 0 4px;line-height:1.1}.ov p{color:#BFE0C6;font-size:14px;line-height:1.5;margin:4px 0 12px;max-width:310px}
+.ov .row{width:100%;max-width:280px;flex-direction:column}
+.ov .chain{display:block;color:#fff;font-size:22px;letter-spacing:2px;margin:2px 0 8px}
+.stars{font-size:44px;letter-spacing:6px;margin:4px 0}
+.stars span{display:inline-block;color:#35533F;transform:scale(.5);transition:transform .35s cubic-bezier(.3,1.8,.5,1),color .2s}
+.stars span.on{color:var(--gold);transform:scale(1)}
+.boot{position:fixed;left:10px;right:10px;top:10px;z-index:9999;padding:12px 14px;border-radius:10px;background:#3B1512;color:#FFD9D2;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+</style>
+
+<div class="boot" id="boot"><b>Oyun başlatılamadı — JavaScript çalışmıyor.</b></div>
+<script>window.addEventListener("error", function(e){ var b=document.getElementById("boot"); if(b) b.innerHTML="<b>Oyun hata verdi</b><br>"+(e.message||"?")+" satır "+(e.lineno||"?"); });</script>
+
+<div id="app"><div class="cab" id="cab">
+  <div class="hud">
+    <span class="stat"><small>Bölüm</small><b id="hLv">1</b></span>
+    <span class="stat c" id="hRailBox"><small>Ray</small><b id="hRail">0/14</b></span>
+    <span class="stat r"><small>★★★ hedef</small><b id="hPar">12</b></span>
+  </div>
+  <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+  <div class="row"><button id="bUndo">↶ Geri al</button><button id="bErase">🧽 Sil</button><button class="go" id="bRun">▶ Çalıştır</button></div>
+</div></div>
+
+<script>
+'use strict';
+/* ============================================================
+   RAY USTASI — ray döşeme bulmacası (his dilimi)
+   Izgarada parmağını sürükle → ray döşenir (düz/viraj yönüne göre seçilir). Parça sayısı sınırlı.
+   Bir kareye aynı yerden ikinci bir yol çizersen MAKAS olur: tren her geçtiğinde yön değiştirir (dokunarak ilk yönü seç).
+   Dik kesişen iki düz ray KAVŞAK olur. ▶ Çalıştır → trenler sırayla depodan çıkar; hepsi kendi renginin istasyonuna varmalı.
+   Çarpışma / raydan çıkma / yanlış istasyon → hata yeri işaretlenir, raylar kalır, düzeltirsin. ★ az parçayla.
+   Engeller: kaya · nehir (köprü 3 parça) · tümsek (bir kareyi uçarak atlar, havadayken çarpışmaz) · renk kapısı · tünel çifti · düğme + bariyer.
+   ============================================================ */
+const W = 360, H = 640, COLS = 7, ROWS = 10, CELL = 48, GX = 12, GY = 84;
+const DV = [[0, -1], [1, 0], [0, 1], [-1, 0]];      // 0 K, 1 D, 2 G, 3 B
+const opp = d => (d + 2) % 4;
+const SPEED = 2.4, TRAIN_GAP = 1.5;                   // kare/sn · aynı depodan çıkış aralığı (sn)
+const COLORS = [
+  { n: 'Kırmızı', c: '#FF5A5F', d: '#B8363B', folk: '👵' },
+  { n: 'Mavi',    c: '#3FA7FF', d: '#1E6BB8', folk: '👦' },
+  { n: 'Sarı',    c: '#FFC93C', d: '#C28E12', folk: '👩' },
+  { n: 'Yeşil',   c: '#43CF72', d: '#23904A', folk: '👴' },
+];
+/* Bölümler — depots: {c, r, exit, trains:[renk], delay} · stations: {c, r, entry, col} · budget: parça · par: [★★★, ★★]
+   rocks: [[c, r]] · rivers: [[c, r]] (köprü = 3 parça, düz) · ramps: [[c, r, eksen]] (tümsek: tren sonraki kareyi uçarak geçer)
+   gates: [[c, r, eksen, renk]] (sadece o renk geçer) · tunnels: [[c, r, ağız yönü, id]] (aynı id'li ağızlar bağlı)
+   buttons: [[c, r, eksen, id]] · barriers: [[c, r, eksen, id]] (düğmeye bir tren basınca açılır) · eksen: 'v' dikey, 'h' yatay */
+const rowOf = (r, cols) => cols.map(c => [c, r]);
+const LEVELS = [
+  { budget: 15, par: [12, 13], hint: 'Depodan istasyona parmağınla ray çiz',
+    depots: [{ c: 1, r: 0, exit: 2, trains: [0] }], stations: [{ c: 5, r: 9, entry: 0, col: 0 }], rocks: [[3, 3], [4, 3], [1, 7], [2, 7]] },
+  { budget: 22, par: [17, 19], hint: 'Aynı kareden ikinci yolu çiz → makas. Dokun: ilk yönü seç',
+    depots: [{ c: 3, r: 0, exit: 2, trains: [0, 1] }], stations: [{ c: 0, r: 9, entry: 0, col: 1 }, { c: 6, r: 9, entry: 0, col: 0 }], rocks: [[3, 7], [3, 8], [3, 9]] },
+  { budget: 24, par: [20, 22], hint: 'Raylar dik kesişirse kavşak olur — trenler aynı anda gelmesin',
+    depots: [{ c: 0, r: 2, exit: 1, trains: [0] }, { c: 3, r: 0, exit: 2, trains: [1] }], stations: [{ c: 6, r: 7, entry: 3, col: 0 }, { c: 3, r: 9, entry: 0, col: 1 }], rocks: [[5, 3], [5, 4], [1, 6]] },
+  { budget: 19, par: [17, 18], hint: 'Nehirde köprü 3 parça — kaç köprü kuracaksın?',
+    depots: [{ c: 3, r: 0, exit: 2, trains: [0, 1, 0] }], stations: [{ c: 1, r: 9, entry: 0, col: 0 }, { c: 5, r: 9, entry: 0, col: 1 }],
+    rivers: rowOf(5, [0, 1, 2, 3, 4, 5, 6]), rocks: [[3, 8], [3, 9]] },
+  { budget: 14, par: [12, 13], hint: 'Tümsekten geçen tren bir kareyi uçarak atlar',
+    depots: [{ c: 0, r: 4, exit: 1, trains: [0] }, { c: 3, r: 0, exit: 2, trains: [1] }], stations: [{ c: 6, r: 4, entry: 3, col: 0 }, { c: 3, r: 9, entry: 0, col: 1 }],
+    ramps: [[2, 4, 'h']], rocks: [[1, 2], [5, 6], [1, 7]] },
+  { budget: 23, par: [21, 22], hint: 'İki kırmızı, sonra mavi… makaslar sırayla döner',
+    depots: [{ c: 3, r: 0, exit: 2, trains: [0, 0, 1] }], stations: [{ c: 1, r: 9, entry: 0, col: 0 }, { c: 5, r: 9, entry: 0, col: 1 }], rocks: [[3, 7], [3, 8], [3, 9]] },
+  { budget: 19, par: [17, 18], hint: 'Kapıdan sadece kırmızı geçer. Mavi başka yol bulmalı',
+    depots: [{ c: 3, r: 0, exit: 2, trains: [1, 0] }], stations: [{ c: 1, r: 9, entry: 0, col: 1 }, { c: 5, r: 9, entry: 0, col: 0 }],
+    rocks: rowOf(5, [0, 1, 2, 4, 5, 6]), gates: [[3, 5, 'v', 0]], ramps: [[1, 4, 'v']] },
+  { budget: 24, par: [22, 23], hint: 'Tünele giren tren aynı işaretli ağızdan çıkar',
+    depots: [{ c: 0, r: 0, exit: 2, trains: [0] }, { c: 6, r: 0, exit: 2, trains: [1], delay: 0.9 }], stations: [{ c: 6, r: 9, entry: 0, col: 0 }, { c: 0, r: 9, entry: 0, col: 1 }],
+    rocks: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(r => [3, r]), tunnels: [[2, 2, 3, 1], [4, 2, 1, 1], [2, 7, 3, 2], [4, 7, 1, 2]] },
+  { budget: 28, par: [26, 27], hint: 'Bariyer, bir tren düğmeye basınca açılır',
+    depots: [{ c: 3, r: 0, exit: 2, trains: [0, 1] }], stations: [{ c: 0, r: 9, entry: 0, col: 0 }, { c: 5, r: 9, entry: 0, col: 1 }],
+    rocks: rowOf(7, [1, 2, 3, 4, 6]), buttons: [[6, 3, 'v', 1]], barriers: [[5, 7, 'v', 1]] },
+  { budget: 32, par: [30, 31], hint: 'Son hat: sırala, atla, köprü kur',
+    depots: [{ c: 3, r: 0, exit: 2, trains: [0, 2, 1] }], stations: [{ c: 1, r: 9, entry: 0, col: 0 }, { c: 3, r: 9, entry: 0, col: 1 }, { c: 5, r: 9, entry: 0, col: 2 }],
+    rivers: rowOf(6, [0, 1, 2, 3, 4, 5, 6]), ramps: [[1, 5, 'v']], gates: [[5, 4, 'v', 2]], rocks: [[0, 3], [6, 8]] },
+];
+const RIVER_COST = 3;
+const LV_KEY = 'dbg.ray.lv';
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const hyp = Math.hypot;
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const hash = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
+const ccx = c => GX + c * CELL + CELL / 2, ccy = r => GY + r * CELL + CELL / 2;
+
+/* ---------------- SES ---------------- */
+const SFX = (() => {
+  let ac = null, master = null, noise = null;
+  function init() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ac = new AC(); master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
+    noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function tone(t0, dur, f0, f1, g, type) { const o = ac.createOscillator(), gg = ac.createGain(); o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+    gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + 0.01); gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(gg); gg.connect(master); o.start(t0); o.stop(t0 + dur + 0.02); }
+  function burst(t0, dur, f, q, g, type) { const s = ac.createBufferSource(); s.buffer = noise; const bp = ac.createBiquadFilter(); bp.type = type || 'bandpass';
+    bp.frequency.value = f; bp.Q.value = q; const gg = ac.createGain(); gg.gain.setValueAtTime(0.0001, t0); gg.gain.exponentialRampToValueAtTime(g, t0 + 0.01);
+    gg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur); s.connect(bp); bp.connect(gg); gg.connect(master); s.start(t0, Math.random()); s.stop(t0 + dur + 0.02); }
+  const w = fn => (...a) => { if (!ac) return; fn(ac.currentTime, ...a); };
+  const note = (t, semi, dur, g, type) => { const f = 523.25 * Math.pow(2, semi / 12); tone(t, dur, f, f, g, type || 'sine'); };
+  return { init,
+    lay: w((t, k) => { burst(t, 0.04, 2600 + (k || 0) * 60, 2, 0.1); tone(t, 0.06, 240 + (k || 0) * 8, 150, 0.07, 'triangle'); }),
+    sw: w(t => { burst(t, 0.05, 3200, 2, 0.12); tone(t, 0.08, 520, 780, 0.06, 'triangle'); }),
+    erase: w(t => { burst(t, 0.08, 1200, 1, 0.08); }),
+    deny: w(t => { tone(t, 0.12, 220, 190, 0.07, 'square'); }),
+    undo: w(t => { tone(t, 0.1, 700, 420, 0.05, 'triangle'); }),
+    whistle: w(t => { [0, 0.28].forEach(o => { tone(t + o, 0.22, 760, 745, 0.045, 'sine'); tone(t + o, 0.22, 958, 940, 0.03, 'sine'); }); }),
+    clack: w(t => { burst(t, 0.03, 2000, 3, 0.03); }),
+    deliver: w(t => { [0, 4, 7, 12].forEach((s, i) => note(t + i * 0.07, s, 0.4, 0.08, 'triangle')); tone(t + 0.3, 0.8, 1568, 1560, 0.03, 'sine'); }),
+    crash: w(t => { burst(t, 1.1, 180, 0.7, 0.5, 'lowpass'); tone(t, 0.8, 140, 40, 0.18, 'sawtooth'); burst(t, 0.4, 2400, 0.6, 0.18); }),
+    wrong: w(t => { tone(t, 0.3, 300, 180, 0.1, 'square'); tone(t + 0.18, 0.35, 240, 140, 0.08, 'square'); }),
+    jump: w(t => { tone(t, 0.35, 300, 900, 0.07, 'triangle'); burst(t, 0.2, 1500, 1, 0.05); }),
+    land: w(t => { burst(t, 0.18, 400, 0.8, 0.2, 'lowpass'); tone(t, 0.12, 160, 80, 0.1, 'sine'); }),
+    tunnel: w(t => { burst(t, 0.5, 300, 0.6, 0.12, 'lowpass'); tone(t, 0.3, 200, 160, 0.04, 'sine'); }),
+    press: w(t => { tone(t, 0.08, 900, 900, 0.06, 'square'); note(t + 0.08, 7, 0.25, 0.07, 'triangle'); note(t + 0.16, 12, 0.35, 0.07, 'triangle'); }),
+    win: w(t => { [0, 4, 7, 12, 16, 19, 24].forEach((s, i) => note(t + i * 0.11, s - 5, 0.9, 0.1, 'triangle')); }),
+  };
+})();
+const buzz = ms => { try { const ua = navigator.userActivation; if (navigator.vibrate && (!ua || ua.hasBeenActive)) navigator.vibrate(ms); } catch (e) {} };
+
+/* ---------------- DURUM ---------------- */
+let S = null, DRAG = null;
+function newRun(lv) {
+  const cfg = LEVELS[lv];
+  S = { lv, cfg, mode: 'edit', erase: false, t: 0, time: 0, grid: [], kind: [], undo: [], trains: [], queue: [], parts: [], pops: [], debris: [], shake: 0,
+    fail: null, arrived: 0, totalTrains: 0, laid: 0, won: false, open: {} };
+  for (let r = 0; r < ROWS; r++) { S.grid.push([]); S.kind.push([]); for (let c = 0; c < COLS; c++) { S.grid[r].push({ links: [], state: 0, flip: 0, pop: 0 }); S.kind[r].push(null); } }
+  const put = (c, r, o) => S.kind[r][c] = Object.assign({ c, r }, o);
+  (cfg.rocks || []).forEach(([c, r]) => put(c, r, { type: 'rock', v: hash(c, r) }));
+  (cfg.rivers || []).forEach(([c, r]) => put(c, r, { type: 'river' }));
+  (cfg.ramps || []).forEach(([c, r, ax]) => put(c, r, { type: 'ramp', axis: ax }));
+  (cfg.gates || []).forEach(([c, r, ax, col]) => put(c, r, { type: 'gate', axis: ax, col }));
+  (cfg.tunnels || []).forEach(([c, r, side, id]) => put(c, r, { type: 'tunnel', side, id }));
+  (cfg.buttons || []).forEach(([c, r, ax, id]) => put(c, r, { type: 'button', axis: ax, id, glow: 0 }));
+  (cfg.barriers || []).forEach(([c, r, ax, id]) => put(c, r, { type: 'barrier', axis: ax, id, arm: 0 }));
+  cfg.depots.forEach(d => S.kind[d.r][d.c] = Object.assign({ type: 'depot' }, d));
+  cfg.stations.forEach(s => S.kind[s.r][s.c] = Object.assign({ type: 'station', hop: 0, sad: 0 }, s));
+  S.totalTrains = cfg.depots.reduce((a, d) => a + d.trains.length, 0);
+}
+const inGrid = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS;
+const cellAt = (x, y) => { const c = Math.floor((x - GX) / CELL), r = Math.floor((y - GY) / CELL); return inGrid(c, r) ? [c, r] : null; };
+const RAILABLE = { river: 1, ramp: 1, gate: 1, button: 1, barrier: 1 };
+const kindAt = (c, r) => inGrid(c, r) ? S.kind[r][c] : null;
+const costAt = (c, r) => { const k = S.kind[r][c]; return k && k.type === 'river' ? RIVER_COST : 1; };
+const axisPair = ax => ax === 'v' ? [0, 2] : [1, 3];
+const used = () => { let n = 0; for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) n += S.grid[r][c].links.length * costAt(c, r); return n; };
+const tunnelPartner = k => { for (const row of S.kind) for (const o of row) if (o && o !== k && o.type === 'tunnel' && o.id === k.id) return o; return null; };
+const samePair = (p, q) => (p[0] === q[0] && p[1] === q[1]) || (p[0] === q[1] && p[1] === q[0]);
+const isStraight = p => p[1] === opp(p[0]);
+const other = (p, d) => p[0] === d ? p[1] : p[0];
+/* bu kenar komşuya bağlı mı? (bağlı değilse "açık uç") */
+function connected(c, r, d) {
+  const nc = c + DV[d][0], nr = r + DV[d][1]; if (!inGrid(nc, nr)) return false;
+  const k = S.kind[nr][nc], od = opp(d);
+  if (k && k.type === 'depot') return k.exit === od;
+  if (k && k.type === 'station') return k.entry === od;
+  if (k && k.type === 'tunnel') return k.side === od;
+  return S.grid[nr][nc].links.some(p => p[0] === od || p[1] === od);
+}
+function snapshot() { return S.grid.map(row => row.map(g => ({ links: g.links.map(p => p.slice()), state: g.state }))); }
+function restore(snap) { snap.forEach((row, r) => row.forEach((g, c) => { S.grid[r][c].links = g.links.map(p => p.slice()); S.grid[r][c].state = g.state; })); }
+
+/* ---------------- ÇİZİM (GİRDİ) ---------------- */
+function toL(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
+cv.addEventListener('pointerdown', e => {
+  if (!S || S.won) return; e.preventDefault(); SFX.init();
+  const [x, y] = toL(e);
+  if (S.mode !== 'edit') { if (S.fail) backToEdit(); return; }
+  const cell = cellAt(x, y); if (!cell) return;
+  const [c, r] = cell;
+  DRAG = { id: e.pointerId, snap: snapshot(), changed: false, moved: false, path: [{ c, r, entry: null, added: null }], x, y, sx: x, sy: y };
+  if (S.erase) { eraseCell(c, r); }
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+});
+cv.addEventListener('pointermove', e => {
+  if (!DRAG || e.pointerId !== DRAG.id) return;
+  const [x, y] = toL(e); DRAG.x = x; DRAG.y = y;
+  if (hyp(x - DRAG.sx, y - DRAG.sy) > 10) DRAG.moved = true;
+  let guard = 0;
+  while (DRAG && guard++ < 20) {   // hızlı sürüklemede kareleri tek tek geç
+    const top = DRAG.path[DRAG.path.length - 1], tx = ccx(top.c), ty = ccy(top.r), dx = x - tx, dy = y - ty;
+    const d = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+    // tümsekten atlanan kareye parmak girince geri dönmüş sayma
+    const lim = top.jump !== undefined && d === opp(top.jump) ? CELL * 1.62 : CELL * 0.62;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < lim) break;
+    if (S.erase) { const nc = top.c + DV[d][0], nr = top.r + DV[d][1]; if (!inGrid(nc, nr)) break; DRAG.path.push({ c: nc, r: nr }); eraseCell(nc, nr); continue; }
+    if (!stepDraw(d)) { DRAG.stuck = true; break; }
+  }
+});
+function endDrag(e) {
+  if (!DRAG || (e && e.pointerId !== DRAG.id)) return;
+  const d = DRAG; DRAG = null;
+  if (d.changed) S.undo.push(d.snap);
+  else if (!d.moved && !S.erase) { const p = d.path[0], g = S.grid[p.r][p.c]; if (g.links.length === 2 && sharedDir(g) !== null) { g.state ^= 1; g.flip = 1; SFX.sw(); buzz(10); } }
+  HUD.dirty = true;
+}
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+const sharedDir = g => { if (g.links.length !== 2) return null; const [a, b] = g.links; return a.find(d => b.includes(d)) ?? null; };
+function budgetLeft() { return S.cfg.budget - used(); }
+function denied(msg, c, r) { if (DRAG && DRAG.deniedT && S.t - DRAG.deniedT < 0.6) return; if (DRAG) DRAG.deniedT = S.t; SFX.deny(); buzz(20); popText(msg, clamp(ccx(c), 70, W - 70), ccy(r) - 30, '#FFB3B5', 15); }
+/* bir karede giriş→çıkış bağlantısı kur. 'ok' | 'full' | 'budget' */
+function addPair(c, r, a, b) {
+  const g = S.grid[r][c], L = g.links, np = [a, b], k = S.kind[r][c], cost = costAt(c, r);
+  if (k && !RAILABLE[k.type]) return 'full';
+  if (k && !isStraight(np)) return 'straight';                                   // özel karelerden sadece düz geçilir
+  if (k && k.axis && !samePair(np, axisPair(k.axis))) return 'axis';
+  if (L.some(p => samePair(p, np))) return 'ok';
+  if (L.length === 1) {
+    const P = L[0], shared = P.filter(d => d === a || d === b);
+    // tek bağlantılı karede diğer ucu boştaysa bük (makas yerine)
+    if (shared.length === 1 && !connected(c, r, other(P, shared[0]))) { L[0] = np; g.pop = 1; return 'ok'; }
+    if (k) return 'full';
+    if (shared.length === 1 || (shared.length === 0 && isStraight(P) && isStraight(np))) { if (budgetLeft() < cost) return 'budget'; L.push(np); g.state = 0; g.pop = 1; return 'ok'; }
+    return 'full';
+  }
+  if (L.length >= 2) return 'full';
+  if (budgetLeft() < cost) return 'budget';
+  L.push(np); g.pop = 1; return 'ok';
+}
+const DENY = { budget: 'Ray bitti!', full: 'Bu kare dolu', straight: 'Buradan sadece düz geçilir', axis: 'Bu yönden geçilmez' };
+function removePair(c, r, p) { const L = S.grid[r][c].links, i = L.findIndex(q => samePair(q, p)); if (i >= 0) L.splice(i, 1); }
+function stepDraw(d) {
+  const P = DRAG.path, A = P[P.length - 1], back = A.jump !== undefined ? 2 : 1, pc = A.c + DV[d][0] * back, pr = A.r + DV[d][1] * back;
+  // geri dönüş: bir önceki kareye döndüyse son adımı geri al
+  if (P.length >= 2 && P[P.length - 2].c === pc && P[P.length - 2].r === pr && (A.jump === undefined || d === opp(A.jump))) {
+    if (A.added) removePair(A.c, A.r, A.added);
+    P.pop(); const B = P[P.length - 1];
+    if (B.added) { removePair(B.c, B.r, B.added); B.added = null; if (B.entry !== null && !S.grid[B.r][B.c].links.length) { B.added = [B.entry, opp(B.entry)]; S.grid[B.r][B.c].links.push(B.added); } }
+    DRAG.changed = true; SFX.undo(); return true;
+  }
+  const kA = S.kind[A.r][A.c];
+  if (kA && (kA.type === 'depot' || kA.type === 'tunnel')) { if (d !== (kA.type === 'depot' ? kA.exit : kA.side)) return false; }
+  else if (kA && !RAILABLE[kA.type]) return false;
+  else if (A.entry !== null) {
+    if (A.entry === d) return false;
+    let stub = null;
+    if (A.added && isStraight(A.added) && A.added[0] === A.entry) { stub = A.added; removePair(A.c, A.r, stub); A.added = null; }   // taslak düz parçayı kaldır
+    const res = addPair(A.c, A.r, A.entry, d);
+    if (res !== 'ok') { if (stub) { S.grid[A.r][A.c].links.push(stub); A.added = stub; } denied(DENY[res], A.c, A.r); return false; }
+    A.added = [A.entry, d]; DRAG.changed = true;
+  } else {
+    // başlangıç karesi: tek bağlantısı ve açık ucu varsa o uçtan devam et / bük
+    const g = S.grid[A.r][A.c];
+    if (g.links.some(p => p.includes(d))) { /* mevcut rayın yönünde devam */ }
+    else if (kA) return false;
+    else if (g.links.length === 1) { const p = g.links[0], open = [p[0], p[1]].filter(x => !connected(A.c, A.r, x));
+      if (open.length && !open.includes(d)) { const keep = other(p, open[0]); if (keep !== d) { g.links[0] = [keep, d]; g.pop = 1; DRAG.changed = true; } else return false; }
+      else if (!open.length) return false; }
+    else return false;
+  }
+  // tümsekten çıkış: bir kare atlanır
+  const jump = !!(kA && kA.type === 'ramp'), stepN = jump ? 2 : 1, nc = A.c + DV[d][0] * stepN, nr = A.r + DV[d][1] * stepN;
+  if (!inGrid(nc, nr)) { denied(jump ? 'İnecek yer yok' : 'Sınır!', A.c, A.r); return false; }
+  const kB = S.kind[nr][nc];
+  if (kB && kB.type === 'rock') { denied(jump ? 'Kayaya iner!' : 'Kaya var', nc, nr); return false; }
+  if (kB && kB.type === 'depot') return false;
+  const B = { c: nc, r: nr, entry: opp(d), added: null }; if (jump) B.jump = d;
+  if (kB && (kB.type === 'station' || kB.type === 'tunnel')) {
+    if (B.entry !== (kB.type === 'station' ? kB.entry : kB.side)) { denied(kB.type === 'station' ? 'İstasyonun girişi öbür yanda' : 'Tünel ağzı öbür yanda', nc, nr); return false; }
+    P.push(B); SFX.lay(P.length); buzz(6); DRAG.stuck = true; return false; }
+  const gB = S.grid[nr][nc];
+  if (!gB.links.length) { const stub = [B.entry, opp(B.entry)];
+    if (kB && kB.axis && !samePair(stub, axisPair(kB.axis))) { denied(DENY.axis, nc, nr); return false; }
+    if (budgetLeft() < costAt(nc, nr)) { denied('Ray bitti!', nc, nr); return false; }
+    B.added = stub; gB.links.push(stub); gB.pop = 1; DRAG.changed = true; }
+  P.push(B); SFX.lay(P.length); buzz(6);
+  return true;
+}
+function eraseCell(c, r) { const g = S.grid[r][c]; if (!g.links.length) return; if (!DRAG.changed) DRAG.changed = true; g.links = []; g.state = 0; SFX.erase(); buzz(8); for (let i = 0; i < 8; i++) S.parts.push({ x: ccx(c) + rnd(-14, 14), y: ccy(r) + rnd(-14, 14), vx: rnd(-40, 40), vy: rnd(-40, 40), t: 0, life: 0.5, r: 2.5, col: '#8A6A48' }); HUD.dirty = true; }
+$('bUndo').onclick = () => { if (S.mode !== 'edit' || !S.undo.length) return; restore(S.undo.pop()); SFX.init(); SFX.undo(); HUD.dirty = true; };
+$('bErase').onclick = () => { if (S.mode !== 'edit') return; S.erase = !S.erase; SFX.init(); SFX.sw(); HUD.dirty = true; };
+$('bRun').onclick = () => { SFX.init(); if (S.mode === 'edit') run(); else backToEdit(); };
+
+/* ---------------- ÇALIŞTIRMA ---------------- */
+function run() {
+  S.mode = 'run'; S.erase = false; S.time = 0; S.trains = []; S.fail = null; S.arrived = 0; S.debris = []; S.editStates = snapshot(); S.open = {};
+  S.queue = []; S.cfg.depots.forEach(d => d.trains.forEach((col, i) => S.queue.push({ depot: d, col, at: (d.delay || 0) + i * TRAIN_GAP })));
+  S.queue.sort((a, b) => a.at - b.at); HUD.dirty = true;
+}
+function backToEdit() { restore(S.editStates); S.mode = 'edit'; S.trains = []; S.fail = null; S.debris = []; S.open = {}; HUD.dirty = true; }
+let NEXT_ID = 1;
+function spawnTrain(q) {
+  const d = q.depot, t = { id: NEXT_ID++, col: q.col, c: d.c, r: d.r, e: opp(d.exit), x: d.exit, p: 0.5, trail: [], body: [], state: 'run', fade: 0, derail: false, station: null, puffT: 0, h: 0, jumps: [] };
+  const h = posOf(t); for (let k = 70; k >= 2; k -= 2) t.trail.push({ x: h.x - DV[d.exit][0] * k, y: h.y - DV[d.exit][1] * k });
+  t.hx = h.x; t.hy = h.y; t.a = h.a; computeBody(t); S.trains.push(t); SFX.whistle();
+}
+/* kare içindeki konum: giriş kenarından çıkış kenarına (düz ya da çeyrek daire) */
+function piecePos(c, r, e, x, p) {
+  const X = ccx(c), Y = ccy(r), h = CELL / 2;
+  const ex = X + DV[e][0] * h, ey = Y + DV[e][1] * h, xx = X + DV[x][0] * h, xy = Y + DV[x][1] * h;
+  if (x === opp(e)) return { x: lerp(ex, xx, p), y: lerp(ey, xy, p), a: Math.atan2(xy - ey, xx - ex) };
+  const kx = X + (DV[e][0] + DV[x][0]) * h, ky = Y + (DV[e][1] + DV[x][1]) * h;
+  const a0 = Math.atan2(ey - ky, ex - kx); let da = Math.atan2(xy - ky, xx - kx) - a0;
+  while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+  const a = a0 + da * p; return { x: kx + Math.cos(a) * h, y: ky + Math.sin(a) * h, a: a + Math.sign(da) * Math.PI / 2 };
+}
+const posOf = t => piecePos(t.c, t.r, t.e, t.x, t.p);
+function pointBack(t, d) {
+  let px = t.hx, py = t.hy, acc = 0;
+  for (let i = t.trail.length - 1; i >= 0; i--) { const q = t.trail[i], L = hyp(px - q.x, py - q.y);
+    if (L > 0.001 && acc + L >= d) { const f = (d - acc) / L; return { x: px + (q.x - px) * f, y: py + (q.y - py) * f, a: Math.atan2(py - q.y, px - q.x) }; }
+    acc += L; px = q.x; py = q.y; }
+  return { x: px, y: py, a: t.a };
+}
+function computeBody(t) { t.body = [0, 1, 2].map(k => { const b = pointBack(t, 11 + k * 19); b.h = t.jumps && t.jumps.length ? ptH(t, b.x, b.y) : 0; return b; }); }
+/* yeni kareye girildi: çıkış yönünü belirle ya da kaza */
+function enterCell(t) {
+  const { c, r, e } = t;
+  if (!inGrid(c, r)) { t.derail = true; t.x = opp(e); return; }
+  const k = S.kind[r][c];
+  if (k && k.type === 'station') { if (k.entry === e) { t.station = k; t.x = opp(e); } else { t.derail = true; t.x = opp(e); } return; }
+  if (k && k.type === 'tunnel') { if (k.side === e) { t.tunnel = k; t.x = opp(e); } else { t.derail = true; t.x = opp(e); } return; }
+  if (k && !RAILABLE[k.type]) { t.derail = true; t.x = opp(e); return; }
+  const g = S.grid[r][c], hits = g.links.filter(p => p[0] === e || p[1] === e);
+  if (!hits.length) { t.derail = true; t.x = opp(e); return; }
+  if (hits.length === 2) {   // makasın gövdesinden girdi: sıradaki kola git, makas döner
+    t.x = other(g.links[g.state], e); g.state ^= 1; g.flip = 1; SFX.sw();
+  } else t.x = other(hits[0], e);
+  if (!k) return;
+  if (k.type === 'ramp') { t.ramp = true; t.jumps.push({ x: ccx(c), y: ccy(r), dx: DV[t.x][0], dy: DV[t.x][1] }); }
+  else if (k.type === 'gate' && k.col !== t.col) t.stop = { at: 0.4, msg: 'Kapı sadece ' + COLORS[k.col].n.toLowerCase() + ' trene açık!' };
+  else if (k.type === 'barrier' && !S.open[k.id]) t.stop = { at: 0.3, msg: 'Bariyer kapalı!' };
+  else if (k.type === 'button') t.button = k;
+}
+/* tümsek: tren rampanın ortasından kalkar, sonraki kareyi uçarak geçer, ondan sonrakine iner.
+   Yükseklik uzayda sabit bir yay: her vagon aynı noktadan geçerken aynı yükseklikte olur */
+const JUMP_LEN = 1.5;
+function ptH(t, x, y) {
+  let h = 0;
+  for (const j of t.jumps) { const s = ((x - j.x) * j.dx + (y - j.y) * j.dy) / CELL, side = Math.abs((x - j.x) * j.dy - (y - j.y) * j.dx);
+    if (s > 0 && s < JUMP_LEN && side < CELL * 0.5) h = Math.max(h, Math.sin(Math.PI * s / JUMP_LEN)); }
+  return h;
+}
+function step(dt) {
+  S.t += dt; S.shake *= Math.exp(-9 * dt);
+  for (const row of S.grid) for (const g of row) { g.flip = Math.max(0, g.flip - dt * 4); g.pop = Math.max(0, g.pop - dt * 5); }
+  for (const row of S.kind) for (const k of row) if (k && k.type === 'station') { k.hop = Math.max(0, k.hop - dt * 1.6); k.sad = Math.max(0, k.sad - dt); }
+  if (S.mode === 'run' && !S.fail) {
+    S.time += dt;
+    while (S.queue.length && S.queue[0].at <= S.time) spawnTrain(S.queue.shift());
+    for (const t of S.trains) stepTrain(t, dt);
+    S.trains = S.trains.filter(t => !t.dead);
+    if (!S.fail) checkCollide();
+    if (!S.fail && S.time > 60) failAt(W / 2, H / 2, 'Tren yolda kayboldu', 'lost');
+    if (!S.fail && !S.queue.length && S.arrived >= S.totalTrains && !S.won) win();
+  }
+  for (const q of S.parts) { q.t += dt; q.vx *= 0.94; q.vy = q.vy * 0.94 + (q.g || 0) * dt; q.x += q.vx * dt; q.y += q.vy * dt; }
+  S.parts = S.parts.filter(q => q.t < q.life);
+  for (const q of S.debris) { q.t += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 0.95; q.vy *= 0.95; q.r += q.vr * dt; q.vr *= 0.95; }
+  for (const q of S.pops) q.t += dt; S.pops = S.pops.filter(q => q.t < 1.4);
+}
+function stepTrain(t, dt) {
+  if (t.state === 'arrive') { t.fade += dt * 3; if (t.fade >= 1) t.dead = true; return; }
+  t.p += SPEED * dt;
+  if (t.station && t.p >= 0.5) { t.p = 0.5; arrive(t); }
+  else if (t.derail && t.p >= 0.3) { const h = posOf(t); t.wreck = true; failAt(h.x, h.y, t.landed ? 'Kötü iniş! İnişte ray yok' : 'Raydan çıktı!', 'derail'); return; }
+  else if (t.stop && t.p >= t.stop.at) { const h = posOf(t); t.wreck = true; failAt(h.x, h.y, t.stop.msg, 'derail'); return; }
+  if (t.button && t.p >= 0.5) { const k = t.button; t.button = null; if (!S.open[k.id]) { S.open[k.id] = true; SFX.press(); buzz(15); popText('Bariyer açıldı!', clamp(ccx(k.c), 70, W - 70), ccy(k.r) - 28, '#B8FFB0', 15); } }
+  if (t.tunnel && t.p >= 0.5) {   // tünel: eşine ışınlan, oradan dışarı çık
+    const P = tunnelPartner(t.tunnel); t.tunnel = null;
+    if (P) { t.c = P.c; t.r = P.r; t.e = opp(P.side); t.x = P.side; t.p = 0.5; const q = posOf(t); t.trail = []; for (let k = 60; k >= 2; k -= 2) t.trail.push({ x: q.x - DV[P.side][0] * k, y: q.y - DV[P.side][1] * k }); SFX.tunnel(); }
+  }
+  while (t.p >= 1 && !t.derail && !t.station && !t.stop && !t.tunnel) {
+    t.p -= 1; t.c += DV[t.x][0]; t.r += DV[t.x][1]; t.e = opp(t.x);
+    if (t.ramp) { t.ramp = false; t.air = true; SFX.jump(); }      // atlanan kare: ray aranmaz, düz uçar
+    else { t.landed = t.air; if (t.air) { t.air = false; S.shake = Math.max(S.shake, 3); SFX.land(); burst(ccx(t.c) - DV[t.e][0] * 22, ccy(t.r) - DV[t.e][1] * 22, 'rgba(230,220,200,.9)', 8); } enterCell(t); }
+  }
+  const h = posOf(t); t.hx = h.x; t.hy = h.y; t.a = h.a;
+  const last = t.trail[t.trail.length - 1]; if (!last || hyp(h.x - last.x, h.y - last.y) >= 2) t.trail.push({ x: h.x, y: h.y });
+  if (t.trail.length > 80) t.trail.shift();
+  computeBody(t);
+  t.h = ptH(t, h.x, h.y);
+  if (t.jumps.length && !t.ramp && !t.air) { const tail = t.body[t.body.length - 1]; t.jumps = t.jumps.filter(j => ((tail.x - j.x) * j.dx + (tail.y - j.y) * j.dy) / CELL < JUMP_LEN + 0.2); }
+  t.puffT -= dt; if (t.puffT <= 0) { t.puffT = 0.22; S.parts.push({ x: t.body[0].x, y: t.body[0].y, vx: rnd(-8, 8), vy: rnd(-20, -8), t: 0, life: 0.8, r: rnd(3, 5), col: 'rgba(255,255,255,.55)', grow: 1 }); }
+}
+function arrive(t) {
+  const k = t.station;
+  if (k.col !== t.col) { k.sad = 1.5; SFX.wrong(); failAt(ccx(k.c), ccy(k.r), 'Yanlış istasyon!', 'wrong'); return; }
+  t.state = 'arrive'; S.arrived++; k.hop = 1; SFX.deliver(); buzz([10, 30, 10]);
+  for (let i = 0; i < 7; i++) S.parts.push({ x: ccx(k.c) + rnd(-14, 14), y: ccy(k.r), vx: rnd(-30, 30), vy: rnd(-90, -40), t: 0, life: 1.1, r: 0, heart: true, g: 30 });
+  popText(pick(['Kavuştular! 💞', 'Hoş geldin!', 'Eve dönüş 🏠']), clamp(ccx(k.c), 70, W - 70), ccy(k.r) - 30, '#FFFFFF', 15);
+}
+function checkCollide() {
+  const live = S.trains.filter(t => t.state === 'run');
+  for (const t of live) for (const o of live) { if (o === t || t.h > 0.15) continue;   // havadaki vagon üstten geçer
+    for (const b of o.body) if (b.h <= 0.15 && hyp(t.hx - b.x, t.hy - b.y) < 13) { failAt((t.hx + b.x) / 2, (t.hy + b.y) / 2, 'Çarpıştılar!', 'crash', [t, o]); return; } }
+}
+function failAt(x, y, msg, why, wreck) {
+  S.fail = { x, y, msg, why, t: 0 }; S.shake = why === 'wrong' ? 5 : 12; if (why !== 'wrong') SFX.crash(); buzz([60, 40, 90]);
+  (wreck || S.trains.filter(t => t.wreck)).forEach(t => { t.state = 'wreck'; t.body.forEach((b, i) => S.debris.push({ x: b.x, y: b.y, vx: rnd(-80, 80), vy: rnd(-80, 80), r: b.a, vr: rnd(-8, 8), t: 0, col: COLORS[t.col], loco: i === 0 })); });
+  S.trains = S.trains.filter(t => t.state !== 'wreck');
+  if (why !== 'wrong') for (let i = 0; i < 3; i++) burst(x + rnd(-6, 6), y + rnd(-6, 6), pick(['#FFB23F', '#FF5A5F', '#FFFFFF']), 18);
+  HUD.dirty = true;
+}
+function burst(x, y, col, n) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = rnd(30, 170); S.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: rnd(0.35, 0.8), r: rnd(1.5, 3.5), col }); } }
+function popText(txt, x, y, col, size) { S.pops.push({ txt, x, y, col, size: size || 18, t: 0 }); }
+function win() {
+  S.won = true; SFX.win(); buzz([30, 40, 60]);
+  const n = used(), [p3, p2] = S.cfg.par; S.stars = n <= p3 ? 3 : n <= p2 ? 2 : 1;
+  const me = S;   // bölüm bu arada değişirse zamanlayıcılar eski duruma dokunmasın
+  S.cfg.stations.forEach((s, i) => setTimeout(() => { if (S !== me) return; S.kind[s.r][s.c].hop = 1; burst(ccx(s.c), ccy(s.r), COLORS[s.col].c, 24); }, i * 160));
+  try { localStorage.setItem(LV_KEY, String(Math.max(+localStorage.getItem(LV_KEY) || 0, Math.min(LEVELS.length - 1, S.lv + 1)))); } catch (e) {}
+  setTimeout(() => { if (S === me && S.won) showWin(); }, 1400);
+}
+
+/* ---------------- ÇİZİM ---------------- */
+function fitCanvas() {
+  const box = $('stage'), availW = box.clientWidth || 360, chrome = $('cab').offsetHeight - cv.offsetHeight || 120;
+  const availH = Math.max(440, innerHeight - chrome - 18), sc = Math.min(availW / W, availH / H), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = Math.round(W * sc * dpr); cv.height = Math.round(H * sc * dpr); cv.style.width = Math.round(W * sc) + 'px'; cv.style.height = Math.round(H * sc) + 'px';
+  ctx.setTransform(sc * dpr, 0, 0, sc * dpr, 0, 0);
+}
+function rrect(x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+const emoji = (e, x, y, size) => { ctx.font = size + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText(e, x, y); };
+function text(s, x, y, size, col, weight) { ctx.font = (weight || 800) + ' ' + size + 'px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = col; ctx.fillText(s, x, y); }
+function heart(x, y, r, col) { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y + r * 0.9); ctx.bezierCurveTo(x - r * 1.4, y - r * 0.2, x - r * 0.6, y - r * 1.3, x, y - r * 0.4); ctx.bezierCurveTo(x + r * 0.6, y - r * 1.3, x + r * 1.4, y - r * 0.2, x, y + r * 0.9); ctx.fill(); }
+function pairPoly(c, r, p, off, n) { const pts = []; for (let k = 0; k <= n; k++) { const q = piecePos(c, r, p[0], p[1], k / n); pts.push([q.x - Math.sin(q.a) * off, q.y + Math.cos(q.a) * off]); } return pts; }
+function strokePoly(pts) { ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke(); }
+function drawRail(c, r, p, s) {
+  const n = isStraight(p) ? 1 : 8;
+  ctx.save(); if (s !== 1) { ctx.translate(ccx(c), ccy(r)); ctx.scale(s, s); ctx.translate(-ccx(c), -ccy(r)); }
+  ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(120,100,80,.5)'; ctx.lineWidth = 18; strokePoly(pairPoly(c, r, p, 0, n));
+  ctx.strokeStyle = '#7A5534'; ctx.lineWidth = 3;
+  for (let k = 0; k < 5; k++) { const q = piecePos(c, r, p[0], p[1], (k + 0.5) / 5), nx = -Math.sin(q.a) * 8, ny = Math.cos(q.a) * 8; ctx.beginPath(); ctx.moveTo(q.x - nx, q.y - ny); ctx.lineTo(q.x + nx, q.y + ny); ctx.stroke(); }
+  ctx.strokeStyle = '#D5DAE2'; ctx.lineWidth = 2.2; strokePoly(pairPoly(c, r, p, -4.5, isStraight(p) ? 1 : 10)); strokePoly(pairPoly(c, r, p, 4.5, isStraight(p) ? 1 : 10));
+  ctx.restore();
+}
+function draw() {
+  if (!S) return;
+  ctx.save();
+  if (S.shake > 0.3) ctx.translate(rnd(-S.shake, S.shake) * 0.5, rnd(-S.shake, S.shake) * 0.5);
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#6DBE72'); g.addColorStop(1, '#58A862'); ctx.fillStyle = g; ctx.fillRect(-10, -10, W + 20, H + 20);
+  for (let i = 0; i < 40; i++) { const x = hash(i, 11) * W, y = hash(12, i) * H; ctx.fillStyle = ['#FFF6A8', '#FFFFFF', '#FFB3D1'][i % 3]; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 7); ctx.fill(); }
+  // ızgara
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { ctx.fillStyle = (r + c) % 2 ? 'rgba(255,255,255,.05)' : 'rgba(0,40,10,.05)'; ctx.fillRect(GX + c * CELL, GY + r * CELL, CELL, CELL); }
+  ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1; rrect(GX - 0.5, GY - 0.5, COLS * CELL + 1, ROWS * CELL + 1, 6); ctx.stroke();
+  // nehir
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const k = S.kind[r][c]; if (!k || k.type !== 'river') continue;
+    const x = GX + c * CELL, y = GY + r * CELL; ctx.fillStyle = '#3D9BD6'; ctx.fillRect(x, y - 1, CELL, CELL + 2);
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { const yy = y + 10 + i * 14, ox = (S.t * 12 + i * 17 + c * 9) % 24; ctx.beginPath(); ctx.moveTo(x + ox - 6, yy); ctx.quadraticCurveTo(x + ox, yy - 3, x + ox + 6, yy); ctx.stroke(); }
+    if (!S.kind[r - 1] || !S.kind[r - 1][c] || S.kind[r - 1][c].type !== 'river') { ctx.fillStyle = '#C9B48A'; ctx.fillRect(x, y - 3, CELL, 4); }
+    if (!S.kind[r + 1] || !S.kind[r + 1][c] || S.kind[r + 1][c].type !== 'river') { ctx.fillStyle = '#C9B48A'; ctx.fillRect(x, y + CELL - 1, CELL, 4); } }
+  // raylar (nehirde köprü tahtası)
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const cell = S.grid[r][c], k = S.kind[r][c];
+    if (k && k.type === 'river' && cell.links.length) { const p = cell.links[0], v = p[0] % 2 === 0; ctx.fillStyle = '#9C6B3E';
+      if (v) { ctx.fillRect(ccx(c) - 15, GY + r * CELL - 2, 30, CELL + 4); ctx.fillStyle = '#7A5230'; ctx.fillRect(ccx(c) - 17, GY + r * CELL - 2, 3, CELL + 4); ctx.fillRect(ccx(c) + 14, GY + r * CELL - 2, 3, CELL + 4); }
+      else { ctx.fillRect(GX + c * CELL - 2, ccy(r) - 15, CELL + 4, 30); ctx.fillStyle = '#7A5230'; ctx.fillRect(GX + c * CELL - 2, ccy(r) - 17, CELL + 4, 3); ctx.fillRect(GX + c * CELL - 2, ccy(r) + 14, CELL + 4, 3); } }
+    for (const p of cell.links) drawRail(c, r, p, 1 + cell.pop * 0.12); }
+  // özel ray kareleri (rayların üstünde)
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const k = S.kind[r][c]; if (!k) continue;
+    if (k.type === 'ramp') drawRamp(k); else if (k.type === 'gate') drawGate(k, false); else if (k.type === 'button') drawButton(k); else if (k.type === 'barrier') drawBarrier(k); }
+  // makas göstergesi
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const cell = S.grid[r][c], sd = sharedDir(cell); if (sd === null) continue;
+    const nextP = cell.links[cell.state], q = piecePos(c, r, sd, other(nextP, sd), 0.72), s = 1 + cell.flip * 0.4;
+    ctx.save(); ctx.translate(q.x, q.y); ctx.scale(s, s); ctx.rotate(q.a);
+    ctx.fillStyle = '#FF8A3D'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-5, -7); ctx.lineTo(-2, 0); ctx.lineTo(-5, 7); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
+    const other2 = cell.links[1 - cell.state], q2 = piecePos(c, r, sd, other(other2, sd), 0.72); ctx.fillStyle = '#E8474C'; ctx.beginPath(); ctx.arc(q2.x, q2.y, 3, 0, 7); ctx.fill(); }
+  // özel kareler
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const k = S.kind[r][c]; if (!k) continue;
+    if (k.type === 'rock') drawRock(c, r, k); else if (k.type === 'station') drawStation(k); }
+  // sürükleme izi
+  if (DRAG && S.mode === 'edit') { const top = DRAG.path[DRAG.path.length - 1]; ctx.strokeStyle = S.erase ? 'rgba(255,120,120,.9)' : 'rgba(255,236,120,.9)'; ctx.lineWidth = 3; rrect(GX + top.c * CELL + 2, GY + top.r * CELL + 2, CELL - 4, CELL - 4, 8); ctx.stroke(); }
+  // trenler (havadakiler en üstte)
+  const airborne = t => t.body.some(b => b.h > 0.01);
+  ctx.save(); ctx.beginPath(); ctx.rect(GX, GY, COLS * CELL, ROWS * CELL); ctx.clip();   // depodaki vagonlar ızgara dışına taşmasın
+  for (const t of S.trains) if (!airborne(t)) drawTrain(t);
+  ctx.restore();
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const k = S.kind[r][c]; if (k && k.type === 'gate') drawGate(k, true); }
+  // depolar ve tüneller (trenin arkası içeride kalsın)
+  for (const d of S.cfg.depots) drawDepot(d);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const k = S.kind[r][c]; if (k && k.type === 'tunnel') drawTunnel(k); }
+  for (const t of S.trains) if (airborne(t)) drawTrain(t);
+  // enkaz
+  for (const q of S.debris) { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.r); ctx.fillStyle = q.loco ? q.col.d : q.col.c; rrect(-8, -6, 16, 12, 3); ctx.fill(); ctx.restore(); }
+  for (const q of S.parts) { const k = q.t / q.life; ctx.globalAlpha = 1 - k;
+    if (q.heart) heart(q.x, q.y, 5 * (1 - k * 0.3), '#FF6FA8');
+    else { ctx.fillStyle = q.col; ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (q.grow ? 1 + k * 1.8 : 1), 0, 7); ctx.fill(); } }
+  ctx.globalAlpha = 1;
+  // hata işareti
+  if (S.fail) { const f = S.fail, pulse = 1 + Math.sin(S.t * 8) * 0.12;
+    ctx.strokeStyle = '#FF3B3B'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(f.x, f.y, 20 * pulse, 0, 7); ctx.stroke();
+    ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(f.x - 8, f.y - 8); ctx.lineTo(f.x + 8, f.y + 8); ctx.moveTo(f.x + 8, f.y - 8); ctx.lineTo(f.x - 8, f.y + 8); ctx.stroke(); }
+  for (const q of S.pops) { const k = q.t / 1.4; ctx.globalAlpha = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25;
+    ctx.font = '800 ' + q.size + 'px "Baloo 2", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(20,40,25,.8)';
+    const y = q.y - k * 26; ctx.strokeText(q.txt, q.x, y); ctx.fillStyle = q.col; ctx.fillText(q.txt, q.x, y); }
+  ctx.globalAlpha = 1;
+  // üst bilgi şeridi
+  ctx.fillStyle = 'rgba(20,40,25,.72)'; rrect(10, 8, W - 20, 64, 14); ctx.fill();
+  if (S.fail) { text(S.fail.msg, W / 2, 30, 20, '#FFB3B5'); text('Dokun → düzenlemeye dön', W / 2, 54, 13, '#DFF5E2', 600); }
+  else if (S.mode === 'run') { text(S.arrived + ' / ' + S.totalTrains + ' tren vardı', W / 2, 30, 18, '#FFFFFF'); text('Trenler yolda…', W / 2, 54, 13, '#DFF5E2', 600); }
+  else { text(S.erase ? '🧽 Silmek için rayların üstünden geç' : S.cfg.hint, W / 2, 28, 13.5, S.erase ? '#FFD0A0' : '#FFFFFF');
+    const left = budgetLeft(), n = S.cfg.budget; const bw = W - 60, x0 = 30; ctx.fillStyle = 'rgba(255,255,255,.12)'; rrect(x0, 46, bw, 12, 6); ctx.fill();
+    ctx.fillStyle = left <= 2 ? '#FF8A8A' : '#FFD27A'; rrect(x0, 46, Math.max(12, bw * left / n), 12, 6); ctx.fill();
+    const [p3] = S.cfg.par, mx = x0 + bw * (n - p3) / n; ctx.fillStyle = '#fff'; ctx.fillRect(mx - 1, 43, 2, 18); text('★', mx, 38, 10, '#FFC93C'); }
+  // L1 ipucu parmağı
+  if (S.lv === 0 && S.mode === 'edit' && used() === 0 && !DRAG) { const d = S.cfg.depots[0], k = (S.t % 2.2) / 2.2, y = ccy(d.r) + CELL * (0.8 + k * 4);
+    ctx.globalAlpha = k < 0.85 ? 1 : (1 - k) / 0.15; text('👆', ccx(d.c) + 10, y + 12, 26, '#fff'); ctx.globalAlpha = 1; }
+  ctx.restore();
+}
+function drawRock(c, r, k) {
+  const x = ccx(c), y = ccy(r);
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 12, 18, 7, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#8D8F99'; ctx.beginPath(); ctx.moveTo(x - 17, y + 10); ctx.lineTo(x - 13, y - 8); ctx.lineTo(x - 2, y - 15); ctx.lineTo(x + 12, y - 10); ctx.lineTo(x + 18, y + 4); ctx.lineTo(x + 10, y + 13); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#A9ABB5'; ctx.beginPath(); ctx.moveTo(x - 12, y - 6); ctx.lineTo(x - 2, y - 13); ctx.lineTo(x + 8, y - 8); ctx.lineTo(x - 2, y - 2); ctx.closePath(); ctx.fill();
+  if (k.v > 0.5) { ctx.fillStyle = '#3E9A52'; ctx.beginPath(); ctx.arc(x + 14, y + 12, 6, 0, 7); ctx.fill(); }
+}
+function drawStation(k) {
+  const C = COLORS[k.col], x = ccx(k.c), y = ccy(k.r), ex = DV[k.entry][0], ey = DV[k.entry][1];
+  // girişten gelen ray
+  drawRail(k.c, k.r, [k.entry, opp(k.entry)], 1);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan2(ey, ex) + Math.PI / 2);   // giriş yukarıda kalsın
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; rrect(-21, -2, 44, 26, 8); ctx.fill();
+  ctx.fillStyle = C.d; ctx.fillRect(-10, 4, 20, 5);
+  ctx.restore();
+  ctx.fillStyle = '#E9DCC4'; rrect(x - 21, y - 21, 42, 42, 9); ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = C.c; ctx.lineWidth = 4; rrect(x - 21, y - 21, 42, 42, 9); ctx.stroke();
+  const hop = Math.sin(k.hop * Math.PI * 3) * k.hop * 8, shake = k.sad > 0 ? Math.sin(S.t * 30) * 2 : 0;
+  emoji(k.sad > 0 ? '😢' : C.folk, x + shake, y - Math.abs(hop) + 1, 22);
+  // bekleme: küçük renk balonu
+  ctx.fillStyle = C.c; ctx.beginPath(); ctx.arc(x + 17, y - 17, 6, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+  if (k.hop > 0.2) heart(x + 15, y - 22 - (1 - k.hop) * 14, 4, '#FF6FA8');
+}
+function drawDepot(d) {
+  const x = ccx(d.c), y = ccy(d.r), a = Math.atan2(DV[d.exit][1], DV[d.exit][0]);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a - Math.PI / 2);   // yerel: çıkış +y yönünde
+  ctx.fillStyle = '#7C6A52'; rrect(-23, -23, 46, 30, 10); ctx.fill();
+  ctx.fillStyle = '#4E9A57'; rrect(-23, -23, 46, 10, 6); ctx.fill();
+  ctx.fillStyle = '#5E5040'; ctx.beginPath(); ctx.arc(0, 8, 15, Math.PI, 0); ctx.lineTo(15, 9); ctx.lineTo(-15, 9); ctx.fill();
+  ctx.fillStyle = '#1D1712'; ctx.beginPath(); ctx.arc(0, 9, 10, Math.PI, 0); ctx.fill();
+  ctx.restore();
+  // bekleyen trenler (sırayla)
+  const left = S.mode === 'run' ? S.queue.filter(q => q.depot === d).map(q => q.col) : d.trains;
+  left.forEach((col, i) => { const bx = x - (left.length - 1) * 7 + i * 14, by = y - 12; ctx.fillStyle = COLORS[col].c; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; rrect(bx - 5.5, by - 6, 11, 12, 3); ctx.fill(); ctx.stroke(); text(String(i + 1), bx, by + 0.5, 8, '#fff'); });
+}
+function drawRamp(k) {
+  const x = ccx(k.c), y = ccy(k.r), v = k.axis === 'v';
+  ctx.save(); ctx.translate(x, y); if (!v) ctx.rotate(Math.PI / 2);
+  ctx.fillStyle = 'rgba(0,0,0,.2)'; rrect(-17, -20, 36, 42, 8); ctx.fill();
+  const g = ctx.createLinearGradient(0, -20, 0, 20); g.addColorStop(0, '#D9A35B'); g.addColorStop(0.5, '#F2C77E'); g.addColorStop(1, '#D9A35B');
+  ctx.fillStyle = g; rrect(-18, -21, 36, 42, 8); ctx.globalAlpha = 0.82; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#8A5A22'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(-7, s * 6); ctx.lineTo(0, s * 13); ctx.lineTo(7, s * 6); ctx.stroke(); }
+  ctx.restore();
+  // atlama yayı (ince, iki yöne)
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.setLineDash([4, 5]);
+  const dx = v ? 0 : 1, dy = v ? 1 : 0;
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + dx * s * 14, y + dy * s * 14); ctx.quadraticCurveTo(x + dx * s * 48 - dy * 26, y + dy * s * 48 - dx * 26, x + dx * s * 82, y + dy * s * 82); ctx.stroke(); }
+  ctx.setLineDash([]);
+}
+function drawGate(k, front) {
+  const x = ccx(k.c), y = ccy(k.r), C = COLORS[k.col], v = k.axis === 'v';
+  const posts = v ? [[x - 19, y], [x + 19, y]] : [[x, y - 19], [x, y + 19]];
+  if (!front) { ctx.fillStyle = C.c; ctx.globalAlpha = 0.28; ctx.fillRect(GX + k.c * CELL + 2, GY + k.r * CELL + 2, CELL - 4, CELL - 4); ctx.globalAlpha = 1; return; }
+  ctx.strokeStyle = C.d; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(posts[0][0], posts[0][1]); ctx.lineTo(posts[1][0], posts[1][1]); ctx.stroke();
+  for (const [px, py] of posts) { ctx.fillStyle = C.c; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke(); }
+  ctx.fillStyle = C.c; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+}
+function drawButton(k) {
+  const x = ccx(k.c), y = ccy(k.r), on = S.open[k.id];
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.arc(x + 1, y + 2, 12, 0, 7); ctx.fill();
+  ctx.fillStyle = on ? '#6CFF8A' : '#FFD23F'; ctx.beginPath(); ctx.arc(x, y, 11, 0, 7); ctx.fill(); ctx.strokeStyle = '#6B4A00'; ctx.lineWidth = 2; ctx.stroke();
+  text(on ? '✓' : String(k.id), x, y + 1, 12, '#3A2A00');
+}
+function drawBarrier(k) {
+  const x = ccx(k.c), y = ccy(k.r), v = k.axis === 'v', open = S.open[k.id];
+  k.arm = lerp(k.arm || 0, open ? 1 : 0, 0.15);
+  // kol: raya dik; açılınca kalkar
+  ctx.save(); ctx.translate(v ? x - 20 : x, v ? y : y - 20); ctx.rotate((v ? 0 : Math.PI / 2) - k.arm * 1.3);
+  for (let i = 0; i < 5; i++) { ctx.fillStyle = i % 2 ? '#FFFFFF' : '#E8474C'; ctx.fillRect(i * 8, -3, 8, 6); }
+  ctx.restore();
+  ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(v ? x - 20 : x, v ? y : y - 20, 5, 0, 7); ctx.fill();
+  ctx.fillStyle = open ? '#6CFF8A' : '#FFD23F'; ctx.beginPath(); ctx.arc(v ? x + 18 : x + 16, v ? y - 16 : y - 18, 7, 0, 7); ctx.fill();
+  text(String(k.id), v ? x + 18 : x + 16, v ? y - 15 : y - 17, 9, '#3A2A00');
+}
+function drawTunnel(k) {
+  const x = ccx(k.c), y = ccy(k.r), a = Math.atan2(DV[k.side][1], DV[k.side][0]);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(a - Math.PI / 2);   // yerel: ağız +y
+  ctx.fillStyle = '#7C6A52'; ctx.beginPath(); ctx.arc(0, -2, 23, 0, 7); ctx.fill();
+  ctx.fillStyle = '#4E9A57'; ctx.beginPath(); ctx.arc(0, -8, 15, 0, 7); ctx.fill();
+  ctx.fillStyle = '#5E5040'; ctx.beginPath(); ctx.arc(0, 14, 14, Math.PI, 0); ctx.lineTo(14, 16); ctx.lineTo(-14, 16); ctx.fill();
+  ctx.fillStyle = '#1D1712'; ctx.beginPath(); ctx.arc(0, 16, 10, Math.PI, 0); ctx.fill();
+  ctx.restore();
+  const TC = ['#fff', '#B07CFF', '#FF8A3D', '#4CE0D2'][k.id % 4];
+  ctx.fillStyle = TC; ctx.beginPath(); ctx.arc(x, y - 4, 8, 0, 7); ctx.fill(); ctx.strokeStyle = '#2A2118'; ctx.lineWidth = 2; ctx.stroke();
+  text(['', '◆', '●', '▲'][k.id % 4], x, y - 3.5, 9, '#2A2118');
+}
+function drawTrain(t) {
+  ctx.globalAlpha = t.state === 'arrive' ? 1 - t.fade : 1;
+  const C = COLORS[t.col];
+  for (const b of t.body) if (b.h > 0.01) { ctx.fillStyle = `rgba(0,0,0,${0.25 * (1 - b.h * 0.5)})`; ctx.beginPath(); ctx.ellipse(b.x + 4 + b.h * 10, b.y + 5 + b.h * 14, 11, 8, b.a, 0, 7); ctx.fill(); }
+  for (let i = t.body.length - 1; i >= 0; i--) { const b = t.body[i], hgt = b.h || 0;
+    ctx.save(); ctx.translate(b.x, b.y - hgt * 16); ctx.rotate(b.a); ctx.scale(1.22 * (1 + hgt * 0.35), 1.22 * (1 + hgt * 0.35));
+    if (i === 0) {
+      ctx.fillStyle = 'rgba(0,0,0,.2)'; rrect(-8, -4, 20, 14, 4); ctx.fill();
+      ctx.fillStyle = C.d; rrect(-10, -7, 20, 14, 4); ctx.fill();
+      ctx.fillStyle = C.c; rrect(-10, -5, 9, 10, 3); ctx.fill();
+      ctx.fillStyle = '#FFEBD0'; ctx.beginPath(); ctx.arc(7, 0, 5, 0, 7); ctx.fill();
+      ctx.fillStyle = '#2A2A2A'; ctx.beginPath(); ctx.arc(8, -1.9, 1.1, 0, 7); ctx.arc(8, 1.9, 1.1, 0, 7); ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,.2)'; rrect(-6, -4.5, 16, 13, 4); ctx.fill();
+      ctx.fillStyle = C.c; rrect(-8, -6.5, 16, 13, 4); ctx.fill(); ctx.strokeStyle = C.d; ctx.lineWidth = 1.5; ctx.stroke();
+      for (const ox of [-3.5, 3.5]) { ctx.fillStyle = '#FFE0BD'; ctx.beginPath(); ctx.arc(ox, 0, 2.7, 0, 7); ctx.fill(); ctx.fillStyle = '#5A3A22'; ctx.beginPath(); ctx.arc(ox - 1, 0, 1.6, Math.PI / 2, Math.PI * 1.5); ctx.fill(); }
+    }
+    ctx.restore(); }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------------- HUD / EKRAN / DÖNGÜ ---------------- */
+const HUD = { dirty: true, update() { if (!this.dirty || !S) return; this.dirty = false;
+  $('hLv').textContent = S.lv + 1; $('hRail').textContent = used() + '/' + S.cfg.budget; $('hPar').textContent = S.cfg.par[0];
+  $('hRailBox').className = 'stat c' + (budgetLeft() <= 2 ? ' warn' : '');
+  const edit = S.mode === 'edit';
+  $('bUndo').disabled = !edit || !S.undo.length; $('bErase').disabled = !edit; $('bErase').className = S.erase ? 'on' : '';
+  $('bRun').textContent = edit ? '▶ Çalıştır' : '✎ Düzenle'; $('bRun').className = edit ? 'go' : ''; } };
+function hideOv() { const o = $('ov'); if (o) o.remove(); }
+function overlay(html) { hideOv(); const d = document.createElement('div'); d.className = 'ov'; d.id = 'ov'; d.innerHTML = html; $('cab').appendChild(d); return d; }
+function start(lv) {
+  if (lv === undefined) { const h = parseInt(location.hash.slice(1), 10); lv = h > 0 ? h - 1 : +(localStorage.getItem(LV_KEY) || 0); }
+  lv = clamp(lv, 0, LEVELS.length - 1);
+  newRun(lv); DRAG = null; HUD.dirty = true; hideOv();
+  const NEWS = {
+    0: ['🚂', 'Ray Ustası', 'Yolcular evlerine dönmek istiyor.<br><b>Parmağını sürükle</b>, ray döşe. Her tren <b>kendi renginin istasyonuna</b> gitmeli.<span class="chain">🚉 ➜ 🛤 ➜ 👵</span>Hazır olunca <b>▶ Çalıştır</b>. Kaza olursa raylar kalır, düzeltirsin. Az rayla ★★★.'],
+    1: ['🔀', 'Makas', 'Bir kareye <b>aynı yerden ikinci yol</b> çizersen makas olur. Tren her geçtiğinde <b>yön değiştirir</b>.<br>Makasa dokunarak ilk yönü seç.'],
+    2: ['✚', 'Kavşak', 'Dik kesişen raylar kavşak olur. İki tren <b>aynı anda</b> gelirse çarpışır — birinin yolunu uzat.'],
+    3: ['🌉', 'Nehir', 'Nehre ray döşemek <b>köprü</b> kurar: <b>3 parça</b> tutar ve sadece düz geçer. Köprüyü paylaş, tasarruf et.'],
+    4: ['🛷', 'Tümsek', 'Tümsekten geçen tren <b>havalanır</b>, önündeki bir kareyi uçarak atlar.<br>Havadayken <b>diğer trenlerin üstünden</b> geçer. İneceği karede ray olmalı!'],
+    5: ['🧠', 'Sıralama', 'Aynı depodan <b>kırmızı, kırmızı, mavi</b> çıkıyor. Tek makas sırayla döner… <b>iki makası zincirle</b>.'],
+    6: ['⛩', 'Renk kapısı', 'Kapıdan <b>sadece kendi rengindeki</b> tren geçer. Tümsek kayaların üstünden de atlatır.'],
+    7: ['⛰', 'Tünel', 'Tünele giren tren <b>aynı işaretli</b> diğer ağızdan çıkar.<br>İki tren aynı rayı ters yönde kullanırsa çarpışır.'],
+    8: ['🔘', 'Düğme ve bariyer', 'Bariyer kapalıyken geçilmez. Bir tren <b>aynı numaralı düğmeye</b> basınca açılır — sırayı iyi kur.'],
+    9: ['🏁', 'Son hat', 'Sıralama, tümsek, köprü, renk kapısı… <b>hepsi bir arada</b>.'],
+  };
+  const nw = NEWS[lv];
+  if (nw) overlay('<div style="font-size:52px">' + nw[0] + '</div><h2>' + (lv ? 'Bölüm ' + (lv + 1) + ' · ' : '') + nw[1] + '</h2><p>' + nw[2] + '</p><div class="row"><button class="go" id="bGo">▶ Başla</button></div>');
+  if ($('bGo')) $('bGo').onclick = () => { SFX.init(); hideOv(); };
+  try { history.replaceState(null, '', location.pathname + location.search + '#' + (lv + 1)); } catch (e) {}
+}
+function showWin() {
+  const last = S.lv >= LEVELS.length - 1, n = used(), [p3, p2] = S.cfg.par;
+  overlay('<div style="font-size:52px">🚉</div><h2>Herkes evinde!</h2><div class="stars" id="stars"><span>★</span><span>★</span><span>★</span></div>'
+    + '<p>' + n + ' ray kullandın · ★★★ ' + p3 + ' · ★★ ' + p2 + '</p>'
+    + (last ? '<p style="margin-top:0">Tüm hatları açtın! 🎉</p>' : '')
+    + '<div class="row">' + (last ? '' : '<button class="go" id="bNx">▶ Sonraki bölüm</button>') + '<button id="bAg">✎ Rayları düzelt</button></div>');
+  [...$('stars').children].forEach((s, i) => { if (i < S.stars) setTimeout(() => s.classList.add('on'), 250 + i * 230); });
+  if (!last) $('bNx').onclick = () => start(S.lv + 1);
+  $('bAg').onclick = () => { hideOv(); S.won = false; backToEdit(); };
+}
+let lastTs = 0;
+function loop(ts) { requestAnimationFrame(loop); const dt = Math.min(0.033, lastTs ? (ts - lastTs) / 1000 : 0); lastTs = ts; step(dt); HUD.update(); draw(); }
+fitCanvas(); fitCanvas(); addEventListener('resize', () => { fitCanvas(); fitCanvas(); });
+start(); requestAnimationFrame(loop); $('boot').remove();
+</script>
