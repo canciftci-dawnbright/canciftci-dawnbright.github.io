@@ -26,11 +26,20 @@ button.pill{pointer-events:auto;cursor:pointer}
 @keyframes mkOn{0%{transform:translateX(-50%) scale(2.2)}100%{transform:translateX(-50%) scale(1)}}
 #bSound{position:absolute;right:10px;top:84px;pointer-events:auto;font-size:15px;padding:2px 9px}
 #bCam{position:absolute;right:10px;top:118px;pointer-events:auto;font-size:14px;padding:2px 9px;gap:4px}
-#bFinish{position:absolute;left:12px;bottom:14px;border:0;border-radius:18px;padding:8px 16px;font:800 17px "Baloo 2",system-ui,sans-serif;color:#fff;background:#3FB86A;box-shadow:0 4px 0 #2a7d48;display:none;animation:cardIn .4s cubic-bezier(.2,.9,.3,1.3)}
+#pw{position:absolute;left:10px;bottom:24px;display:flex;gap:7px}
+.pwb{position:relative;width:50px;height:50px;border:0;border-radius:16px;background:#FFF4E6;box-shadow:0 4px 0 #c9924a;font:800 22px "Baloo 2",system-ui,sans-serif;color:#3a2410;padding:0;transition:transform .15s}
+.pwb .n{position:absolute;right:-5px;top:-6px;min-width:20px;height:20px;border-radius:10px;background:#FF7A3D;color:#fff;font-size:13px;line-height:20px;box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.pwb .l{position:absolute;left:0;right:0;bottom:-15px;font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.pwb.on{background:#FFE27A;transform:translateY(-6px) scale(1.08);box-shadow:0 0 0 3px #fff,0 0 18px 4px var(--c)}
+.pwb.off{opacity:.4}
+.pwb.pwpop{animation:pwPop .35s cubic-bezier(.2,.9,.3,1.6)}
+@keyframes pwPop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+#bFinish{position:absolute;left:12px;bottom:94px;border:0;border-radius:18px;padding:8px 16px;font:800 17px "Baloo 2",system-ui,sans-serif;color:#fff;background:#3FB86A;box-shadow:0 4px 0 #2a7d48;display:none;animation:cardIn .4s cubic-bezier(.2,.9,.3,1.3)}
 #spin{position:absolute;right:12px;bottom:14px;border:0;border-radius:18px;padding:8px 14px;font:800 17px "Baloo 2",system-ui,sans-serif;color:#3a2410;background:#FFE6B8;box-shadow:0 4px 0 #c9924a}
 #spin:active,#bFinish:active{transform:translateY(3px)}
 #hint{position:absolute;left:0;right:0;bottom:78px;text-align:center;font-weight:800;font-size:20px;text-shadow:0 2px 4px rgba(0,0,0,.5);pointer-events:none}
-#finger{position:absolute;left:50%;bottom:120px;font-size:44px;pointer-events:none;animation:drag 1.8s ease-in-out infinite;filter:drop-shadow(0 3px 3px rgba(0,0,0,.4))}
+#finger{position:absolute;left:52%;top:40%;font-size:44px;pointer-events:none;animation:tapHint 1.2s ease-in-out infinite;filter:drop-shadow(0 3px 3px rgba(0,0,0,.4))}
+@keyframes tapHint{0%,100%{transform:translate(-50%,0) scale(1)}40%{transform:translate(-50%,6px) scale(.82)}55%{transform:translate(-50%,6px) scale(.82)}}
 @keyframes drag{0%{transform:translate(-50%,0) scale(1);opacity:0}10%{opacity:1;transform:translate(-50%,0) scale(.85)}60%{transform:translate(-10%,-230px) scale(.85);opacity:1}80%{transform:translate(-10%,-230px) scale(1);opacity:0}100%{opacity:0}}
 #banner{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;display:none}
 #banner .in{display:inline-block;background:#FF7A3D;border:3px solid #fff;border-radius:22px;padding:8px 26px;box-shadow:0 6px 0 #b8501f;animation:banner 1.9s cubic-bezier(.2,.9,.3,1.2) forwards}
@@ -42,6 +51,8 @@ button.pill{pointer-events:auto;cursor:pointer}
 @keyframes popUp{0%{transform:translate(-50%,-50%) scale(.3)}15%{transform:translate(-50%,-50%) scale(1.25)}30%{transform:translate(-50%,-60%) scale(1)}100%{transform:translate(-50%,-160%) scale(1);opacity:0}}
 .pop.big{animation:popBig 1.3s ease-out forwards}
 @keyframes popBig{0%{transform:translate(-50%,-50%) scale(.2) rotate(-10deg)}12%{transform:translate(-50%,-50%) scale(1.35) rotate(3deg)}25%{transform:translate(-50%,-50%) scale(1) rotate(0)}75%{opacity:1}100%{transform:translate(-50%,-110%) scale(1.05);opacity:0}}
+#cancel{position:absolute;transform:translate(-50%,-50%);pointer-events:none;display:none;padding:4px 12px;border-radius:14px;font-weight:800;font-size:15px;white-space:nowrap;background:rgba(20,30,50,.6);color:#fff;border:2px dashed rgba(255,255,255,.6);transition:background .12s,transform .12s}
+#cancel.hot{background:#E5484D;border:2px solid #fff;transform:translate(-50%,-50%) scale(1.18)}
 #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 .ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,20,35,.5);animation:fade .25s}
 @keyframes fade{from{opacity:0}}
@@ -72,6 +83,7 @@ button.pill{pointer-events:auto;cursor:pointer}
 <body>
 <div id="app">
   <div id="flash"></div>
+  <div id="cancel">✕ İptal için buraya</div>
   <div id="hud">
     <button class="pill" id="bMenu">☰ <b id="hLv">1</b></button>
     <div class="pill" id="hThrows"></div>
@@ -80,8 +92,9 @@ button.pill{pointer-events:auto;cursor:pointer}
   <button class="pill" id="bSound">♪</button>
   <button class="pill" id="bCam">🎥 <b id="hCam">1</b></button>
   <div id="banner"></div>
-  <div id="hint">Sürükle, nişan al, bırak!</div>
+  <div id="hint">Fırlatmak istediğin yere dokun!<br><small>Yüksekteki parçaya dokunursan yukarıdan geçer</small></div>
   <div id="finger">👆</div>
+  <div id="pw"></div>
   <button id="bFinish">Bitir ✓</button>
   <button id="spin"></button>
   <div id="err">3D kütüphaneleri yüklenemedi.<br>İnternet bağlantısını kontrol et.</div>
@@ -116,6 +129,12 @@ const KINDS = {   // shape/r/hy/hx/hz: vuruş bölgesi; w: yıkım yüzdesindeki
   crate:  { shape: 'box', mass: 1.4, imp: 5.5, up: 1, w: 1 },
   tnt:    { shape: 'cyl', r: 0.32, hy: 0.36, mass: 1.2, w: 0 },
 };
+const POWERS = {   // her bölüm başında 3'er hak; atıştan önce seçilir, o atışa uygulanır
+  power: { ic: '💪', name: 'Güçlü', col: '#FF5A3C' },
+  giant: { ic: 'XL', name: 'Dev', col: '#3FA2FF' },
+  fire:  { ic: '🔥', name: 'Ateşli', col: '#FF9A2E' },
+};
+const PW_COUNT = 3, POWER_IMP = 2.4, POWER_UP = 1.6, GIANT_K = 2.1, BURN_T = 1.1;
 const CAN_COLS = ['#FF5A6E', '#3FA2FF', '#FFC83C', '#4FD68A', '#B07CFF'];
 const BOTTLE_COLS = [['#6FE09A', '#F7E36B'], ['#E0A060', '#B8452A'], ['#7CC8F0', '#FF8FB8']];   // [cam, içindeki sıvı]
 const THEMES = {
@@ -216,6 +235,16 @@ const SFX = (() => {
     combo(n) { if (!ok('combo', 0.1)) return; const t = ac.currentTime; for (let i = 0; i < Math.min(n, 7); i++) { const f = nf(PENTA[i + 2]); tone(t + i * 0.055, 0.3, f, f, 0.06, 'triangle'); } },
     milestone(k) { if (!ok('ms', 0.2)) return; const t = ac.currentTime; [0, 4, 7, 12].forEach((s, i) => { const f = nf(s + k * 2); tone(t + i * 0.06, 0.35, f, f, 0.07, 'triangle'); }); burst(t, 0.2, 7000, 1, 0.06); },
     star(k) { if (!ac) return; const t = ac.currentTime, f = nf([7, 12, 16][k]); tone(t, 0.45, f, f, 0.1, 'triangle'); tone(t + 0.05, 0.5, f * 2, f * 2, 0.04, 'sine'); burst(t, 0.1, 6000, 1, 0.08); },
+    arm(on) { if (!ok('arm', 0.05)) return; const t = ac.currentTime; tone(t, 0.12, on ? 500 : 700, on ? 900 : 400, 0.08, 'triangle'); if (on) tone(t + 0.06, 0.15, 1200, 1500, 0.04, 'sine'); },
+    powerThrow() { if (!ok('pt', 0.1)) return; const t = ac.currentTime; tone(t, 0.3, 90, 40, 0.4, 'sine'); burst(t, 0.3, 400, 0.8, 0.35, 'lowpass'); },
+    powerHit() { if (!ok('ph', 0.05)) return; const t = ac.currentTime; tone(t, 0.18, 120, 50, 0.3, 'sine'); burst(t, 0.12, 900, 0.7, 0.25); },
+    giantThrow() { if (!ok('gt', 0.1)) return; const t = ac.currentTime; tone(t, 0.45, 70, 110, 0.25, 'triangle'); tone(t, 0.45, 140, 220, 0.08, 'sine'); },
+    fireThrow() { if (!ok('ft', 0.1)) return; const t = ac.currentTime; burst(t, 0.5, 1500, 0.5, 0.3, 'lowpass'); for (let i = 0; i < 6; i++) burst(t + i * 0.05, 0.03, 3000, 2, 0.1); },
+    ignite() { if (!ok('ign', 0.08)) return; const t = ac.currentTime; burst(t, 0.35, 1200, 0.6, 0.3, 'lowpass'); tone(t, 0.2, 300, 150, 0.06, 'sawtooth'); },
+    sizzle() { if (!ok('siz', 0.12)) return; const t = ac.currentTime; burst(t, 0.18, 6000, 1.5, 0.12, 'highpass'); },
+    burnOut() { if (!ok('bo', 0.06)) return; const t = ac.currentTime; burst(t, 0.4, 500, 0.6, 0.3, 'lowpass'); for (let i = 0; i < 4; i++) burst(t + i * 0.04 + rnd(0, 0.03), 0.03, 2500, 2, 0.12); },
+    cancel() { if (!ok('cancel', 0.1)) return; const t = ac.currentTime; tone(t, 0.18, 700, 300, 0.08, 'triangle'); tone(t + 0.08, 0.15, 400, 200, 0.05, 'sine'); },
+    holdStart() { if (!ok('hold', 0.1)) return; const t = ac.currentTime; tone(t, 0.25, 400, 800, 0.04, 'sine'); burst(t, 0.2, 5000, 1, 0.04); },
     count() { if (!ok('count', 0.035)) return; const t = ac.currentTime; tone(t, 0.04, 1400, 1500, 0.03, 'square'); },
     win() { if (!ac || G.FAST) return; const t = ac.currentTime; [0, 4, 7, 12, 16, 19, 24].forEach((s, i) => { const f = nf(s); tone(t + i * 0.08, 0.6, f, f, 0.08, 'triangle'); }); },
     lose() { if (!ac || G.FAST) return; const t = ac.currentTime; tone(t, 0.5, 440, 220, 0.1); tone(t + 0.3, 0.6, 330, 165, 0.08); },
@@ -250,7 +279,8 @@ const CAMS = [
   { name: 'Kuş bakışı', fov: 54, aim: [V3(0, 19, 3.5), V3(0, 0, -12.5)] },
   { name: 'Atınca düz açı', fov: 58, aim: [V3(0, 10, 5), V3(0, 0.3, -12.5)], fly: [V3(0, 3.6, 4.2), V3(0, 1.3, -13)] },
 ];
-const cam = () => CAMS[SAVE.cam || 0];
+const DEFAULT_CAM = 3;   // oyuncu en çok "Atınca düz açı"yı sevdi
+const cam = () => CAMS[SAVE.cam ?? DEFAULT_CAM];
 let CAM_POS = cam().aim[0], CAM_LOOK = cam().aim[1];
 const camLook = CAM_LOOK.clone(), camPos = CAM_POS.clone();
 camera.position.copy(CAM_POS); camera.lookAt(CAM_LOOK);
@@ -615,33 +645,37 @@ function loadLevel(i) {
   const L = LEVELS[i]; seed = 12345 + i * 97;
   S = { lv: i, L, objs: [], statics: [], obstacles: [], throwsLeft: L.throws, used: 0, phase: 'play', B: { state: 'hand', t: 0, appear: 1, spin: 0 }, spinDir: S ? S.spinDir : 1,
     shake: 0, hitstop: 0, slowT: 0, slowK: 1, quiet: 0, idle: 0, time: 0, lostBody: null, fuses: [], pendingShatter: new Set(), pendingDust: [], fovKick: 0, glove: { swing: 0, catchT: 0 },
-    focus: null, finT: 0, throwMoved: 0, recent: [], lastCollapse: -9, movedW: 0, totalW: 0, passed: false, ms: {}, catchCam: 0, kill: [] };
+    pw: { power: PW_COUNT, giant: PW_COUNT, fire: PW_COUNT }, armed: {}, focus: null, finT: 0, throwMoved: 0, recent: [], lastCollapse: -9, movedW: 0, totalW: 0, passed: false, ms: {}, catchCam: 0, kill: [] };
   applyTheme(THEMES[L.theme]); camPos.copy(CAM_POS); camLook.copy(CAM_LOOK);
   for (const [fn, x, z, o] of L.build) B[fn](x, z, o || {});
   // her parça yüzdeye sayılır: kaideler sayesinde hepsine ulaşılabilir (bölüm yüklenince reachCheck ile doğrulandı)
   for (const o of S.objs) { o.w = o.K.w; S.totalW += o.w; }
-  syncObjs(true); updateHud(true); hideOv();
+  syncObjs(true); updateHud(true); updatePw(true); hideOv();
   const first = i === 0 && !SAVE.stars[0];
   $('finger').style.display = first ? 'block' : 'none'; $('hint').style.display = first ? 'block' : 'none'; $('bFinish').style.display = 'none';
   showBanner(`Bölüm ${i + 1}`, L.name);
   SFX.music(SAVE.sound); SFX.intensity(0);
 }
 /* ---------------- YOL ---------------- */
-function makePath(ax, az, side) {
+function makePath(ax, az, side, h) {
   const dx = ax - HAND.x, dz = az - HAND.z;
   // parmağın gösterdiği nokta = en uç nokta; döngü "side" tarafına açılır, dönüş eksen boyunca gelir
   const ang = clamp(Math.atan2(dx, -dz), -1.05, 1.05) - side * Math.atan(WIDTH_K);
   const L = clamp(Math.hypot(dx, dz), MIN_L, MAX_L) / Math.hypot(1, WIDTH_K);
   const ux = Math.sin(ang), uz = -Math.cos(ang);
-  return { L, ux, uz, nx: -uz, nz: ux, s: side, T: T_BASE + L * T_PER, ax, az };
+  return { L, ux, uz, nx: -uz, nz: ux, s: side, T: T_BASE + L * T_PER, ax, az, h: h === undefined ? FLY_Y : h };
 }
 function pathPoint(P, tn, out) {
   const ph = 2 * Math.PI * tn + EASE_A * Math.sin(2 * Math.PI * tn);
   const f = P.L * (1 - Math.cos(ph)) / 2, lat = P.s * P.L * WIDTH_K * (Math.sin(ph) + 1 - Math.cos(ph)) / 2;
-  return out.set(HAND.x + P.ux * f + P.nx * lat, FLY_Y, HAND.z + P.uz * f + P.nz * lat);   // sabit yükseklik: kaide üstündeki en alt sıra her yerde vurulabilsin
+  // elden 1.5'te çıkar, hızla dokunulan noktanın yüksekliğine yükselir, dönüşte ele iner
+  const lift = Math.min(1, Math.sin(ph / 2) * 1.8);
+  return out.set(HAND.x + P.ux * f + P.nx * lat, FLY_Y + (P.h - FLY_Y) * lift, HAND.z + P.uz * f + P.nz * lat);
 }
-function obstacleAt(p) {
-  const pad = BOOM_R * 0.75;
+// güçlendiriciler: uçan bumerangın modları, yoksa bir sonraki atış için seçilenler
+const boomR = m => BOOM_R * (m && m.giant ? GIANT_K : 1);
+function obstacleAt(p, r) {
+  const pad = (r || BOOM_R) * 0.75;
   for (const o of S.obstacles) {
     if (p.y > o.h) continue;
     if (o.type === 'cyl') { if ((p.x - o.x) ** 2 + (p.z - o.z) ** 2 < (o.r + pad) ** 2) return o; }
@@ -651,13 +685,14 @@ function obstacleAt(p) {
 }
 // parça yerel eksenlerinde bumerang noktasına mesafe (devrilmiş parçada da doğru)
 const _wp = new CANNON.Vec3(), _lp = new CANNON.Vec3();
-function zoneDist(o, p) {
-  const bp = o.body.position; if (Math.abs(p.x - bp.x) > o.bound + BOOM_R || Math.abs(p.z - bp.z) > o.bound + BOOM_R || Math.abs(p.y - bp.y) > o.bound + BOOM_R) return 9;
+function zoneDist(o, p, r) {
+  const bp = o.body.position, rr = o.bound + (r || BOOM_R); if (Math.abs(p.x - bp.x) > rr || Math.abs(p.z - bp.z) > rr || Math.abs(p.y - bp.y) > rr) return 9;
   _wp.set(p.x, p.y, p.z); o.body.pointToLocalFrame(_wp, _lp);
   if (o.K.shape === 'cyl') return Math.hypot(Math.max(0, Math.hypot(_lp.x, _lp.z) - o.r), Math.max(0, Math.abs(_lp.y) - o.hy));
   return Math.hypot(Math.max(0, Math.abs(_lp.x) - o.hx), Math.max(0, Math.abs(_lp.y) - o.hy), Math.max(0, Math.abs(_lp.z) - o.hz));
 }
-const inZone = (o, p) => zoneDist(o, p) < BOOM_R * 0.8;
+// dev bumerangda dikey tolerans da büyür (daha çok kata değer)
+const inZone = (o, p, r) => zoneDist(o, p, r) < (r || BOOM_R) * 0.8;
 
 /* ---------------- NİŞAN ---------------- */
 const ray = new THREE.Raycaster(), flyPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -FLY_Y), aimCam = camera.clone();
@@ -671,46 +706,175 @@ function aimFromEvent(e) {
   if (!ray.ray.intersectPlane(flyPlane, hit) || hit.z > HAND.z - 1) hit.set(ray.ray.direction.x * 100, FLY_Y, -MAX_L - 5);
   return hit;
 }
-function updatePreview() {
-  if (!aim) { dots.visible = false; xMark.visible = false; ring.visible = false; return; }
-  const P = aim.P; let blocked = -1;
-  const live = S.objs.filter(o => o.alive && !o.moved);
-  for (let i = 0; i < DOTS; i++) {
-    pathPoint(P, i / (DOTS - 1), _a);
-    if (blocked < 0 && i > 0) { for (let k = 1; k <= 3; k++) { pathPoint(P, (i - 1 + k / 3) / (DOTS - 1), _b); if (obstacleAt(_b)) { blocked = i; xMark.position.copy(_b); break; } } }
-    let near = null; if (blocked < 0) for (const o of live) if (inZone(o, _a)) { near = o; if (o.kind === 'tnt') break; }
-    const pulse = 1 + 0.25 * Math.sin(S.time * 10 - i * 0.5);
-    _m.compose(_a, _q.identity(), _s.setScalar(blocked < 0 ? (near ? 1.7 : 1) * pulse : 0)); dots.setMatrixAt(i, _m);
-    dots.setColorAt(i, _col.set(!near ? (i / DOTS < 0.5 ? 0xffffff : 0xCFF3FF) : near.kind === 'tnt' ? 0xFF4A2D : 0xFFD23C));
+/* Basılı tutunca gidiş-dönüş izi: rüzgâr akıntısı. Yolu izleyen birkaç ince şerit; kıvrılır, dalgalanır,
+   üzerlerinde kuyruklu hava çizgileri hedefe doğru akar, kenarları ve uçları yumuşakça kaybolur. */
+const PREV_N = 96, HOLD_T = 0.2, CANCEL_PX = 64, WIND_S = 6;
+const windMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uReveal: { value: 0 }, uW: { value: 0.06 } },
+  vertexShader: `attribute vec3 aSide; attribute vec3 aInfo; attribute vec4 pcol;   // aInfo: yol oranı, kenar (-1/1), şerit no
+    uniform float uTime; uniform float uW; varying vec4 vCol; varying vec3 vInfo;
+    void main() {
+      vCol = pcol; vInfo = aInfo; float s = aInfo.z, x = aInfo.x;
+      float taper = sin(clamp(x, 0.0, 1.0) * 3.14159);
+      float wob = (sin(x * 18.0 + uTime * (2.2 + s * 0.35) + s * 1.7) * 0.09 + sin(x * 6.0 - uTime * 1.2 + s) * 0.07) * taper;
+      vec3 p = position + aSide * (wob + aInfo.y * uW * (0.35 + 0.65 * taper));
+      p.y += sin(x * 11.0 + uTime * 1.6 + s * 2.3) * 0.06 * taper;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }`,
+  fragmentShader: `uniform float uTime; uniform float uReveal; varying vec4 vCol; varying vec3 vInfo;
+    void main() {
+      if (vInfo.x > uReveal) discard;
+      float s = vInfo.z;
+      float seg = fract(vInfo.x * (2.6 + mod(s, 3.0) * 0.7) - uTime * (0.5 + 0.09 * s) - s * 0.37);
+      float streak = smoothstep(0.0, 0.4, seg) * (1.0 - smoothstep(0.5, 0.95, seg));
+      float edge = 1.0 - abs(vInfo.y); edge *= edge;
+      float ends = smoothstep(0.0, 0.07, vInfo.x) * smoothstep(1.0, 0.88, vInfo.x);
+      gl_FragColor = vec4(vCol.rgb, vCol.a * (0.12 + 0.88 * streak) * edge * ends * 0.8);
+    }`,
+  transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+});
+const windMesh = new THREE.Mesh(new THREE.BufferGeometry(), windMat);
+windMesh.renderOrder = 12; windMesh.visible = false; windMesh.frustumCulled = false; scene.add(windMesh);
+function buildWind(pts, cols, rk) {
+  const N = pts.length, V = WIND_S * N * 2;
+  const pos = new Float32Array(V * 3), side = new Float32Array(V * 3), info = new Float32Array(V * 3), pc = new Float32Array(V * 4), idx = [];
+  for (let st = 0; st < WIND_S; st++) {
+    const lo = (st - (WIND_S - 1) / 2) * 0.12 * rk, yo = ((st % 3) - 1) * 0.08 * rk, amp = 1 - Math.abs(st - (WIND_S - 1) / 2) / WIND_S;
+    for (let i = 0; i < N; i++) {
+      const p = pts[i], a = pts[Math.max(0, i - 1)], b = pts[Math.min(N - 1, i + 1)];
+      let tx = b.x - a.x, tz = b.z - a.z; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      const sx = -tz, sz = tx, c = cols[i];
+      for (const e of [0, 1]) {
+        const v = (st * N + i) * 2 + e;
+        pos.set([p.x + sx * lo, p.y + yo, p.z + sz * lo], v * 3); side.set([sx, 0, sz], v * 3);
+        info.set([i / (N - 1), e ? 1 : -1, st], v * 3); pc.set([c[0], c[1], c[2], c[3] * (0.55 + 0.45 * amp)], v * 4);
+      }
+      if (i < N - 1) { const v0 = (st * N + i) * 2; idx.push(v0, v0 + 1, v0 + 2, v0 + 1, v0 + 3, v0 + 2); }
+    }
   }
-  dots.instanceMatrix.needsUpdate = true; dots.instanceColor.needsUpdate = true;
-  dots.visible = true; xMark.visible = blocked >= 0; xMark.lookAt(camera.position); xMark.scale.setScalar(1 + 0.15 * Math.sin(S.time * 14));
-  pathPoint(P, 0.5, _a); ring.position.set(_a.x, 0.03, _a.z); ring.visible = true; ring.scale.setScalar(1 + 0.1 * Math.sin(S.time * 8));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aSide', new THREE.BufferAttribute(side, 3));
+  g.setAttribute('aInfo', new THREE.BufferAttribute(info, 3)); g.setAttribute('pcol', new THREE.BufferAttribute(pc, 4)); g.setIndex(idx);
+  windMesh.geometry.dispose(); windMesh.geometry = g; windMat.uniforms.uW.value = 0.06 * rk;
 }
-const aimPull = () => aim ? clamp(aim.P.L / (MAX_L / Math.hypot(1, WIDTH_K)), 0.15, 1) : 0;
+const aimMark = new THREE.Group(); {
+  const m = new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.55, depthTest: false });
+  const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.03, 8, 40), m); r1.rotation.x = -Math.PI / 2; aimMark.add(r1);
+  const r2 = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.025, 8, 32, Math.PI * 1.4), m); r2.rotation.x = -Math.PI / 2; aimMark.add(r2);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 6), new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.45, depthTest: false })); aimMark.add(pole); aimMark.userData.pole = pole;
+  aimMark.traverse(o => o.renderOrder = 13); aimMark.visible = false; scene.add(aimMark); }
+function buildPreview(P, cancelHot) {
+  const M = S.armed, r = boomR(M), pts = [], cols = [];
+  const base = M.fire ? [1, 0.62, 0.25] : M.power ? [1, 0.45, 0.4] : M.giant ? [0.45, 0.8, 1] : null;
+  const live = S.objs.filter(o => o.alive && !o.moved);
+  let blocked = -1;
+  for (let i = 0; i <= PREV_N; i++) {
+    const p = pathPoint(P, i / PREV_N, new THREE.Vector3()); pts.push(p);
+    if (blocked < 0 && !M.fire && obstacleAt(p, r)) { blocked = i; xMark.position.copy(p); }
+    let c;
+    if (cancelHot) c = [0.7, 0.72, 0.78, 0.3];
+    else if (blocked >= 0) c = [1, 0.45, 0.45, 0.22];
+    else { const near = live.some(o => inZone(o, p, r));
+      c = near ? [1, 0.9, 0.55, 1] : base ? [...base, 0.9] : [0.96, 0.99, 1, 0.9]; }
+    cols.push(c);
+  }
+  buildWind(pts, cols, M.giant ? 1.8 : 1);
+  xMark.visible = blocked >= 0 && !cancelHot;
+  aimMark.position.set(P.ax, P.h, P.az); aimMark.userData.pole.position.y = -P.h / 2; aimMark.userData.pole.scale.y = P.h;
+  aimMark.children[0].material.color.set(cancelHot ? '#9aa3ad' : blocked >= 0 ? '#FF6A6A' : '#FFFFFF');
+}
+function updatePreview() {
+  const hold = tap && tap.holding && S.B.state === 'hand' && S.phase === 'play';
+  const cEl = $('cancel');
+  if (!hold) { if (windMesh.visible) { windMesh.visible = aimMark.visible = xMark.visible = false; } cEl.style.display = 'none'; dots.visible = false; ring.visible = false; return; }
+  // iptal bölgesi: bumerangın ekrandaki yeri
+  const v = _d.copy(boomPivot.position).project(camera), rect = renderer.domElement.getBoundingClientRect(), ar = app.getBoundingClientRect();
+  const bx = rect.left + (v.x + 1) / 2 * rect.width, by = rect.top + (1 - v.y) / 2 * rect.height;
+  const hot = Math.hypot(tap.cx - bx, tap.cy - by) < CANCEL_PX; tap.cancelHot = hot;
+  cEl.style.display = 'block'; cEl.style.left = (bx - ar.left) + 'px'; cEl.style.top = (by - ar.top - 46) + 'px'; cEl.classList.toggle('hot', hot); cEl.textContent = hot ? '✕ Bırak: iptal' : '✕ İptal için buraya';
+  if (hot !== tap.lastHot) { tap.lastHot = hot; if (hot) { SFX.arm(false); buzz(10); } tap.dirty = true; }
+  if (tap.dirty || tap.frame++ % 4 === 0) {
+    const tg = hot ? tap.tg : pickTarget({ clientX: tap.cx, clientY: tap.cy });
+    if (tg) { tap.tg = tg; tap.dirty = false; buildPreview(makePath(tg.x, tg.z, S.spinDir, tg.h), hot); windMesh.visible = aimMark.visible = true; }
+  }
+  tap.reveal = Math.min(1, (tap.reveal || 0) + 0.016 / 0.3);
+  const ease = 1 - Math.pow(1 - tap.reveal, 3);
+  windMat.uniforms.uReveal.value = ease; windMat.uniforms.uTime.value = S.time;
+  aimMark.scale.setScalar(ease * (1 + 0.08 * Math.sin(S.time * 7))); aimMark.children[1].rotation.z = S.time * 2;
+  xMark.lookAt(camera.position);
+}
+const aimPull = () => tap && tap.holding && !tap.cancelHot ? 0.6 : 0;
+// Dokun-fırlat: dokunulan 3D nokta = döngünün en uç noktası; bir yapıya dokunulursa o yüksekliğe uçar (üst katları devirmek için)
+const TAP_MOVE = 30, MIN_H = 1.2, MAX_H = 5.5, groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+let tap = null;
+function pickTarget(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera({ x: (e.clientX - r.left) / r.width * 2 - 1, y: -((e.clientY - r.top) / r.height * 2 - 1) }, camera);
+  const objs = [levelRoot];
+  for (const k in VIS) for (const L of VIS[k].layers) if (L.im.count) { L.im.computeBoundingSphere(); objs.push(L.im); }
+  const hit = ray.intersectObjects(objs, true)[0];
+  const p = new THREE.Vector3();
+  if (hit) p.copy(hit.point); else { if (!ray.ray.intersectPlane(groundPlane, p)) return null; p.y = FLY_Y; }
+  if (p.z > HAND.z - 2) return null;
+  return { x: p.x, z: p.z, h: clamp(hit ? p.y : FLY_Y, MIN_H, MAX_H) };
+}
+// kısa dokunuş = hemen at; basılı tut (ya da kaydır) = iz göster, parmağı gezdirerek hedefi değiştir; bumerangın üstüne bırak = iptal
 renderer.domElement.addEventListener('pointerdown', e => {
   SFX.init(); SFX.music(SAVE.sound); if (!S || S.phase !== 'play' || S.B.state !== 'hand' || S.throwsLeft <= 0) return;
-  const h = aimFromEvent(e); aim = { id: e.pointerId, P: makePath(h.x, h.z, S.spinDir) };
+  tap = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: e.clientX, cy: e.clientY, t0: performance.now(), holding: false, dirty: true, frame: 0 };
   try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {}
-  SFX.chargeStart(); buzz(5);
+  clearTimeout(tap._h); const me = tap; me._h = setTimeout(() => { if (tap === me && !me.holding) { me.holding = true; SFX.holdStart(); buzz(8); } }, HOLD_T * 1000);
+  buzz(5);
 });
-renderer.domElement.addEventListener('pointermove', e => { if (!aim || e.pointerId !== aim.id) return; const h = aimFromEvent(e); aim.P = makePath(h.x, h.z, S.spinDir); });
-function endAim(e) { if (!aim || (e && e.pointerId !== aim.id)) return; const P = aim.P, k = aimPull(); aim = null; SFX.chargeStop(); if (e && e.type === 'pointercancel') return; throwBoom(P, k); }
-renderer.domElement.addEventListener('pointerup', endAim); renderer.domElement.addEventListener('pointercancel', endAim);
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!tap || e.pointerId !== tap.id) return; tap.cx = e.clientX; tap.cy = e.clientY; tap.dirty = true;
+  if (!tap.holding && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > TAP_MOVE) { tap.holding = true; SFX.holdStart(); }
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  const t = tap; tap = null; if (t) clearTimeout(t._h); updatePreview();
+  if (!t || e.pointerId !== t.id || !S || S.phase !== 'play' || S.B.state !== 'hand') return;
+  if (t.holding && t.cancelHot) { SFX.cancel(); buzz([15, 30, 15]); pop(boomPivot.position, 'İptal', '#FFB3C0', 22); return; }
+  const tg = pickTarget(e); if (!tg) { buzz(15); return; }
+  showTapMark(tg); throwBoom(makePath(tg.x, tg.z, S.spinDir, tg.h), clamp((tg.h - 1) / 3, 0.4, 1));
+});
+renderer.domElement.addEventListener('pointercancel', () => { if (tap) clearTimeout(tap._h); tap = null; });
+const tapMark = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.07, 8, 28), new THREE.MeshBasicMaterial({ color: '#FFE27A', transparent: true, depthTest: false }));
+tapMark.rotation.x = -Math.PI / 2; tapMark.renderOrder = 10; tapMark.visible = false; scene.add(tapMark);
+const tapPole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1, 6), new THREE.MeshBasicMaterial({ color: '#FFE27A', transparent: true, opacity: 0.6, depthTest: false }));
+tapPole.renderOrder = 10; tapPole.visible = false; scene.add(tapPole);
+function showTapMark(tg) {
+  tapMark.position.set(tg.x, tg.h, tg.z); tapMark.visible = true; tapMark.userData.t = 0;
+  tapPole.position.set(tg.x, tg.h / 2, tg.z); tapPole.scale.set(1, tg.h, 1); tapPole.visible = tg.h > FLY_Y + 0.2; tapPole.userData.t = 0;
+}
 $('spin').addEventListener('click', () => { SFX.init(); S.spinDir *= -1; if (aim) aim.P = makePath(aim.P.ax, aim.P.az, S.spinDir); updateSpinBtn(); buzz(5); });
+function updatePw(build) {
+  const box = $('pw');
+  if (build || !box.children.length) box.innerHTML = Object.keys(POWERS).map(k => `<button class="pwb" data-k="${k}" style="--c:${POWERS[k].col}">${POWERS[k].ic}<span class="n"></span><span class="l">${POWERS[k].name}</span></button>`).join('');
+  box.querySelectorAll('.pwb').forEach(b => { const k = b.dataset.k, n = S.pw[k]; b.querySelector('.n').textContent = n; b.classList.toggle('on', !!S.armed[k]); b.classList.toggle('off', n <= 0 && !S.armed[k]); });
+}
+$('pw').addEventListener('click', e => {
+  const b = e.target.closest('.pwb'); if (!b || !S || S.phase !== 'play' || S.B.state === 'fly') return; SFX.init();
+  const k = b.dataset.k;
+  if (!S.armed[k] && S.pw[k] <= 0) { buzz(20); popBig(POWERS[k].name + ' bitti', '#FFB3C0'); return; }
+  S.armed[k] = !S.armed[k]; SFX.arm(S.armed[k]); buzz(8);
+  if (S.armed[k]) { b.classList.remove('pwpop'); void b.offsetWidth; b.classList.add('pwpop'); spark(HAND, 10, [POWERS[k].col, '#FFFFFF'], 2.5, 2.5); }
+  updatePw();
+});
 function updateSpinBtn() { $('spin').textContent = S.spinDir > 0 ? 'Sağdan git ➜' : '⬅ Soldan git'; }
 $('bSound').addEventListener('click', () => { SFX.init(); SAVE.sound = !SAVE.sound; persist(); SFX.setOn(SAVE.sound); SFX.music(SAVE.sound); $('bSound').style.opacity = SAVE.sound ? 1 : 0.45; });
 $('bSound').style.opacity = SAVE.sound ? 1 : 0.45;
 $('bMenu').addEventListener('click', () => { SFX.init(); showLevels(); });
-$('bCam').addEventListener('click', () => { SAVE.cam = ((SAVE.cam || 0) + 1) % CAMS.length; persist(); CAM_POS = cam().aim[0]; CAM_LOOK = cam().aim[1]; $('hCam').textContent = SAVE.cam + 1; popBig('Kamera: ' + cam().name, '#ffffff'); buzz(5); });
-$('hCam').textContent = (SAVE.cam || 0) + 1;
+$('bCam').addEventListener('click', () => { SAVE.cam = ((SAVE.cam ?? DEFAULT_CAM) + 1) % CAMS.length; persist(); CAM_POS = cam().aim[0]; CAM_LOOK = cam().aim[1]; $('hCam').textContent = SAVE.cam + 1; popBig('Kamera: ' + cam().name, '#ffffff'); buzz(5); });
+$('hCam').textContent = (SAVE.cam ?? DEFAULT_CAM) + 1;
 $('bFinish').addEventListener('click', () => { SFX.init(); if (S.phase === 'play' && S.passed && S.B.state === 'hand') startFinale(true); });
 
 /* ---------------- ATIŞ / YAKALAMA ---------------- */
 function throwBoom(P, k) {
   if (S.phase !== 'play' || S.B.state !== 'hand' || S.throwsLeft <= 0) return;
   k = k || 0.5;
-  S.throwsLeft--; S.used++; S.B = { state: 'fly', t: 0, P, prev: HAND.clone(), spin: 0, hitSet: new Set() };
+  const mods = Object.assign({}, S.armed); for (const key in mods) if (mods[key]) S.pw[key]--; S.armed = {}; updatePw();
+  if (mods.power) { SFX.powerThrow(); S.shake += 0.15; } if (mods.fire) SFX.fireThrow(); if (mods.giant) SFX.giantThrow();
+  S.throwsLeft--; S.used++; S.B = { state: 'fly', t: 0, P, prev: HAND.clone(), spin: 0, hitSet: new Set(), mods };
   S.throwMoved = 0; S.idle = 0; SFX.throw(k); SFX.whooshStart(); buzz(12); S.shake = 0.1 + 0.1 * k; S.fovKick = 4 + 3 * k; S.glove.swing = 1; trailPts.length = 0;
   $('finger').style.display = 'none'; $('hint').style.display = 'none';
   puff(_a.set(HAND.x, HAND.y - 0.1, HAND.z), 6, '#FFFFFF', 0.8, 1.8, 0.5, 0.35);
@@ -753,14 +917,18 @@ function onCollide(o, e) {
   else if (o.kind === 'crate') SFX.crate(vol);
   if (onGround && v > 3 && (o.kind === 'brick' || o.kind === 'crate' || o.kind === 'plank')) S.pendingDust.push([o.body.position.x, o.body.position.z, vol, o.kind]);
 }
-function hitObj(o, q, vel) {
+function hitObj(o, q, vel, mods) {
+  mods = mods || {};
   const cp = o.body.position; o.cd = HIT_CD; S.B.hitSet.add(o);
-  wakeNear(cp, 3);
+  wakeNear(cp, mods.power ? 4.5 : 3);
   if (o.K.brk) { shatter(o); return; }
-  if (o.kind === 'tnt') { ignite(o); return; }
+  if (o.kind === 'tnt') { if (mods.fire) { o.lit = true; explode(o); } else ignite(o); return; }   // ateşli: fitil beklemeden patlar
+  if (mods.fire && (o.kind === 'plank' || o.kind === 'crate') && !o.burn) { o.burn = BURN_T; SFX.ignite(); }
   const sp = Math.hypot(vel.x, vel.z) || 1, px = cp.x - q.x, pz = cp.z - q.z, pl = Math.hypot(px, pz) || 1;
   const dx = 0.7 * vel.x / sp + 0.3 * px / pl, dz = 0.7 * vel.z / sp + 0.3 * pz / pl, K = o.K, m = o.mass * (o.kind === 'plank' ? 0.6 : 1);
-  o.body.applyImpulse(new CANNON.Vec3(dx * K.imp * m, K.up * m, dz * K.imp * m), new CANNON.Vec3(0, 0.08, 0));
+  const pk = mods.power ? POWER_IMP : 1, uk = mods.power ? POWER_UP : 1;
+  o.body.applyImpulse(new CANNON.Vec3(dx * K.imp * m * pk, K.up * m * uk, dz * K.imp * m * pk), new CANNON.Vec3(0, 0.08, 0));
+  if (mods.power && !G.FAST) { S.hitstop = Math.min(0.09, S.hitstop + 0.02); S.shake = Math.min(0.5, S.shake + 0.08); puff(cp, 2, '#FFD0C0', 1.1, 2.5, 0.6, 0.3); SFX.powerHit(); }
   if (o.kind !== 'plank') o.body.angularVelocity.set(srnd(-8, 8), srnd(-8, 8), srnd(-8, 8));
   _a.set(cp.x, cp.y, cp.z);
   if (o.kind === 'can') { SFX.can(0.85 + S.B.hitSet.size * 0.05); buzz(10);
@@ -824,12 +992,19 @@ function step(dt) {
     B.spin += sdt * 22;
     const vel = _c.copy(pos).sub(B.prev).divideScalar(Math.max(sdt, 1e-4));
     SFX.whoosh(B.spin, clamp(1 - pos.distanceTo(camera.position) / 45, 0.2, 1) * (S.slowT > 0 ? 0.4 : 1));
+    const M = B.mods, r = boomR(M);
     let hitOb = null, hitP = null;
-    for (let k = 1; k <= 4 && !hitOb; k++) { _a.lerpVectors(B.prev, pos, k / 4); const o = obstacleAt(_a); if (o) { hitOb = o; hitP = _a.clone(); } }
+    for (let k = 1; k <= 4 && !hitOb; k++) { _a.lerpVectors(B.prev, pos, k / 4); const o = obstacleAt(_a, r); if (o) { hitOb = o; hitP = _a.clone(); } }
+    if (hitOb && M.fire) {   // ateşli bumerang taşın içinden geçer, cızırdar
+      if (!G.FAST && Math.random() < 0.5) { spark(hitP, 3, ['#FFE27A', '#FF7A2E', '#FFFFFF'], 3, 2, { size: 0.7 }); puff(hitP, 1, '#8A8A8A', 0.7, 0.8, 1, 0.5); SFX.sizzle(); }
+      hitOb = null; }
+    if (M.fire && !G.FAST) { spark(pos, 2, ['#FFE27A', '#FF9A2E', '#FF5A2E'], 1, 1.5, { g: -2, size: 0.9, life: 0.7 }); if (Math.random() < 0.3) puff(pos, 1, '#FF8A3C', 0.5, 0.3, 1.2, 0.35); }
+    if (M.power && !G.FAST && Math.random() < 0.4) puff(pos, 1, '#FFB0A0', 0.45, 0.2, 0.2, 0.25);
     if (hitOb) loseBoom(hitOb, hitP, vel.clone());
     else {
+      const vv = vel.clone();
       for (const o of S.objs) { if (!o.alive) continue; o.cd -= sdt; if (o.cd > 0) continue;
-        const q = closestOnSeg(B.prev, pos, o.body.position, _b); if (inZone(o, q)) hitObj(o, q.clone(), vel); }
+        const q = closestOnSeg(B.prev, pos, o.body.position, _b); if (inZone(o, q, r)) hitObj(o, q.clone(), vv, M); }
       B.prev.copy(pos);
       if (tn >= 1) catchBoom();
       else { boomPivot.position.copy(pos); trailPts.unshift(pos.clone()); if (trailPts.length > RIB_N) trailPts.pop(); }
@@ -843,6 +1018,15 @@ function step(dt) {
   for (const f of S.fuses) { f.t -= sdt; if (f.o.alive && f.t <= 0) explode(f.o); }
   S.fuses = S.fuses.filter(f => f.t > 0 && f.o.alive);
   for (const o of S.pendingShatter) shatter(o); S.pendingShatter.clear();
+  // yanan tahta/kasa: alev çıkarır, süre dolunca kül olup kaybolur (üstündekiler düşer)
+  for (const o of S.objs) { if (!o.burn || !o.alive) continue;
+    o.burn -= sdt; const bp = o.body.position;
+    if (!G.FAST && Math.random() < 0.8) { spark(_a.set(bp.x + rnd(-o.hx, o.hx), bp.y + o.hy, bp.z + rnd(-o.hz, o.hz)), 2, ['#FFE27A', '#FF9A2E', '#FF5A2E'], 0.8, 2, { g: -3, size: 1.1, life: 0.6 });
+      if (Math.random() < 0.25) puff(_a, 1, '#5A5050', 0.8, 0.3, 1.5, 0.9); }
+    if (o.burn <= 0) { o.alive = false; S.kill.push(o); wakeNear(bp, 2.5); SFX.burnOut();
+      spark(bp, 16, ['#FF9A2E', '#3A3230', '#FFE27A'], 3, 3, { size: 0.9, stay: 0.5 });
+      puff(bp, 5, '#6A6060', 1.2, 1, 1.5, 1);
+      if (!G.FAST) for (let i = 0; i < 3; i++) addDebris(bp.x + rnd(-0.4, 0.4), bp.z + rnd(-0.4, 0.4), '#2E2A28', rnd(0.2, 0.4)); } }
   for (const [x, z, v, kind] of S.pendingDust) { puff(_a.set(x, 0.2, z), 2 + Math.round(v * 3), kind === 'brick' ? '#D9B8A0' : '#D9C7A6', 0.9 + v, 1.5, 0.6, 0.6);
     if (kind === 'brick' && !G.FAST && Math.random() < 0.5) addDebris(x + rnd(-0.3, 0.3), z + rnd(-0.3, 0.3), '#B85A3C', rnd(0.08, 0.16)); }
   S.pendingDust.length = 0;
@@ -866,11 +1050,11 @@ function step(dt) {
   // eldiven ve elde bumerang
   if (S.B.state === 'hand') { const a = S.B.appear = Math.min(1, (S.B.appear || 1) + dt * 4), pull = aimPull();
     boomPivot.position.set(HAND.x + 0.1 * pull + (aim ? rnd(-1, 1) * 0.02 * pull : 0), HAND.y + Math.sin(S.time * 2.5) * 0.06 + 0.25 * pull, HAND.z + 0.7 * pull); S.B.spin += dt * (aim ? 3 + 14 * pull : 1.5);
-    boom.scale.setScalar(1.15 * (a < 1 ? 1 - Math.pow(1 - a, 3) + Math.sin(a * Math.PI) * 0.35 : 1)); boom.visible = S.throwsLeft > 0 || S.phase !== 'play'; }
-  else boom.scale.setScalar(1.15);
+    boom.scale.setScalar(1.15 * (S.armed.giant ? 1.6 : 1) * (a < 1 ? 1 - Math.pow(1 - a, 3) + Math.sin(a * Math.PI) * 0.35 : 1)); boom.visible = S.throwsLeft > 0 || S.phase !== 'play'; }
+  else boom.scale.setScalar(1.15 * (S.B.mods && S.B.mods.giant ? GIANT_K : 1));
   if (S.B.state !== 'lost') { boom.rotation.set(0, S.B.spin * S.spinDir * -1, 0); boomPivot.rotation.set(S.B.state === 'fly' ? 0.25 : 0.5, 0, S.B.state === 'fly' ? -0.3 * S.B.P.s : 0); }
   else boomPivot.rotation.set(0, 0, 0);
-  spinDisc.visible = S.B.state === 'fly';
+  spinDisc.visible = S.B.state === 'fly'; spinDisc.scale.setScalar(S.B.mods && S.B.mods.giant ? GIANT_K : 1);
   // bitiş
   const p = pct();
   if (S.phase === 'play') {
@@ -909,6 +1093,7 @@ function animateFx(dt) {
   boomLight.intensity *= Math.exp(-8 * dt);
   S.shake = Math.max(0, S.shake - dt * 1.3); S.fovKick *= Math.exp(-5 * dt); S.catchCam = Math.max(0, S.catchCam - dt);
   S.flyHold = Math.max(0, (S.flyHold || 0) - dt); S.glove.swing = Math.max(0, S.glove.swing - dt * 3); S.glove.catchT = Math.max(0, S.glove.catchT - dt * 4);
+  if (tapMark.visible) { const t = tapMark.userData.t += dt; tapMark.scale.setScalar(1 + t * 1.5); tapMark.material.opacity = Math.max(0, 1 - t * 1.6); tapPole.material.opacity = Math.max(0, 0.6 - t); if (t > 0.65) { tapMark.visible = false; tapPole.visible = false; } }
   if (catchRing.visible) { const t = catchRing.userData.t += dt; catchRing.position.copy(HAND); catchRing.scale.setScalar(1 + t * 5); catchRing.material.opacity = Math.max(0, 1 - t * 3); if (t > 0.35) catchRing.visible = false; }
   SFX.musicTick();
 }
@@ -919,13 +1104,14 @@ function render() {
   const T = S.time, pull = aimPull();
   if (aim) SFX.charge(pull);
   // iz şeridi
-  const fly = S.B.state === 'fly' && trailPts.length > 1;
+  const fly = S.B.state === 'fly' && trailPts.length > 1, FM = (S.B.state === 'fly' && S.B.mods) || {};
+  const rk = FM.giant ? 2.2 : FM.power ? 1.5 : 1, rc = FM.fire ? [1, 0.55, 0.15] : FM.power ? [1, 0.45, 0.35] : FM.giant ? [0.6, 0.85, 1] : [1, 0.97, 0.85];
   for (let i = 0; i < RIB_N; i++) {
     const p = trailPts[Math.min(i, trailPts.length - 1)] || HAND, pa = trailPts[Math.max(0, i - 1)] || p, pb = trailPts[Math.min(trailPts.length - 1, i + 1)] || p;
     let dx = pa.x - pb.x, dz = pa.z - pb.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
-    const w = fly && i < trailPts.length ? 0.2 * (1 - i / RIB_N) : 0, al = fly ? 0.5 * Math.pow(1 - i / RIB_N, 1.5) : 0;
+    const w = fly && i < trailPts.length ? 0.2 * rk * (1 - i / RIB_N) : 0, al = fly ? 0.5 * Math.pow(1 - i / RIB_N, 1.5) : 0;
     ribPos.set([p.x - dz * w, p.y, p.z + dx * w, p.x + dz * w, p.y, p.z - dx * w], i * 6);
-    ribCol.set([1, 0.97, 0.85, al, 1, 0.97, 0.85, al], i * 8);
+    ribCol.set([rc[0], rc[1], rc[2], al, rc[0], rc[1], rc[2], al], i * 8);
   }
   ribGeo.attributes.position.needsUpdate = true; ribGeo.attributes.color.needsUpdate = true;
   // hız çizgileri
@@ -944,8 +1130,12 @@ function render() {
   glove.position.set(GLOVE_BASE.x + 0.1 * pull - 0.25 * sp, GLOVE_BASE.y + 0.25 * pull + 0.4 * sp + 0.25 * ct, GLOVE_BASE.z + 0.7 * pull - 1.1 * sp - 0.3 * ct);
   glove.rotation.set(-0.35 - 0.5 * pull + 0.9 * sp + Math.sin(T * 2.5) * 0.03, 0.35 - 0.6 * sp, -0.15);
   glove.scale.setScalar(1 + 0.25 * Math.sin(ct * Math.PI));
-  boom.userData.body.material.emissive.setRGB(0.4 * pull * (0.6 + 0.4 * Math.sin(T * 14)), 0.16 * pull, 0);
-  blob.position.set(boomPivot.position.x, 0.02, boomPivot.position.z); blob.scale.setScalar(boom.visible ? 1 : 0.001);
+  const GM = S.B.state === 'fly' ? (S.B.mods || {}) : S.armed, fl = 0.6 + 0.4 * Math.sin(T * 14);
+  if (GM.fire) boom.userData.body.material.emissive.setRGB(0.9 * (0.7 + 0.3 * Math.sin(T * 31)), 0.35, 0);
+  else if (GM.power) boom.userData.body.material.emissive.setRGB(0.7 * fl, 0.05, 0.02);
+  else if (GM.giant) boom.userData.body.material.emissive.setRGB(0.05, 0.25 * fl, 0.5 * fl);
+  else boom.userData.body.material.emissive.setRGB(0.4 * pull * fl, 0.16 * pull, 0);
+  blob.position.set(boomPivot.position.x, 0.02, boomPivot.position.z); blob.scale.setScalar(boom.visible ? (S.B.mods && S.B.state === 'fly' && S.B.mods.giant ? GIANT_K : 1) : 0.001);
   // parçacıklar
   for (let i = 0; i < PART_N; i++) { const p = parts[i];
     if (p && p.t < p.life + (p.stay ? 5 : 0)) { const k = p.stay ? 1 : 1 - p.t / p.life; _q.setFromAxisAngle(_b.set(1, 1, 0).normalize(), p.r); _m.compose(_a.set(p.x, p.y, p.z), _q, _s.setScalar(p.s * Math.max(0.05, Math.min(1, k * 2)))); partMesh.setColorAt(i, p.c); }
@@ -1047,7 +1237,7 @@ addEventListener('resize', fit);
 let lastTs = 0;
 function loop(ts) { requestAnimationFrame(loop); if (window.PAUSE) return; const dt = Math.min(0.033, lastTs ? (ts - lastTs) / 1000 : 0); lastTs = ts; if (dt > 0) step(dt); render(); }
 fit(); loadLevel(unlockedMax()); requestAnimationFrame(loop);
-Object.assign(G, { step, render, makePath, pathPoint, obstacleAt, inZone, throwBoom, loadLevel, LEVELS, SAVE, pct }); Object.defineProperty(G, 'S', { get: () => S });
+Object.assign(G, { step, render, makePath, pathPoint, obstacleAt, inZone, throwBoom, loadLevel, LEVELS, SAVE, pct, camera }); Object.defineProperty(G, 'S', { get: () => S });
 </script>
 </body>
 </html>
