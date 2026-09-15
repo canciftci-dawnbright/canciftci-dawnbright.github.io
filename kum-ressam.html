@@ -61,7 +61,7 @@ button.go{background:var(--go);color:#fff;border-color:#D9553A}
 const W = 360, H = 640;
 const COLS = 50, ROWS = 40, CELL = 5, DEP = 3, BX = 55, BY = 150;
 const BW = COLS * CELL, BH = ROWS * CELL, FLOOR = BY + BH;
-const RAIL_Y = 116, RAIL_X0 = 8, RAIL_X1 = 352, SPEED = 105, GAP = 44, POUR_STAGGER = 0.022, GRAV = 900;
+const RAIL_Y = 116, RAIL_X0 = 8, RAIL_X1 = 352, SPEED = 130, GAP = 40, POUR_STAGGER = 0.018, GRAV = 900, ENTER_T = 0.22, MAX_ORDERS = 8, HOLD_CANCEL = 0.4;
 const PARK_Y = 392, Q_Y = 458, Q_STEP = 42;
 const PAL = [null,
   [238, 64, 82],   // 1 kırmızı
@@ -131,6 +131,7 @@ const SFX = (() => {
     boom: w('boom', t => { burst(t, 1.6, 140, 0.4, 0.9, 'lowpass'); tone(t, 0.9, 110, 28, 0.45, 'sine'); burst(t, 0.6, 2200, 0.5, 0.3); for (let i = 0; i < 14; i++) burst(t + 0.08 + i * 0.05, 0.08, rnd(1500, 5000), 2, 0.08); }),
     firework: w('firework', t => { tone(t, 0.35, 700, 1600, 0.03, 'sine'); burst(t + 0.35, 0.3, 1200, 0.6, 0.25, 'lowpass'); for (let i = 0; i < 8; i++) burst(t + 0.45 + i * 0.04, 0.04, rnd(3000, 7000), 3, 0.05); }),
     honk: w('honk', t => { tone(t, 0.1, 440, 430, 0.05, 'square'); tone(t, 0.1, 554, 545, 0.035, 'square'); tone(t + 0.14, 0.16, 440, 430, 0.05, 'square'); tone(t + 0.14, 0.16, 554, 545, 0.035, 'square'); }, 0.2),
+    order: w('order', (t, n) => { note(t, 4 + Math.min(n, 8) * 2, 0.09, 0.05, 'triangle'); tone(t + 0.05, 0.05, 1600, 2000, 0.03, 'sine'); }),
     tap: w('tap', t => { tone(t, 0.05, 900, 1200, 0.04, 'triangle'); }),
     cheer: w('cheer', (t, k) => { [0, 4, 7, 12, 16].forEach((s, i) => note(t + i * 0.05, s + k * 2, 0.35, 0.06, 'triangle')); burst(t, 0.4, 5000, 0.6, 0.04); }),
     combo: w('combo', (t, k) => { const s = Math.min(k, 8) * 2; note(t, 7 + s, 0.15, 0.06, 'square'); note(t + 0.07, 12 + s, 0.25, 0.06, 'triangle'); }),
@@ -239,7 +240,7 @@ function newRun(lv) {
   S = { lv, cfg, t: 0, time: 0, phase: 'play', running: false, target, built: new Uint8Array(COLS * ROWS), sh: new Uint8Array(COLS * ROWS),
     fill: new Uint8Array(COLS), trucks: [], queue: [], park: Array(cfg.park).fill(null), parts: [], pops: [], sparks: [], shake: 0,
     landed: 0, total: 0, sent: 0, maxPark: 0, failWhy: '', winT: 0, glow: 0,
-    flash: new Float32Array(COLS * ROWS), combo: 0, bestCombo: 0, milestone: 0, press: null, shimmer: [], celebrate: 0, danger: 0, comboPop: 0 };
+    flash: new Float32Array(COLS * ROWS), combo: 0, bestCombo: 0, milestone: 0, press: null, shimmer: [], celebrate: 0, danger: 0, comboPop: 0, orders: [] };
   for (let i = 0; i < target.length; i++) { S.sh[i] = Math.floor(hash(i % COLS, (i / COLS | 0) + lv * 5) * 4); if (target[i]) S.total++; }
   let L = COLS, R = 0, T = ROWS; for (let i = 0; i < target.length; i++) if (target[i]) { const c = i % COLS, r = i / COLS | 0; L = Math.min(L, c); R = Math.max(R, c); T = Math.min(T, r); }
   S.bounds = { L, R, T, cx: BX + (L + R + 1) / 2 * CELL, cy: BY + (T + ROWS) / 2 * CELL, w: (R - L + 1) * CELL, h: (ROWS - T) * CELL };
@@ -275,9 +276,12 @@ const parked = () => S.park.filter(Boolean).length;
 function toL(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; }
 function queueX(i) { return S.cfg.cols === 2 ? [120, 240][i] : [66, 180, 294][i]; }
 function parkX(i) { const step = 300 / S.cfg.park; return 30 + step * (i + 0.5); }
+/* dokunulan kamyon: sıraya alınmış bir karta dokunulduysa o (iptal için), yoksa sütunun henüz sıraya alınmamış ilk kamyonu */
 function truckAt(x, y) {
   if (Math.abs(y - PARK_Y) < 26) { for (let i = 0; i < S.park.length; i++) { const t = S.park[i]; if (t && t.state === 'park' && Math.abs(x - parkX(i)) < 30) return t; } }
-  if (y > Q_Y - 26) { for (let i = 0; i < S.queue.length; i++) if (Math.abs(x - queueX(i)) < 52 && S.queue[i].length) return S.queue[i][0]; }
+  if (y > Q_Y - 26) { for (let i = 0; i < S.queue.length; i++) { const q = S.queue[i]; if (Math.abs(x - queueX(i)) >= 52 || !q.length) continue;
+    const hit = q.slice(0, 4).find(t => S.orders.includes(t) && Math.abs(y - (t.qy !== undefined ? t.qy : Q_Y)) < Q_STEP / 2);
+    return hit || q.find(t => !S.orders.includes(t)) || null; } }
   return null;
 }
 /* basılı tutarken önizleme: bu kamyon şimdi gönderilse hangi hücrelere döker */
@@ -293,11 +297,38 @@ cv.addEventListener('pointerdown', e => {
   try { cv.setPointerCapture(e.pointerId); } catch (err) {}
 });
 cv.addEventListener('pointermove', e => { const P = S && S.press; if (!P || e.pointerId !== P.id) return; const [x, y] = toL(e); if (Math.hypot(x - P.x, y - P.y) > 44) S.press = null; });
-cv.addEventListener('pointerup', e => { const P = S && S.press; if (!P || e.pointerId !== P.id) return; S.press = null; if (S.phase === 'play' && (P.t.state === 'queue' || P.t.state === 'park')) launch(P.t); });
+cv.addEventListener('pointerup', e => { const P = S && S.press; if (!P || e.pointerId !== P.id) return; S.press = null;
+  if (S.phase !== 'play' || !(P.t.state === 'queue' || P.t.state === 'park')) return;
+  if (S.orders.includes(P.t)) {
+    if (P.T >= HOLD_CANCEL) { cancelOrder(P.t); return; }                                    // basılı tutup bırak: iptal
+    const q = S.queue.find(q => q.includes(P.t)), nx = q && q.find(t => !S.orders.includes(t));  // hızlı dokunuş: sütundaki sıradakini ekle
+    if (nx) launch(nx);
+    return; }
+  launch(P.t); });
 cv.addEventListener('pointercancel', () => { if (S) S.press = null; });
 function railBlocked() { return onRail() >= S.cfg.onRail || S.trucks.some(t => t.state === 'enter' || (t.state === 'rail' && t.x < RAIL_X0 + GAP + 6)); }
+/* sipariş: ray doluysa ya da sırada bekleyen varsa kamyon numaralı sıraya girer, yer açılınca kendiliğinden çıkar */
+function canGoNow(t) { return t.state === 'park' || (t.state === 'queue' && S.queue.some(q => q[0] === t)); }
 function launch(t) {
-  if (railBlocked()) { t.deny = 1; SFX.deny(); buzz(20); popText(onRail() >= S.cfg.onRail ? 'Ray dolu!' : 'Bekle…', t.state === 'park' ? parkX(t.slot) : W / 2, (t.state === 'park' ? PARK_Y : Q_Y) - 30, '#FFB3B5', 15); return; }
+  if (S.orders.length || railBlocked() || !canGoNow(t)) {
+    if (S.orders.length >= MAX_ORDERS) { t.deny = 1; SFX.deny(); buzz(20); popText('Sipariş listesi dolu', W / 2, PARK_Y - 34, '#FFB3B5', 14); return; }
+    S.orders.push(t); t.pop = 0.8; SFX.order(S.orders.length); buzz(6); return;
+  }
+  sendTruck(t);
+}
+function cancelOrder(t) {
+  // sütunda arkasındaki siparişler de iptal olur (öndeki gitmeden onlar çıkamaz)
+  const qi = S.queue.findIndex(q => q.includes(t)), drop = qi >= 0 ? S.queue[qi].slice(S.queue[qi].indexOf(t)) : [t];
+  S.orders = S.orders.filter(o => !drop.includes(o)); t.pop = 0.5; SFX.deny(); popText('İptal', t.state === 'park' ? parkX(t.slot) : queueX(qi), (t.state === 'park' ? PARK_Y : t.qy) - 26, '#D6CCF0', 13);
+}
+function stepOrders() {
+  if (S.phase !== 'play' || !S.orders.length || railBlocked()) return;
+  const t = S.orders[0];
+  if (t.state !== 'queue' && t.state !== 'park') { S.orders.shift(); return; }
+  if (!canGoNow(t)) return;   // sütunda önündeki henüz çıkmadı
+  S.orders.shift(); sendTruck(t);
+}
+function sendTruck(t) {
   if (t.state === 'queue') { const qi = S.queue.findIndex(q => q[0] === t); t.ex = queueX(qi); t.ey = t.qy !== undefined ? t.qy : Q_Y; S.queue[qi].shift(); }
   else { t.ex = parkX(t.slot); t.ey = PARK_Y; S.park[t.slot] = null; t.slot = -1; }
   t.state = 'enter'; t.enter = 0; t.lastC = -1; t.dead = false; S.trucks.push(t); SFX.go(); buzz(8); HUD.dirty = true;
@@ -308,6 +339,7 @@ function step(dt) {
   S.t += dt; S.shake *= Math.exp(-10 * dt); S.glow = Math.max(0, S.glow - dt * 0.6); S.comboPop = Math.max(0, S.comboPop - dt * 1.5);
   if (S.running && S.phase === 'play') S.time += dt;
   if (S.phase === 'won') { S.celebrate += dt; stepFinale(dt); }
+  stepOrders();
   SFX.musicTick();
   // yeni inen tanelerin parıltısı
   const fl = S.flash; for (let i = 0; i < fl.length; i++) if (fl[i] > 0) fl[i] = Math.max(0, fl[i] - dt * 3.5);
@@ -345,7 +377,7 @@ function step(dt) {
 }
 function stepTruck(t, dt) {
   t.pop = Math.max(0, t.pop - dt * 3); t.deny = Math.max(0, t.deny - dt * 3); t.pourT = Math.max(0, t.pourT - dt);
-  if (t.state === 'enter') { t.enter += dt / 0.35; const k = Math.min(1, t.enter), e = k * k * (3 - 2 * k); t.x = lerp(t.ex, RAIL_X0, e); t.y = lerp(t.ey, RAIL_Y, e); if (k >= 1) { t.state = 'rail'; t.x = RAIL_X0; t.y = RAIL_Y; } return; }
+  if (t.state === 'enter') { t.enter += dt / ENTER_T; const k = Math.min(1, t.enter), e = k * k * (3 - 2 * k); t.x = lerp(t.ex, RAIL_X0, e); t.y = lerp(t.ey, RAIL_Y, e); if (k >= 1) { t.state = 'rail'; t.x = RAIL_X0; t.y = RAIL_Y; } return; }
   if (t.state === 'leave') { t.leaveT += dt; const k = t.leaveT; t.y -= dt * (80 + k * 420); t.x += dt * 70; t.spin = -k * 0.6;
     if (Math.random() < 0.5) S.sparks.push({ x: t.x - 18, y: t.y + 8, vx: rnd(-30, -10), vy: rnd(10, 40), t: 0, life: 0.5, col: 'rgba(255,255,255,.7)', dust: true });
     if (t.leaveT > 0.9) t.dead = true; return; }
@@ -513,7 +545,8 @@ function draw() {
     ctx.strokeStyle = 'rgba(60,30,70,.75)'; ctx.lineWidth = 1;
     for (const i of P.cells) { const c = i % COLS, r = i / COLS | 0; ctx.globalAlpha = a * (0.6 + 0.35 * Math.sin(S.t * 10 - c * 0.3)); ctx.fillRect(BX + c * CELL, BY + r * CELL, CELL, CELL); ctx.strokeRect(BX + c * CELL + 0.5, BY + r * CELL + 0.5, CELL - 1, CELL - 1); }
     ctx.globalAlpha = 1;
-    const n = P.cells.length, ok = n >= P.t.left, msg = n === 0 ? 'Şu an dökemez' : ok ? 'Tamamen boşalır ✓' : n + ' döker · ' + (P.t.left - n) + ' artar';
+    const n = P.cells.length, ok = n >= P.t.left, oi = S.orders.indexOf(P.t);
+    const msg = oi >= 0 ? (P.T >= HOLD_CANCEL ? 'Bırak: sıradan çıkar' : 'Sırada #' + (oi + 1) + ' · tut: iptal') : n === 0 ? 'Şu an dökemez' : ok ? 'Tamamen boşalır ✓' : n + ' döker · ' + (P.t.left - n) + ' artar';
     const px = P.t.state === 'park' ? parkX(P.t.slot) : P.x, py = P.t.state === 'park' ? PARK_Y - 38 : Q_Y - 40;
     ctx.globalAlpha = a; ctx.fillStyle = 'rgba(43,36,64,.9)'; const bw = msg.length * 6.4 + 20, bx = clamp(px, bw / 2 + 4, W - bw / 2 - 4); rrect(bx - bw / 2, py - 12, bw, 24, 12); ctx.fill();
     text(msg, bx, py, 12.5, n === 0 ? '#FFB3B5' : ok ? '#A8F0A0' : '#FFE6A8'); ctx.globalAlpha = 1; }
@@ -663,13 +696,23 @@ function drawPark() {
     ctx.fillStyle = danger && !S.park[i] ? `rgba(255,90,110,${0.25 + 0.15 * Math.sin(S.t * 8)})` : 'rgba(90,70,110,.16)'; rrect(x - 27, PARK_Y - 22, 54, 44, 10); ctx.fill();
     ctx.strokeStyle = 'rgba(90,70,110,.35)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; rrect(x - 27, PARK_Y - 22, 54, 44, 10); ctx.stroke(); ctx.setLineDash([]);
     const t = S.park[i];
-    if (t && t.state === 'park') { drawTruck(t, x, PARK_Y, 1, false); if (S.phase === 'play' && pourable(t.col) > 0) { ctx.fillStyle = '#5FC46A'; ctx.beginPath(); ctx.arc(x + 22, PARK_Y - 16, 5, 0, 7); ctx.fill(); } }
+    if (t && t.state === 'park') { drawTruck(t, x, PARK_Y, 1, false); if (S.phase === 'play' && pourable(t.col) > 0) { ctx.fillStyle = '#5FC46A'; ctx.beginPath(); ctx.arc(x + 22, PARK_Y - 16, 5, 0, 7); ctx.fill(); } orderBadge(t, x, PARK_Y); }
     else if (!t) text('P', x, PARK_Y, 16, 'rgba(90,70,110,.35)'); }
+}
+function orderBadge(t, x, y) {
+  const i = S.orders.indexOf(t); if (i < 0) return;
+  const s = 1 + t.pop * 0.4, bx = x - 26, by = y - 16;
+  ctx.save(); ctx.translate(bx, by); ctx.scale(s, s);
+  ctx.fillStyle = 'rgba(40,20,40,.25)'; ctx.beginPath(); ctx.arc(1, 2, 10, 0, 7); ctx.fill();
+  ctx.fillStyle = i === 0 ? '#FF7A59' : '#FFB23F'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, 7); ctx.fill(); ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2; ctx.stroke();
+  text(String(i + 1), 0, 0.5, 12, '#FFFFFF');
+  ctx.restore();
+  if (i === 0) { ctx.strokeStyle = `rgba(255,122,89,${0.5 + 0.4 * Math.sin(S.t * 10)})`; ctx.lineWidth = 2.5; rrect(x - 24, y - 16, 48, 34, 8); ctx.stroke(); }
 }
 function drawQueue() {
   for (let i = 0; i < S.queue.length; i++) { const q = S.queue[i], x = queueX(i);
     ctx.fillStyle = 'rgba(90,70,110,.12)'; rrect(x - 50, Q_Y - 26, 100, H - Q_Y + 20, 14); ctx.fill();
-    for (let k = Math.min(3, q.length - 1); k >= 0; k--) { const y = q[k].qy !== undefined ? q[k].qy : Q_Y + k * Q_STEP; drawTruck(q[k], x, y, k === 0 ? 1 : 0.85 - k * 0.15, false);
+    for (let k = Math.min(3, q.length - 1); k >= 0; k--) { const y = q[k].qy !== undefined ? q[k].qy : Q_Y + k * Q_STEP; drawTruck(q[k], x, y, k === 0 || S.orders.includes(q[k]) ? 1 : 0.85 - k * 0.15, false); orderBadge(q[k], x, y);
       if (k === 0 && S.phase === 'play' && pourable(q[k].col) > 0) { ctx.fillStyle = '#5FC46A'; ctx.beginPath(); ctx.arc(x + 26, y - 16, 5, 0, 7); ctx.fill(); } }
     if (q.length > 4) text('+' + (q.length - 4), x, H - 10, 11, 'rgba(60,40,70,.6)', 700); }
 }
