@@ -37,7 +37,7 @@ html,body{margin:0;height:100%;background:#7fc4e8;overflow:hidden;font-family:"B
 .yuk .lv{font-weight:800;font-size:13px;color:#3d6b8c;font-variant-numeric:tabular-nums}
 .yuk button{border:0;border-radius:12px;padding:8px 12px;font:800 14px "Baloo 2",system-ui,sans-serif;background:#FFB03A;color:#fff;box-shadow:0 3px 0 #c97d1c;white-space:nowrap}
 .yuk button:disabled{background:#dfeaf2;color:#8fa9bb;box-shadow:0 3px 0 #b8ccda}
-#turbo{position:absolute;left:50%;transform:translateX(-50%);top:calc(124px + env(safe-area-inset-top,0px));width:210px;padding:6px 12px 8px;border-radius:16px;background:rgba(10,60,80,.55);color:#fff;font:800 14px "Baloo 2",system-ui,sans-serif;text-align:center;pointer-events:none;box-shadow:0 0 16px rgba(40,220,255,.45)}
+#turbo{position:absolute;left:50%;transform:translateX(-50%);top:calc(150px + env(safe-area-inset-top,0px));width:210px;padding:6px 12px 8px;border-radius:16px;background:rgba(10,60,80,.55);color:#fff;font:800 14px "Baloo 2",system-ui,sans-serif;text-align:center;pointer-events:none;box-shadow:0 0 16px rgba(40,220,255,.45)}
 #turbo[hidden]{display:none!important}
 #turbo.yan{background:rgba(200,90,20,.75);box-shadow:0 0 30px rgba(255,150,40,.9)}
 #turbo i{display:block;margin-top:4px;height:8px;border-radius:4px;background:rgba(0,0,0,.3);overflow:hidden}
@@ -314,6 +314,10 @@ function adimla(S, g, dt) {
   } else if (S.faz === 'ucus') {
     const V = Math.hypot(S.vx, S.vy), sr = 0.5 * FZ.rho * cda * V * V / S.m;
     S.vx -= sr * (S.vx / V) * dt; S.vy -= (sr * (S.vy / V) + FZ.g + S.gEk) * dt;
+    // havada turbo: burnun baktigi yone itis (oyuncu istegi); burun ileri-yukari ise ucus uzar
+    const turboHava = !!g.turbo && S.turbo > 0;
+    if (turboHava) { S.turbo = Math.max(0, S.turbo - dt); const a = TURBO.kuvvet / S.m; S.vx += Math.cos(S.egim) * a * dt; S.vy += Math.sin(S.egim) * a * dt; }
+    S.turboYaniyor = turboHava;
     S.x += S.vx * dt; S.y += S.vy * dt; S.v = V;
     // havada da yana yonlendirilir (yerdekinin yarisi, hiz kaybi yok): inis yokusundaki toplanabilire hizalanmak icin
     const hedefWh = Math.max(-1, Math.min(1, g.yon || 0)) * YOL.wMax * HAVA.yanOran;
@@ -848,7 +852,7 @@ function bitir(nasil) {
 /* ---------------- GİRDİ ----------------
    Tek parmak: yokuşta yatay kaydırma motoru o yana götürür (parmağın ekrandaki kayması →
    hedef yanal konum). Havada da yatay kaydırma yana götürür; dikey kaydırma burnu çevirir
-   (yukarı = burun kalkar). Yokuşta parmak kaymadan basılı kalırsa turbo yanar. */
+   (yukarı = burun kalkar). Yerde ya da havada parmak kaymadan basılı kalırsa turbo yanar. */
 const tuval = renderer.domElement;
 function basla() { SES.baslat(); if (faz !== 'hazir') return; faz = 'kosu'; $('bar').style.display = 'none'; $('baslik').style.display = 'none'; }
 const BURUN_OLU = 10;   // px: bu kadar dikey kayma burnu cevirmez
@@ -930,7 +934,7 @@ function adim(dt) {
   // havada yatay hiz: duvar sonrasi inise cekilirken dusus hizi gostergeyi sisirmesin
   $('hizD').textContent = Math.round((S.faz === 'ucus' ? S.vx : gorsel.v) * 3.6);
   $('hMesafe').textContent = Math.round(S.x);
-  const tb = $('turbo'), tGoster = faz === 'kosu' && S.faz === 'yokus' && S.turbo > 0;
+  const tb = $('turbo'), tGoster = faz === 'kosu' && (S.faz === 'yokus' || S.faz === 'ucus') && S.turbo > 0;   // havada da kullanilabilir
   if (tb.hidden === tGoster) tb.hidden = !tGoster;
   const kd = $('hKademe'); if (kd.hidden === S.gecilen > 0) kd.hidden = !(S.gecilen > 0);
   if (S.gecilen > 0) $('hKademeD').textContent = '×' + (S.gecilen + 1);
