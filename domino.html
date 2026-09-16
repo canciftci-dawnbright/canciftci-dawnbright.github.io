@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Domino Zinciri</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;height:100%;background:#2a1f18;overflow:hidden;font-family:"Baloo 2",system-ui,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;color:#fff}
+#app{position:relative;margin:0 auto;height:100%;width:min(100vw,calc(100vh * 0.5625));overflow:hidden}
+#app canvas{display:block;width:100%;height:100%}
+#hud{position:absolute;left:0;right:0;top:env(safe-area-inset-top,0px);display:flex;justify-content:space-between;align-items:center;padding:10px;pointer-events:none}
+.pill{background:rgba(30,18,10,.6);border-radius:16px;padding:4px 10px;display:flex;align-items:center;gap:8px;font-weight:800;font-size:18px;box-shadow:0 2px 0 rgba(0,0,0,.3)}
+.pill b{font-variant-numeric:tabular-nums}
+.pill b.bump{animation:bump .3s cubic-bezier(.2,.9,.3,1.5)}
+@keyframes bump{0%{transform:scale(1.5)}100%{transform:scale(1)}}
+.tile{display:inline-block;width:9px;height:16px;border-radius:3px;background:#F6E7C8;box-shadow:inset 0 -3px 0 #d9b98a}
+#bar{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:10px}
+.btn{border:0;border-radius:18px;padding:10px 16px;font:800 18px "Baloo 2",system-ui,sans-serif;color:#3a2410;background:#FFE6B8;box-shadow:0 5px 0 #b98a4a}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #b98a4a}
+.btn.go{background:#FF7A3D;color:#fff;box-shadow:0 5px 0 #a8431f;padding:10px 26px;font-size:22px}
+.btn[disabled]{opacity:.45}
+#hint{position:absolute;left:0;right:0;bottom:92px;text-align:center;font-weight:800;font-size:19px;text-shadow:0 2px 4px rgba(0,0,0,.6);pointer-events:none;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.05)}}
+.pop{position:absolute;transform:translate(-50%,-50%);font-weight:800;pointer-events:none;white-space:nowrap;text-shadow:0 2px 0 rgba(20,10,5,.9);animation:popUp .9s ease-out forwards}
+@keyframes popUp{0%{transform:translate(-50%,-50%) scale(.3)}15%{transform:translate(-50%,-50%) scale(1.25)}30%{transform:translate(-50%,-60%) scale(1)}100%{transform:translate(-50%,-150%) scale(1);opacity:0}}
+#over{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(20,10,5,.5)}
+.card{background:#FFF4E2;color:#3a2410;border-radius:22px;padding:20px 24px;text-align:center;box-shadow:0 8px 0 #b98a4a;animation:cardIn .35s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes cardIn{from{transform:scale(.6)}}
+.card h2{margin:0 0 4px;font-size:30px}
+.card p{margin:2px 0 14px;font-size:17px}
+#lvNav{display:flex;align-items:center;gap:4px;pointer-events:auto}
+#lvNav button{border:0;background:rgba(30,18,10,.6);color:#fff;font:800 22px "Baloo 2",system-ui,sans-serif;width:32px;height:32px;border-radius:11px;line-height:1;padding:0}
+#lvNav button[disabled]{opacity:.3}
+#lvName{font-weight:800;font-size:16px;text-shadow:0 2px 3px rgba(0,0,0,.6);white-space:nowrap;padding:0 2px}
+#lvName .best{color:#FFD27A;font-size:13px}
+.pill.low{background:rgba(170,45,30,.85)}
+.pill .bump,.pill.bump{animation:bump .3s cubic-bezier(.2,.9,.3,1.5)}
+#banner{position:absolute;left:0;right:0;top:calc(50px + env(safe-area-inset-top,0px));text-align:center;pointer-events:none;opacity:0;padding:0 10px}
+#banner.show{animation:bn 2.4s ease forwards}
+#banner.show.long{animation-duration:3.8s}
+#bnT{display:inline-block;background:rgba(30,18,10,.62);border-radius:13px;padding:3px 13px;font-weight:800;font-size:19px;text-shadow:0 2px 3px rgba(0,0,0,.5)}
+#bnS{display:inline-block;margin-top:4px;background:rgba(30,18,10,.62);border-radius:11px;padding:2px 11px;font-weight:800;font-size:15px;color:#FFD27A;text-shadow:0 2px 3px rgba(0,0,0,.5)}
+#bnS:empty{display:none}
+@keyframes bn{0%{opacity:0;transform:scale(.7)}12%{opacity:1;transform:scale(1.06)}20%{transform:scale(1)}80%{opacity:1}100%{opacity:0}}
+.stars{font-size:40px;letter-spacing:4px;color:#E8A33F}
+.star{display:inline-block;animation:starIn .45s cubic-bezier(.2,.9,.3,1.6) both}
+.star.off{color:#3a2410;opacity:.18}
+@keyframes starIn{from{transform:scale(0) rotate(-40deg);opacity:0}}
+.card small{font-size:14px;opacity:.7}
+#bSound{position:absolute;left:10px;bottom:calc(16px + env(safe-area-inset-bottom,0px));width:38px;height:38px;border:0;border-radius:13px;background:rgba(30,18,10,.6);color:#fff;font-size:18px;line-height:1;padding:0}
+#bSound.off{opacity:.45}
+#err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:20px}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="pill" id="hStock"><span class="tile"></span><b id="hLeft">0</b></div>
+    <div id="lvNav"><button id="lvPrev">‹</button><div id="lvName"></div><button id="lvNext">›</button></div>
+    <div class="pill">🔔 <b id="hBells">0/1</b></div>
+  </div>
+  <div id="hint">Başlangıç taşından parmağınla yol çiz</div>
+  <div id="bar">
+    <button class="btn" id="bUndo">↶</button>
+    <button class="btn go" id="bGo">İt!</button>
+    <button class="btn" id="bClear">Sil</button>
+  </div>
+  <button id="bSound" aria-label="Ses">🔊</button>
+  <div id="banner"><div id="bnT"></div><div id="bnS"></div></div>
+  <div id="over"><div class="card"><h2 id="ovT"></h2><p id="ovP"></p><div id="ovBtns"></div></div></div>
+  <div id="err">3D kütüphaneleri yüklenemedi.<br>İnternet bağlantısını kontrol et.</div>
+</div>
+<script>setTimeout(() => { if (!window.G || !window.G.step) document.getElementById('err').style.display = 'flex'; }, 8000);</script>
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+
+/* ---------------- AYARLAR ---------------- */
+const DOM = { w: 0.5, h: 1.0, d: 0.16 };      // domino taşı (genişlik, yükseklik, kalınlık)
+const SPACING = 0.52;                         // taşlar arası mesafe (yol boyunca)
+const MAX_TURN = 0.62;                        // ardışık taşlar arası izin verilen en büyük dönüş (rad); fazlası kırmızı uyarı
+const GATE_HALF = 0.85;                       // çan kemeri direklerinin merkeze uzaklığı; zincir iki direğin arasından geçmeli
+const BIG = { w: 0.56, h: 2.0, d: 0.2 };      // dev taş: hendeğin üstüne devrilip karşı kıyıdaki taşı iter (2 taş hakkı)
+const JUMP_MAX = 1.65;                        // dev taştan karşı kıyı taşına en uzak mesafe
+const VASE_R = 0.16, VASE_BLOCK = 0.5, VASE_RING = 0.62;   // vazo çarpma yarıçapı / taş konamayan yarıçap / tehlike halkası
+const TNT = { w: 0.9, d: 0.6, h: 0.6 };
+const FORK = { w: 1.2, h: 1.2, d: 0.22, out: 0.62, side: 0.38, spread: 0.35 };   // çatal blok + önündeki iki çıkış taşı
+const TABLE_G = 8;                            // masa çarpışma grubu (hendeğe düşen taş masadan geçer)
+const SAVE_KEY = 'dbg.domino.v2';
+const P = Math.PI;
+// start: başlangıç taşı (yaw π = -z yönü, ekranda yukarı) · stock: taş hakkı · stars: [3★, 2★] için en fazla taş
+// walls/pillars: engeller · vases: devrilen taş değerse kırılır · ditches: taş konamaz, dev taşla aşılır
+// tnts: zincir değince patlar, out taşlarını devirir · forks: çatal, önündeki iki çıkıştan iki kol çizilir
+// bells: çan kemerleri, hepsi çalınmalı (rot 0 = zincir z yönünde geçer) · yeni: yeni mekanik tanıtımı
+const LEVELS = [
+  // 1-3: temel
+  { name: 'Isınma', goal: 'Zinciri çanın altından geçir', hint: 'Başlangıç taşından parmağınla yol çiz',
+    start: { x: 0, z: 5.4, yaw: P }, stock: 28, stars: [23, 26],
+    walls: [{ x: -1.25, z: 1.0, w: 4.1, d: 0.6, h: 1.3 }],
+    bells: [{ x: -1.2, z: -4.4, rot: 0 }] },
+  { name: 'Zikzak', goal: 'Duvarların arasından kıvrıl', hint: 'Geri sürükleyerek taş silebilirsin',
+    start: { x: -2.3, z: 5.6, yaw: P }, stock: 42, stars: [35, 40],
+    walls: [{ x: -0.95, z: 2.6, w: 4.7, d: 0.5, h: 1.3 }, { x: 0.95, z: -1.2, w: 4.7, d: 0.5, h: 1.3 }],
+    pillars: [{ x: 0.3, z: 0.7, r: 0.28 }],
+    bells: [{ x: 1.6, z: -4.6, rot: 0 }] },
+  { name: 'Labirent', goal: 'İki çanı da çal · taşın az', hint: 'Köşeleri sıkı dön, taş hakkın sınırlı',
+    start: { x: -2.3, z: 5.6, yaw: P }, stock: 74, stars: [68, 72],
+    walls: [
+      { x: -1.15, z: 1.1, w: 0.5, d: 10.6, h: 1.3 }, { x: 1.15, z: -1.1, w: 0.5, d: 10.6, h: 1.3 },
+      { x: -3.0, z: 1.5, w: 1.0, d: 0.4, h: 1.3 }, { x: -0.55, z: -1.0, w: 0.7, d: 0.4, h: 1.3 },
+      { x: 0.55, z: 2.0, w: 0.7, d: 0.4, h: 1.3 }, { x: 3.0, z: -1.5, w: 1.0, d: 0.4, h: 1.3 }],
+    bells: [{ x: -1.15, z: -5.3, rot: P / 2 }, { x: 2.3, z: -4.8, rot: 0 }] },
+  // 4-6: vazolar
+  { name: 'Vazolar', goal: 'Çanı çal, vazoları kırma', yeni: 'Vazo: devrilen taş değerse kırılır', hint: 'Kırmızı halkaların dışından geç',
+    start: { x: 0, z: 5.6, yaw: P }, stock: 28, stars: [23, 26],
+    vases: [{ x: -1.2, z: 3.6 }, { x: 1.2, z: 2.2 }, { x: -1.6, z: 0.8 }, { x: 1.2, z: 0.3 }, { x: 1.9, z: -0.9 }, { x: -1.2, z: -1.6 }, { x: 1.2, z: -2.9 }, { x: -2.2, z: -3.2 }],
+    bells: [{ x: 0.2, z: -5.0, rot: 0 }] },
+  { name: 'Vazo Koridoru', goal: 'İki çan · vazolara dikkat', hint: 'Virajda taşlar dışa savrulur',
+    start: { x: -2.4, z: 5.6, yaw: P }, stock: 57, stars: [47, 54],
+    walls: [{ x: 0, z: 0.9, w: 0.5, d: 10.6, h: 1.3 }],
+    vases: [{ x: -0.5, z: 3.4 }, { x: -2.9, z: 0.6 }, { x: -2.8, z: -2.6 }, { x: 0.5, z: 0.3 }, { x: 2.9, z: 1.2 }, { x: 0.5, z: 4.0 }],
+    bells: [{ x: -1.75, z: 0.8, rot: 0 }, { x: 1.75, z: 4.6, rot: 0 }] },
+  { name: 'Galeri', goal: 'İki çan · dar geçitler', hint: 'Taş hakkın sınırlı, yolu planla',
+    start: { x: 2.4, z: 5.7, yaw: P }, stock: 49, stars: [40, 46],
+    walls: [{ x: -0.9, z: 3.4, w: 4.8, d: 0.5, h: 1.3 }, { x: 0.9, z: -0.2, w: 4.8, d: 0.5, h: 1.3 }, { x: -0.9, z: -3.6, w: 4.8, d: 0.5, h: 1.3 }],
+    vases: [{ x: 2.9, z: 2.4 }, { x: -2.9, z: 1.4 }, { x: -2.9, z: -1.1 }, { x: 0.6, z: -2.0 }, { x: 2.9, z: -2.6 }, { x: 0.0, z: -5.7 }],
+    bells: [{ x: 0.6, z: 1.6, rot: P / 2 }, { x: -1.8, z: -4.9, rot: P / 2 }] },
+  // 7-9: hendek + dev taş
+  { name: 'Hendek', goal: 'Hendeği aş, çanı çal', yeni: 'Hendek: karşıya sürükle, dev taş köprü olur', hint: 'Parmağını hendeğin karşısına sürükle',
+    start: { x: 0, z: 5.6, yaw: P }, stock: 28, stars: [23, 26],
+    ditches: [{ x: 0, z: 0.8, w: 6.6, d: 0.8 }],
+    walls: [{ x: 1.9, z: -2.4, w: 2.8, d: 0.5, h: 1.3 }],
+    bells: [{ x: 1.2, z: -4.8, rot: 0 }] },
+  { name: 'Çift Hendek', goal: 'Atla ya da dolan', hint: 'Dev taş 2 taş hakkı yer',
+    start: { x: -2.3, z: 5.6, yaw: P }, stock: 27, stars: [22, 25],
+    ditches: [{ x: -1.0, z: 2.8, w: 4.6, d: 0.8 }, { x: 0.8, z: -1.6, w: 5.0, d: 0.9 }],
+    walls: [{ x: -2.5, z: -1.6, w: 1.6, d: 0.5, h: 1.3 }],
+    vases: [{ x: 1.9, z: -0.3 }, { x: -0.6, z: -3.2 }, { x: 2.4, z: 4.2 }],
+    bells: [{ x: 1.4, z: -4.8, rot: 0 }] },
+  { name: 'Adalar', goal: 'İki adadaki çanları çal', hint: 'Hangi adadan başlayacağını seç',
+    start: { x: -2.3, z: 5.6, yaw: P }, stock: 34, stars: [28, 32],
+    ditches: [{ x: 0, z: -1.2, w: 0.8, d: 10.0 }, { x: -1.85, z: 0.6, w: 2.9, d: 0.8 }, { x: 1.85, z: -2.4, w: 2.9, d: 0.8 }],
+    vases: [{ x: -2.8, z: -0.6 }, { x: -0.9, z: -1.6 }, { x: 2.8, z: -3.6 }, { x: 0.9, z: -4.2 }],
+    bells: [{ x: -1.8, z: -4.2, rot: 0 }, { x: 1.9, z: -4.9, rot: 0 }] },
+  // 10-12: TNT
+  { name: 'Fitil', goal: 'TNT’yi patlat, çanı çal', yeni: 'TNT: patlayınca arkadaki taş devrilir', hint: 'İki yol çiz: TNT’ye ve arkadaki taştan çana',
+    start: { x: 2.4, z: 5.6, yaw: P }, stock: 27, stars: [22, 25],
+    walls: [{ x: -1.875, z: 0.4, w: 2.85, d: 0.5, h: 1.3 }, { x: 1.875, z: 0.4, w: 2.85, d: 0.5, h: 1.3 }],
+    pillars: [{ x: 1.0, z: 3.0, r: 0.3 }],
+    tnts: [{ x: 0, z: 0.4, out: [{ x: 0, z: -0.35, yaw: P }] }],
+    bells: [{ x: -1.6, z: -4.8, rot: 0 }] },
+  { name: 'Patlak Köprü', goal: 'Hendek, çan, TNT, çan', hint: 'Başka bir yoldan devam etmek için o taşa dokun',
+    start: { x: -2.3, z: 5.6, yaw: P }, stock: 32, stars: [26, 30],
+    ditches: [{ x: 0, z: 3.4, w: 6.6, d: 0.8 }],
+    walls: [{ x: -0.975, z: -0.6, w: 4.65, d: 0.5, h: 1.3 }, { x: 2.775, z: -0.6, w: 1.05, d: 0.5, h: 1.3 }],
+    tnts: [{ x: 1.8, z: -0.6, out: [{ x: 1.8, z: -1.35, yaw: P }] }],
+    vases: [{ x: 0.6, z: -2.8 }, { x: -2.6, z: -3.0 }, { x: 2.6, z: 1.9 }],
+    bells: [{ x: -0.6, z: 1.4, rot: P / 2 }, { x: -1.5, z: -4.8, rot: 0 }] },
+  { name: 'Zincirleme', goal: 'İki patlama, iki çan', hint: 'Üç parça yol çiz',
+    start: { x: 2.4, z: 5.6, yaw: P }, stock: 39, stars: [32, 37],
+    walls: [{ x: -2.875, z: 2.6, w: 0.85, d: 0.5, h: 1.3 }, { x: 0.875, z: 2.6, w: 4.85, d: 0.5, h: 1.3 },
+      { x: -0.875, z: -1.6, w: 4.85, d: 0.5, h: 1.3 }, { x: 2.875, z: -1.6, w: 0.85, d: 0.5, h: 1.3 }],
+    tnts: [{ x: -2.0, z: 2.6, out: [{ x: -2.0, z: 1.85, yaw: P }] }, { x: 2.0, z: -1.6, out: [{ x: 2.0, z: -2.35, yaw: P }] }],
+    vases: [{ x: 0.4, z: 4.2 }, { x: -1.2, z: -0.7 }, { x: 1.3, z: 1.6 }, { x: 0.3, z: -3.6 }, { x: -2.7, z: -3.9 }],
+    bells: [{ x: 0.2, z: 0.5, rot: P / 2 }, { x: -1.6, z: -5.0, rot: 0 }] },
+  // 13-15: çatal
+  { name: 'Çatal', goal: 'İki kolla iki çanı çal', yeni: 'Çatal: zincir ikiye ayrılır', hint: 'Çatalın önündeki iki taştan iki yol çiz',
+    start: { x: 0, z: 5.6, yaw: P }, stock: 39, stars: [32, 37],
+    forks: [{ x: 0, z: 1.8, yaw: P }],
+    walls: [{ x: 0, z: -2.6, w: 0.5, d: 4.4, h: 1.3 }],
+    bells: [{ x: -2.0, z: -4.2, rot: 0 }, { x: 2.0, z: -4.2, rot: 0 }] },
+  { name: 'Çift Kol', goal: 'Bir kol TNT’ye, bir kol hendeğe', hint: 'Her kolu ayrı ayrı planla',
+    start: { x: -2.2, z: 5.6, yaw: P }, stock: 39, stars: [32, 37],
+    forks: [{ x: 0, z: 2.2, yaw: P }],
+    walls: [{ x: -2.775, z: -1.6, w: 1.05, d: 0.5, h: 1.3 }, { x: -0.825, z: -1.6, w: 1.05, d: 0.5, h: 1.3 }, { x: 0, z: -2.9, w: 0.5, d: 6.6, h: 1.3 }],
+    tnts: [{ x: -1.8, z: -1.6, out: [{ x: -1.8, z: -2.35, yaw: P }] }],
+    ditches: [{ x: 1.85, z: -1.2, w: 2.9, d: 0.8 }],
+    vases: [{ x: -2.8, z: -3.7 }, { x: -0.8, z: -4.0 }, { x: 2.8, z: 0.6 }, { x: 0.9, z: -3.2 }],
+    bells: [{ x: -1.8, z: -5.0, rot: 0 }, { x: 1.7, z: -4.6, rot: 0 }] },
+  { name: 'Final', goal: 'Üç çan · hepsi bir arada', hint: 'Hendek, çatal, TNT: sırayla düşün',
+    start: { x: 0, z: 5.8, yaw: P }, stock: 43, stars: [36, 41],
+    ditches: [{ x: 0, z: 4.3, w: 6.6, d: 0.8 }],
+    forks: [{ x: 0, z: 1.9, yaw: P }],
+    walls: [{ x: 0, z: -3.1, w: 0.5, d: 6.2, h: 1.3 }, { x: 0.825, z: -2.0, w: 1.15, d: 0.5, h: 1.3 }, { x: 2.8, z: -2.0, w: 1.0, d: 0.5, h: 1.3 }],
+    tnts: [{ x: 1.85, z: -2.0, out: [{ x: 1.85, z: -2.75, yaw: P }] }],
+    vases: [{ x: -0.9, z: 0.0 }, { x: -2.9, z: -2.8 }, { x: -1.0, z: -3.4 }, { x: 2.8, z: -4.0 }, { x: 0.9, z: -3.8 }, { x: 2.6, z: 1.2 }],
+    bells: [{ x: -2.0, z: -1.0, rot: 0 }, { x: 1.8, z: -5.2, rot: 0 }, { x: -1.6, z: -5.2, rot: 0 }] },
+];
+const PHYS_DT = 1 / 120, PHYS_SUB = 4;
+const $ = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const G = window.G = { FAST: false };
+
+/* ---------------- SES ---------------- */
+const SFX = (() => {
+  let ac = null, master, noise, muted = false; const last = {};
+  function init() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ac = new AC(); master = ac.createGain(); master.gain.value = muted ? 0 : 0.85; master.connect(ac.destination);
+    noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function tone(t, dur, f0, f1, g, type) { const o = ac.createOscillator(), gg = ac.createGain(); o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    gg.gain.setValueAtTime(0.0001, t); gg.gain.exponentialRampToValueAtTime(g, t + 0.004); gg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(gg); gg.connect(master); o.start(t); o.stop(t + dur + 0.02); }
+  function burst(t, dur, fr, q, g, type) { const s = ac.createBufferSource(); s.buffer = noise; const bp = ac.createBiquadFilter(); bp.type = type || 'bandpass'; bp.frequency.value = fr; bp.Q.value = q;
+    const gg = ac.createGain(); gg.gain.setValueAtTime(0.0001, t); gg.gain.exponentialRampToValueAtTime(g, t + 0.003); gg.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(bp); bp.connect(gg); gg.connect(master); s.start(t, Math.random()); s.stop(t + dur + 0.02); }
+  const ok = (k, gap) => { if (!ac || G.FAST) return false; const t = ac.currentTime; if (last[k] && t - last[k] < gap) return false; last[k] = t; return true; };
+  return { init,
+    setMute(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.85; },
+    place(i) { if (!ok('place', 0.03)) return; const t = ac.currentTime, fr = 900 + (i % 8) * 60; tone(t, 0.05, fr, fr * 0.8, 0.07, 'triangle'); burst(t, 0.03, 3500, 1.5, 0.08); },
+    remove() { if (!ok('rm', 0.04)) return; const t = ac.currentTime; tone(t, 0.07, 500, 300, 0.06, 'triangle'); },
+    deny() { if (!ok('deny', 0.12)) return; const t = ac.currentTime; tone(t, 0.12, 240, 180, 0.08, 'square'); },
+    push() { if (!ac) return; const t = ac.currentTime; burst(t, 0.25, 700, 1, 0.25); tone(t, 0.15, 200, 400, 0.08, 'triangle'); },
+    clack(i, v) { if (!ok('clack', 0.028)) return; const t = ac.currentTime, fr = 1500 + Math.min(i, 40) * 18 + rnd(-60, 60);   // zincir ilerledikçe hafifçe incelen tık
+      tone(t, 0.045, fr, fr * 0.7, 0.05 * v, 'triangle'); burst(t, 0.035, 4200, 2, 0.14 * v); },
+    bell(hi) { if (!ac) return; const t = ac.currentTime, m = hi ? 1.5 : 1, L = hi ? 0.6 : 1;   // hi: ara çan (tiz, kısa)
+      [[523, 0.22], [1320, 0.1], [2100, 0.07], [2980, 0.04]].forEach(([fr, g], i) => tone(t, (2.2 - i * 0.4) * L, fr * m, fr * m * 0.998, g, 'sine')); burst(t, 0.05, 6000, 1, 0.2); },
+    combo(n) { if (!ok('combo', 0.1)) return; const t = ac.currentTime, fr = 660 * Math.pow(2, Math.min(n, 8) * 2 / 12); tone(t, 0.12, fr, fr, 0.06, 'triangle'); tone(t + 0.06, 0.16, fr * 1.5, fr * 1.5, 0.05, 'triangle'); },
+    boom() { if (!ac) return; const t = ac.currentTime; burst(t, 0.7, 380, 0.7, 0.7, 'lowpass'); tone(t, 0.55, 110, 35, 0.35, 'sine'); burst(t, 0.18, 2400, 0.8, 0.25); },
+    shatter() { if (!ac) return; const t = ac.currentTime; for (let i = 0; i < 7; i++) { const fr = rnd(2600, 6200); tone(t + i * 0.022, 0.09, fr, fr * 0.8, 0.045, 'triangle'); } burst(t, 0.28, 5200, 1.4, 0.28); },
+    fork() { if (!ok('fork', 0.2)) return; const t = ac.currentTime; tone(t, 0.12, 520, 720, 0.07, 'triangle'); tone(t + 0.07, 0.14, 760, 1040, 0.06, 'triangle'); },
+    jump() { if (!ok('jump', 0.08)) return; const t = ac.currentTime; tone(t, 0.12, 280, 620, 0.09, 'triangle'); burst(t, 0.05, 1800, 1, 0.1); },
+    star(k) { if (!ac || G.FAST) return; const t = ac.currentTime, fr = 784 * Math.pow(2, k * 4 / 12); tone(t, 0.25, fr, fr, 0.08, 'triangle'); burst(t, 0.06, 5000, 1, 0.08); },
+    win() { if (!ac) return; const t = ac.currentTime; [0, 4, 7, 12, 16].forEach((n, i) => { const fr = 523.25 * Math.pow(2, n / 12); tone(t + 0.3 + i * 0.09, 0.5, fr, fr, 0.07, 'triangle'); }); },
+    fail() { if (!ac) return; const t = ac.currentTime; tone(t, 0.4, 330, 200, 0.09, 'triangle'); tone(t + 0.2, 0.5, 260, 150, 0.07, 'triangle'); },
+  };
+})();
+const buzz = ms => { try { if (save.mute) return; const ua = navigator.userActivation; if (!G.FAST && navigator.vibrate && (!ua || ua.hasBeenActive)) navigator.vibrate(ms); } catch (e) {} };
+
+/* ---------------- SAHNE ---------------- */
+const app = $('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+app.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#2a1f18'); scene.fog = new THREE.Fog('#2a1f18', 18, 34);
+const camera = new THREE.PerspectiveCamera(52, 9 / 16, 0.1, 100);
+const CAM_POS = new THREE.Vector3(0, 12.5, 9.5), CAM_LOOK = new THREE.Vector3(0, 0, 0.2);
+const camLook = CAM_LOOK.clone(), camPos = CAM_POS.clone();
+scene.add(new THREE.HemisphereLight('#fff1dc', '#3b2a1c', 0.9));
+const sun = new THREE.DirectionalLight('#ffe2b8', 2.4); sun.position.set(-5, 12, 6); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 11, bottom: -11, near: 1, far: 40 }); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
+scene.add(sun, sun.target);
+const lamp = new THREE.PointLight('#ffcf8a', 12, 16, 1.6); lamp.position.set(0, 6, -1); scene.add(lamp);
+const canvasTex = (w, h, draw, rep) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); } t.anisotropy = 4; return t; };
+const std = (color, o) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.7 }, o || {}));
+const mesh = (geo, mat, shadow) => { const m = new THREE.Mesh(geo, mat); m.castShadow = shadow !== false; m.receiveShadow = true; return m; };
+
+// masa: sıcak ahşap
+const woodTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#9c6a3f'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 9; i++) { g.fillStyle = i % 2 ? '#a57146' : '#94633a'; g.fillRect(0, i * (h / 9), w, h / 9 - 2); }
+  g.strokeStyle = 'rgba(70,40,20,.25)'; g.lineWidth = 1.5; for (let i = 0; i < 40; i++) { g.beginPath(); const y = Math.random() * h; g.moveTo(0, y); for (let x = 0; x <= w; x += 32) g.lineTo(x, y + Math.sin(x * 0.05 + i) * 3); g.stroke(); } }, [3, 4]);
+const table = mesh(new THREE.BoxGeometry(12, 0.5, 16), std('#ffffff', { map: woodTex, roughness: 0.75 }), false);
+table.position.y = -0.25; scene.add(table);
+const rim = std('#6b4424', { roughness: 0.6 });
+for (const [w, d, x, z] of [[12.4, 0.3, 0, -8.1], [12.4, 0.3, 0, 8.1], [0.3, 16.4, -6.1, 0], [0.3, 16.4, 6.1, 0]]) { const r = mesh(new THREE.BoxGeometry(w, 0.35, d), rim); r.position.set(x, 0.1, z); scene.add(r); }
+const floor = mesh(new THREE.PlaneGeometry(80, 80), std('#1f1712', { roughness: 1 }), false); floor.rotation.x = -Math.PI / 2; floor.position.y = -3; scene.add(floor);
+
+/* ---------------- FİZİK ---------------- */
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82 * 1.6, 0) });
+world.solver.iterations = 20; world.allowSleep = false;
+const tableMat = new CANNON.Material('table'), domMat = new CANNON.Material('dom');
+// Test sonucu: masa sürtünmesi yüksek + taşlar arası sürtünme sıfır olmazsa taşlar kayıp birbirine yaslanıyor, zincir 1-2 taşta duruyor
+world.addContactMaterial(new CANNON.ContactMaterial(tableMat, domMat, { friction: 3, restitution: 0, frictionEquationStiffness: 1e8, contactEquationStiffness: 1e8 }));
+world.addContactMaterial(new CANNON.ContactMaterial(domMat, domMat, { friction: 0, restitution: 0 }));
+const tableBody = new CANNON.Body({ mass: 0, material: tableMat, shape: new CANNON.Plane() });
+tableBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0); world.addBody(tableBody);
+
+/* ---------------- KAYIT ---------------- */
+const ALL = /[?&]all\b/.test(location.search);   // test: bütün bölümler açık
+const save = (() => { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } })();
+save.best = save.best || {}; save.max = save.max || 0;
+const saveGame = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} };
+tableBody.collisionFilterGroup = TABLE_G;
+
+/* ---------------- YARDIMCI ---------------- */
+// yerel çerçeve: lx = sağ, lz = ileri (yaw yönü)
+const frameOf = (x, z, yaw) => ({ x, z, s: Math.sin(yaw), c: Math.cos(yaw) });
+const toLocal = (f, px, pz) => { const dx = px - f.x, dz = pz - f.z; return [dx * f.c - dz * f.s, dx * f.s + dz * f.c]; };
+const fromLocal = (f, lx, lz) => [f.x + f.c * lx + f.s * lz, f.z - f.s * lx + f.c * lz];
+const inDitch = (x, z) => (LV.ditches || []).some(d => Math.abs(x - d.x) < d.w / 2 && Math.abs(z - d.z) < d.d / 2);
+
+/* ---------------- BÖLÜM NESNELERİ ---------------- */
+/* Engeller once '#5b3b22' idi: hem zeminin (#9c6a3f) hem cercevenin (#4a2f1a)
+   sicak kahvesiyle ayni aileden oldugu icin golge gibi okunuyor, 1. bolumde
+   ortadaki duvar cercevenin parcasi saniliyordu. Serin gri-mavi + acik ust yuz
+   sicak ahsapta aninda ayrisiyor; sutunlar da ayni dili konussun diye ayni ton. */
+const obstSide = std('#4d5560', { roughness: 0.75 }), obstTop = std('#646e7a', { roughness: 0.6 });
+const obstMat = [obstSide, obstSide, obstTop, obstSide, obstSide, obstSide];   // BoxGeometry yuz sirasi: +x -x +y -y +z -z
+const pillarMat = std('#5f6b78', { roughness: 0.6 }), frameMat = std('#4a2f1a', { roughness: 0.7 });
+const brass = std('#e0b04a', { metalness: 0.85, roughness: 0.28 }), darkMat = std('#3b2a1c', { roughness: 0.6 });
+const FRAME = [{ x: -3.5, z: 0, w: 0.4, d: 13.2, h: 0.6 }, { x: 3.5, z: 0, w: 0.4, d: 13.2, h: 0.6 }, { x: 0, z: -6.4, w: 7.4, d: 0.4, h: 0.6 }, { x: 0, z: 6.4, w: 7.4, d: 0.4, h: 0.6 }];
+const bellShape = [[0, 0], [0.12, 0], [0.16, -0.1], [0.19, -0.29], [0.29, -0.43], [0.29, -0.46], [0, -0.46]].map(([x, y]) => new THREE.Vector2(x, y));
+const stripTex = canvasTex(128, 32, (g, w, h) => { g.fillStyle = '#ffffff'; for (let x = -h; x < w + h; x += 24) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 12, h); g.lineTo(x + 12 + h, 0); g.lineTo(x + h, 0); g.fill(); } });
+const vaseProfile = [[0, 0], [0.11, 0], [0.16, 0.06], [0.2, 0.22], [0.19, 0.4], [0.12, 0.56], [0.08, 0.64], [0.1, 0.72], [0.12, 0.75], [0, 0.75]].map(([x, y]) => new THREE.Vector2(x, y));
+const vaseTex = canvasTex(64, 64, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(255,255,255,.0)';
+  g.fillStyle = 'rgba(40,20,10,.25)'; g.fillRect(0, h * 0.28, w, 4); g.fillRect(0, h * 0.62, w, 3);
+  g.fillStyle = 'rgba(255,255,255,.55)'; for (let x = 4; x < w; x += 16) { g.beginPath(); g.arc(x, h * 0.45, 3, 0, 7); g.fill(); } });
+const VASE_COLS = ['#3d7cc9', '#e07a5f', '#5fa88a', '#e6b34a', '#9b6fc2'];
+const ditchTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#0b0705'; g.fillRect(0, 0, w, h);
+  for (const [x0, y0, x1, y1] of [[0, 0, 0, 26], [0, h, 0, h - 26], [0, 0, 26, 0], [w, 0, w - 26, 0]]) { const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, 'rgba(70,42,24,.95)'); gr.addColorStop(1, 'rgba(70,42,24,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); } });
+const rimDark = std('#3a2414', { roughness: 0.7 });
+const tntTex = canvasTex(128, 96, (g, w, h) => { g.fillStyle = '#c8321e'; g.fillRect(0, 0, w, h); g.fillStyle = '#8a1f12'; for (let x = 8; x < w; x += 24) g.fillRect(x, 0, 4, h);
+  g.fillStyle = '#f4e3c1'; g.fillRect(0, h * 0.3, w, h * 0.4); g.fillStyle = '#2a1a10'; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('TNT', w / 2, h / 2 + 2); });
+const forkTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#2f8f9d'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(0,0,0,.2)'; g.lineWidth = 8; g.strokeRect(4, 4, w - 8, h - 8);
+  g.strokeStyle = '#f4e3c1'; g.lineWidth = 14; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(w / 2, h * 0.84); g.lineTo(w / 2, h * 0.52); g.lineTo(w * 0.24, h * 0.18); g.moveTo(w / 2, h * 0.52); g.lineTo(w * 0.76, h * 0.18); g.stroke(); });
+const arrowShape = new THREE.Shape();
+[[0, 0.34], [0.3, 0.02], [0.13, 0.02], [0.13, -0.28], [-0.13, -0.28], [-0.13, 0.02], [-0.3, 0.02]].forEach(([x, y], i) => i ? arrowShape.lineTo(x, y) : arrowShape.moveTo(x, y));
+const arrowGeo = new THREE.ShapeGeometry(arrowShape);
+function makeArrow(color) { const g = new THREE.Group(), m = new THREE.Mesh(arrowGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide })); m.rotation.x = Math.PI / 2; g.add(m); scene.add(g); return g; }
+
+let LV = null, bells = [], vases = [], tnts = [], forks = [];
+const lvObjs = [], lvBodies = [];
+function addStatic(m, body) { if (m) { scene.add(m); lvObjs.push(m); } if (body) { world.addBody(body); lvBodies.push(body); } }
+function addWall(o, mat) { const m = mesh(new THREE.BoxGeometry(o.w, o.h, o.d), mat); m.position.set(o.x, o.h / 2, o.z);
+  const b = new CANNON.Body({ mass: 0, material: tableMat, shape: new CANNON.Box(new CANNON.Vec3(o.w / 2, o.h / 2, o.d / 2)) }); b.position.set(o.x, o.h / 2, o.z); addStatic(m, b); }
+function makeBell(def) {
+  const rot = def.rot || 0, g = new THREE.Group(); g.position.set(def.x, 0, def.z); g.rotation.y = rot; addStatic(g);
+  for (const sx of [-GATE_HALF, GATE_HALF]) {
+    const p = mesh(new THREE.CylinderGeometry(0.06, 0.08, 2.05, 10), darkMat); p.position.set(sx, 1.02, 0); g.add(p);
+    const f = mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.1, 14), darkMat); f.position.set(sx, 0.05, 0); g.add(f); }
+  const bar = mesh(new THREE.BoxGeometry(GATE_HALF * 2 + 0.24, 0.1, 0.1), darkMat); bar.position.y = 2.05; g.add(bar);
+  const pivot = new THREE.Group(); pivot.position.y = 2.0; g.add(pivot);
+  pivot.add(mesh(new THREE.LatheGeometry(bellShape, 24), brass));
+  const clap = mesh(new THREE.SphereGeometry(0.06, 10, 8), darkMat); clap.position.y = -0.41; pivot.add(clap);
+  const glow = new THREE.PointLight('#ffd27a', 0, 6, 2); glow.position.y = 1.6; g.add(glow);
+  const strip = new THREE.Mesh(new THREE.PlaneGeometry(GATE_HALF * 2 - 0.16, 0.5), new THREE.MeshBasicMaterial({ color: '#ffd27a', map: stripTex, transparent: true, opacity: 0.5, depthWrite: false }));
+  strip.rotation.x = -Math.PI / 2; strip.position.y = 0.012; g.add(strip);
+  return { def, g, pivot, glow, strip, swing: 0, rung: false, f: frameOf(def.x, def.z, rot) };
+}
+function makeVase(def, i) {
+  const col = VASE_COLS[i % VASE_COLS.length], g = new THREE.Group(); g.position.set(def.x, 0, def.z); addStatic(g);
+  g.add(mesh(new THREE.LatheGeometry(vaseProfile, 20), std(col, { map: vaseTex, roughness: 0.22, metalness: 0.05 })));
+  const ring = new THREE.Mesh(new THREE.RingGeometry(VASE_RING - 0.07, VASE_RING, 32), new THREE.MeshBasicMaterial({ color: '#ff6a5a', transparent: true, opacity: 0.35, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.012; g.add(ring);
+  return { def, g, ring, col, broken: false };
+}
+function makeDitch(d) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(d.w, d.d), new THREE.MeshBasicMaterial({ map: ditchTex })); m.rotation.x = -Math.PI / 2; m.position.set(d.x, 0.004, d.z); addStatic(m);
+  for (const [w, dd, ox, oz] of [[d.w + 0.06, 0.06, 0, -d.d / 2], [d.w + 0.06, 0.06, 0, d.d / 2], [0.06, d.d, -d.w / 2, 0], [0.06, d.d, d.w / 2, 0]]) {
+    const e = mesh(new THREE.BoxGeometry(w, 0.03, dd), rimDark, false); e.position.set(d.x + ox, 0.015, d.z + oz); addStatic(e); }
+}
+function makeTnt(def) {
+  const rot = def.rot || 0, f = frameOf(def.x, def.z, rot);
+  const m = mesh(new THREE.BoxGeometry(TNT.w, TNT.h, TNT.d), std('#ffffff', { map: tntTex, roughness: 0.6 })); m.position.set(def.x, TNT.h / 2, def.z); m.rotation.y = rot;
+  const fuse = mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.28, 6), darkMat); fuse.position.set(0.2, TNT.h / 2 + 0.12, 0); fuse.rotation.z = 0.5; m.add(fuse);
+  const body = new CANNON.Body({ mass: 0, material: tableMat, shape: new CANNON.Box(new CANNON.Vec3(TNT.w / 2, TNT.h / 2, TNT.d / 2)) });
+  body.position.set(def.x, TNT.h / 2, def.z); body.quaternion.setFromEuler(0, rot, 0); addStatic(m, body);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.66, 0.76, 36), new THREE.MeshBasicMaterial({ color: '#ff4a2a', transparent: true, opacity: 0.4, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(def.x, 0.013, def.z); addStatic(ring);
+  return { def, f, m, body, ring, blown: false, outChains: [] };
+}
+function makeFork(def) {
+  const f = frameOf(def.x, def.z, def.yaw);
+  const m = mesh(new THREE.BoxGeometry(FORK.w, FORK.h, FORK.d), std('#ffffff', { map: forkTex, roughness: 0.5 })); addStatic(m);
+  const arrowG = makeArrow('#8fd8ff'); lvObjs.push(arrowG);
+  return { def, f, m, arrowG, body: null, fired: false, outChains: [] };
+}
+function loadLevel(n) {
+  n = clamp(n | 0, 0, LEVELS.length - 1);
+  if (S) { for (const t of S.tiles) { scene.remove(t.mesh); t.mesh.material.dispose(); if (t.body) world.removeBody(t.body); } for (const ch of S.chains) scene.remove(ch.arrow); for (const fk of forks) if (fk.body) world.removeBody(fk.body); }
+  S = null;
+  for (const o of lvObjs) scene.remove(o); for (const b of lvBodies) world.removeBody(b); lvObjs.length = 0; lvBodies.length = 0;
+  LV = LEVELS[n]; LV.i = n; LV.allWalls = FRAME.concat(LV.walls || []); save.level = n; saveGame();
+  for (const o of FRAME) addWall(o, frameMat);
+  for (const o of LV.walls || []) addWall(o, obstMat);
+  for (const p of LV.pillars || []) { const m = mesh(new THREE.CylinderGeometry(p.r, p.r * 1.12, 1.3, 20), pillarMat); m.position.set(p.x, 0.65, p.z);
+    const b = new CANNON.Body({ mass: 0, material: tableMat, shape: new CANNON.Box(new CANNON.Vec3(p.r, 0.65, p.r)) }); b.position.set(p.x, 0.65, p.z); addStatic(m, b); }
+  for (const d of LV.ditches || []) makeDitch(d);
+  vases = (LV.vases || []).map(makeVase);
+  tnts = (LV.tnts || []).map(makeTnt);
+  forks = (LV.forks || []).map(makeFork);
+  bells = LV.bells.map(makeBell);
+  const cam = LV.cam || [15.5, 7, 0.3];
+  CAM_POS.set(0, cam[0], cam[1]); CAM_LOOK.set(0, 0, cam[2]); camPos.copy(CAM_POS); camLook.copy(CAM_LOOK);
+  $('hint').textContent = LV.hint;
+  newState();
+  // Baslik satiri HUD'daki bolum adiyla ayniydi ve tahtanin ortasini kapatiyordu: hedefi one aldik.
+  banner(LV.goal, LV.yeni ? 'YENİ · ' + LV.yeni : '', !!LV.yeni);
+}
+const rungCount = () => bells.reduce((a, b) => a + (b.rung ? 1 : 0), 0);
+// koşu sırasında değişen bölüm nesnelerini ilk hâline getir
+function resetStatics() {
+  for (const b of bells) { b.rung = false; b.swing = 0; b.glow.intensity = 0; }
+  for (const v of vases) { v.broken = false; v.g.visible = true; }
+  for (const tn of tnts) { if (tn.blown) world.addBody(tn.body); tn.blown = false; tn.m.visible = true; tn.ring.visible = true; }
+  for (const fk of forks) { if (fk.body) world.removeBody(fk.body); fk.body = null; fk.fired = false; fk.m.position.set(fk.def.x, FORK.h / 2, fk.def.z); fk.m.rotation.set(0, fk.def.yaw, 0); }
+}
+
+/* ---------------- TAŞLAR ---------------- */
+const tileTex = canvasTex(64, 128, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(6, h / 2 - 2, w - 12, 4);
+  g.fillStyle = 'rgba(255,255,255,.9)'; for (const y of [h * 0.25, h * 0.75]) { g.beginPath(); g.arc(w / 2, y, 7, 0, 7); g.fill(); }
+  g.strokeStyle = 'rgba(0,0,0,.12)'; g.lineWidth = 4; g.strokeRect(2, 2, w - 4, h - 4); });
+const tileGeo = new THREE.BoxGeometry(DOM.w, DOM.h, DOM.d), bigGeo = new THREE.BoxGeometry(BIG.w, BIG.h, BIG.d);
+const tileColor = i => new THREE.Color().setHSL((0.02 + i * 0.035) % 1, 0.72, 0.56);
+const ANCHOR_COL = new THREE.Color('#F6E7C8'), BIG_COL = new THREE.Color('#d9a441');
+const ghost = new THREE.Mesh(tileGeo, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.35, depthWrite: false }));
+ghost.visible = false; scene.add(ghost);
+const breakMark = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.46, 32), new THREE.MeshBasicMaterial({ color: '#ff5a4a', transparent: true, opacity: 0.85, depthWrite: false }));
+breakMark.rotation.x = -Math.PI / 2; breakMark.position.y = 0.015; breakMark.visible = false; scene.add(breakMark);
+
+let S = null;
+function newState() {
+  if (S) { for (const t of S.tiles) { scene.remove(t.mesh); t.mesh.material.dispose(); if (t.body) world.removeBody(t.body); } for (const ch of S.chains) scene.remove(ch.arrow); }
+  resetStatics();
+  S = { phase: 'build', tiles: [], chains: [], active: 0, order: 0, time: 0, runT: 0, still: 0, slowT: 0, slowK: 1, fallen: 0, shake: 0, lastFallT: 0, winAt: 0, breakPos: null, events: [], focus: new THREE.Vector3(LV.start.x, 0, LV.start.z) };
+  addChain(LV.start.x, LV.start.z, LV.start.yaw, null);
+  for (const tn of tnts) tn.outChains = tn.def.out.map(o => addChain(o.x, o.z, o.yaw, tn));
+  for (const fk of forks) fk.outChains = [-1, 1].map(sg => { const [x, z] = fromLocal(fk.f, sg * FORK.side, FORK.out); return addChain(x, z, fk.def.yaw + sg * FORK.spread, fk); });
+  breakMark.visible = false; boomT = 9;
+  $('over').style.display = 'none'; $('hint').style.display = 'block';
+  updateHud();
+}
+function addChain(x, z, yaw, src) {
+  const ci = S.chains.length; S.chains.push({ tiles: [], src, arrow: makeArrow('#fff4e2') });
+  addTile(ci, x, z, yaw, false, true); return ci;
+}
+function addTile(ci, x, z, yaw, big, anchor) {
+  const col = anchor ? ANCHOR_COL : big ? BIG_COL : tileColor(S.tiles.length);
+  const m = mesh(big ? bigGeo : tileGeo, new THREE.MeshStandardMaterial({ color: col, map: tileTex, roughness: 0.45, metalness: 0.05, emissive: col, emissiveIntensity: 0 }));
+  m.position.set(x, (big ? BIG.h : DOM.h) / 2, z); m.rotation.set(0, yaw, 0); scene.add(m);
+  const t = { x, z, yaw, col, risky: false, big: !!big, anchor: !!anchor, converted: false, ci, idx: S.tiles.length, order: anchor ? -1 : ++S.order, mesh: m, body: null, fallen: false, fallT: -9, sunk: false, flash: 0, pop: anchor ? 1 : 0 };
+  S.tiles.push(t); S.chains[ci].tiles.push(t); return t;
+}
+function setBig(t, on) {
+  t.big = on; t.mesh.geometry = on ? bigGeo : tileGeo; t.mesh.position.y = (on ? BIG.h : DOM.h) / 2;
+  const col = on ? BIG_COL : tileColor(t.idx); t.col = col; t.mesh.material.color.copy(col); t.mesh.material.emissive.copy(col); t.pop = 0;
+
+}
+const usedTiles = () => S.tiles.reduce((a, t) => a + (t.anchor ? 0 : t.big ? 2 : 1), 0);
+const stockLeft = () => LV.stock - usedTiles();
+const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
+// neden konamaz: 'wall' | 'post' | 'vase' | 'tnt' | 'fork' | 'ditch' | 'self' | false
+function blockedAt(x, z, ci) {
+  if (Math.abs(x) > 5.6 || Math.abs(z) > 7.6) return 'wall';
+  for (const o of LV.allWalls) if (Math.abs(x - o.x) < o.w / 2 + 0.28 && Math.abs(z - o.z) < o.d / 2 + 0.28) return 'wall';
+  for (const p of LV.pillars || []) if (Math.hypot(x - p.x, z - p.z) < p.r + 0.3) return 'wall';
+  for (const b of bells) for (const s of [-GATE_HALF, GATE_HALF]) { const [wx, wz] = fromLocal(b.f, s, 0); if (Math.hypot(x - wx, z - wz) < 0.4) return 'post'; }
+  for (const v of vases) if (Math.hypot(x - v.def.x, z - v.def.z) < VASE_BLOCK) return 'vase';
+  for (const tn of tnts) { const [lx, lz] = toLocal(tn.f, x, z); if (Math.abs(lx) < TNT.w / 2 + 0.28 && Math.abs(lz) < TNT.d / 2 + 0.28) return 'tnt'; }
+  for (const fk of forks) { const [lx, lz] = toLocal(fk.f, x, z); if (Math.abs(lx) < FORK.w / 2 + 0.2 && Math.abs(lz) < FORK.d / 2 + 0.28) return 'fork'; }
+  for (const d of LV.ditches || []) if (Math.abs(x - d.x) < d.w / 2 + 0.15 && Math.abs(z - d.z) < d.d / 2 + 0.15) return 'ditch';
+  if (S) for (let c = 0; c < S.chains.length; c++) { const T = S.chains[c].tiles, n = T.length - (c === ci ? 2 : 0);   // kendi hattının üstüne binme
+    for (let i = 0; i < n; i++) if (Math.hypot(T[i].x - x, T[i].z - z) < 0.42) return 'self'; }
+  return false;
+}
+// taş devrilirken önünde süpürdüğü alan duvar/direk köşesine takılır mı (yalnız merkeze bakmak virajda yetmiyor)
+function sweepBlocked(x, z, yaw) {
+  const vx = Math.sin(yaw), vz = Math.cos(yaw);
+  for (const f of [0.15, 0.4]) for (const sd of [-0.25, 0, 0.25]) {
+    const px = x + vx * f + vz * sd, pz = z + vz * f - vx * sd;
+    for (const o of LV.allWalls) if (Math.abs(px - o.x) < o.w / 2 + 0.04 && Math.abs(pz - o.z) < o.d / 2 + 0.04) return true;
+    for (const p of LV.pillars || []) if (Math.hypot(px - p.x, pz - p.z) < p.r + 0.04) return true;
+    for (const b of bells) for (const s2 of [-GATE_HALF, GATE_HALF]) { const [wx, wz] = fromLocal(b.f, s2, 0); if (Math.hypot(px - wx, pz - wz) < 0.1) return true; }
+  }
+  return false;
+}
+// devrilen taş vazoya değecek mi: kurarken taş kırmızı yanıp uyarır
+// tin/tout: taşa giriş/çıkış dönüşü; keskin viraj ve zikzakta taş dışa savrulur, pay büyür
+function riskAt(x, z, yaw, len, tin, tout) {
+  if (!vases.length) return false;
+  tin = tin || 0; tout = tout || 0;
+  const wiggle = (Math.abs(tout) >= 0.45 || (tin * tout < 0 && Math.abs(tin - tout) >= 0.6)) ? 0.3 : Math.abs(tout) >= 0.25 ? 0.12 : 0;
+  const vx = Math.sin(yaw), vz = Math.cos(yaw), r = VASE_R + 0.2 + wiggle;   // devrilirken yana kayma payı (virajda ~0.3 kayıyor)
+  for (let f = 0.1; f <= (len || 1.0) + 0.15; f += 0.2) for (const sd of [-0.27, 0, 0.27]) {
+    const px = x + vx * f + vz * sd, pz = z + vz * f - vx * sd;
+    for (const v of vases) if (Math.hypot(px - v.def.x, pz - v.def.z) < r) return true;
+  }
+  return false;
+}
+// (x,z)'den yaw yönündeki ilk hendek: giriş/çıkış mesafesi
+function ditchHit(x, z, yaw) {
+  const vx = Math.sin(yaw), vz = Math.cos(yaw); let best = null;
+  for (const d of LV.ditches || []) {
+    let t0 = -1e9, t1 = 1e9;
+    for (const [p, v, lo, hi] of [[x, vx, d.x - d.w / 2, d.x + d.w / 2], [z, vz, d.z - d.d / 2, d.z + d.d / 2]]) {
+      if (Math.abs(v) < 1e-6) { if (p < lo || p > hi) t0 = 1e9; continue; }
+      let a = (lo - p) / v, b = (hi - p) / v; if (a > b) [a, b] = [b, a]; t0 = Math.max(t0, a); t1 = Math.min(t1, b); }
+    if (t0 <= t1 && t0 >= 0 && t0 < 0.9 && (!best || t0 < best.t0)) best = { t0, t1 };
+  }
+  return best;
+}
+function landing(x, z, yaw, t1, ci) {   // dev taştan karşı kıyıya
+  const d = t1 + 0.28, vx = Math.sin(yaw), vz = Math.cos(yaw); if (d > JUMP_MAX) return null;
+  for (let s = 0.25; s < d; s += 0.25) { const w = blockedAt(x + vx * s, z + vz * s, ci); if (w && w !== 'ditch' && w !== 'self') return null; }
+  const lx = x + vx * d, lz = z + vz * d; return blockedAt(lx, lz, ci) ? null : { x: lx, z: lz, yaw };
+}
+// son taştan yaw yönüne bir adım: [normal taş] ya da hendekte [dev taş|çevir, karşı kıyı taşı]; null = konamaz
+function planStep(last, yaw, ci) {
+  const vx = Math.sin(yaw), vz = Math.cos(yaw);
+  if (last.big) { const h = ditchHit(last.x, last.z, last.yaw); if (h) { const l = landing(last.x, last.z, last.yaw, h.t1, ci); return l ? [l] : null; } }
+  const nx = last.x + vx * SPACING, nz = last.z + vz * SPACING, why = blockedAt(nx, nz, ci);
+  if (!why) return sweepBlocked(nx, nz, yaw) ? null : [{ x: nx, z: nz, yaw }];
+  if (why !== 'ditch' || last.big) return null;
+  let h = ditchHit(last.x, last.z, yaw);
+  if (h && h.t0 - 0.24 >= 0.3) {   // kıyıya yeni dev taş
+    const tb = h.t0 - 0.24, bx = last.x + vx * tb, bz = last.z + vz * tb;
+    if (blockedAt(bx, bz, ci)) return null;
+    const l = landing(bx, bz, yaw, h.t1 - tb, ci); return l ? [{ x: bx, z: bz, yaw, big: true }, l] : null;
+  }
+  if (last.anchor) return null;
+  h = ditchHit(last.x, last.z, last.yaw); if (!h || h.t0 > 0.8) return null;   // kıyıdaki son taşı dev taşa çevir
+  const l = landing(last.x, last.z, last.yaw, h.t1, ci); return l ? [{ convert: true }, l] : null;
+}
+// parmak noktasına doğru aktif hattı uzat: sabit aralık, yumuşatılmış dönüş
+function extendTo(px, pz) {
+  let placed = 0; const ci = S.active, T = S.chains[ci].tiles;
+  for (let guard = 0; guard < 60; guard++) {
+    const n = T.length, last = T[n - 1];
+    if (n > 1) { const prev = T[n - 2]; if (Math.hypot(px - prev.x, pz - prev.z) < SPACING * 0.55) { removeLastOf(ci); continue; } }   // geri sürükle = sil
+    const dx = px - last.x, dz = pz - last.z;
+    if (Math.hypot(dx, dz) < (last.big ? 0.9 : SPACING)) break;
+    let yaw = Math.atan2(dx, dz); const turn = angDiff(yaw, last.yaw);
+    if (Math.abs(turn) > MAX_TURN) yaw = last.yaw + Math.sign(turn) * MAX_TURN;   // keskin dönüşü yumuşat
+    const opts = planStep(last, yaw, ci);
+    if (!opts) { ghostAt(last, px, pz, true); SFX.deny(); buzz(10); break; }
+    const cost = opts.reduce((a, o) => a + (o.big ? 2 : 1), 0);
+    if (stockLeft() < cost) { ghostAt(last, px, pz, true); SFX.deny(); bump($('hStock')); break; }
+    for (const o of opts) { if (o.convert) { setBig(last, true); last.converted = true; last.order = ++S.order; } else addTile(ci, o.x, o.z, o.yaw, o.big); }
+    placed++; if (opts.length > 1) { SFX.jump(); buzz(12); } else { SFX.place(S.tiles.length); buzz(4); }
+  }
+  if (placed) { $('hint').style.display = 'none'; breakMark.visible = false; updateRisk(ci); updateHud(); }
+  return placed;
+}
+function updateRisk(ci) {
+  const T = S.chains[ci].tiles, tn = i => i > 0 && i < T.length ? angDiff(T[i].yaw, T[i - 1].yaw) : 0;
+  for (let i = Math.max(1, T.length - 3); i < T.length; i++) { const t = T[i]; t.risky = riskAt(t.x, t.z, t.yaw, t.big ? BIG.h : DOM.h, tn(i), tn(i + 1)); }
+}
+function ghostAt(last, px, pz, bad) {
+  let yaw = Math.atan2(px - last.x, pz - last.z); const turn = angDiff(yaw, last.yaw);
+  if (Math.abs(turn) > MAX_TURN) yaw = last.yaw + Math.sign(turn) * MAX_TURN;
+  ghost.position.set(last.x + Math.sin(yaw) * SPACING, DOM.h / 2, last.z + Math.cos(yaw) * SPACING); ghost.rotation.set(0, yaw, 0);
+  ghost.material.color.set(bad ? '#ff5a5a' : '#ffffff'); ghost.visible = true;
+}
+function removeLastOf(ci) {
+  const T = S.chains[ci].tiles; if (T.length <= 1) return;
+  const t = T[T.length - 1];
+  if (t.converted) { setBig(t, false); t.converted = false; t.pop = 1; }   // dev taşa çevrilmiş taş geri normale döner
+  else { T.pop(); S.tiles.splice(S.tiles.indexOf(t), 1); scene.remove(t.mesh); t.mesh.material.dispose(); }
+  updateRisk(ci); breakMark.visible = false; SFX.remove(); updateHud();
+}
+function undo() {   // en son konan taşı sil (hangi kolda olursa)
+  let bi = -1, bo = -1;
+  S.chains.forEach((ch, i) => { const e = ch.tiles[ch.tiles.length - 1]; if (ch.tiles.length > 1 && e.order > bo) { bo = e.order; bi = i; } });
+  if (bi >= 0) { S.active = bi; removeLastOf(bi); }
+}
+function pickChain(px, pz) {   // parmağa en yakın hat ucu aktif olur
+  let best = -1, bd = 1.4;
+  S.chains.forEach((ch, i) => { const e = ch.tiles[ch.tiles.length - 1], d = Math.hypot(e.x - px, e.z - pz); if (d < bd) { bd = d; best = i; } });
+  if (best >= 0) S.active = best;
+}
+
+/* ---------------- ZİNCİRİ BAŞLAT ---------------- */
+const UP = new CANNON.Vec3(0, 1, 0), _up = new CANNON.Vec3();
+function makeBody(t) {
+  const dim = t.big ? BIG : DOM;
+  const body = new CANNON.Body({ mass: t.big ? 1.6 : 1, material: domMat, shape: new CANNON.Box(new CANNON.Vec3(dim.w / 2, dim.h / 2, dim.d / 2)), linearDamping: 0.01, angularDamping: 0.02 });
+  body.collisionFilterGroup = 2; body.half = new CANNON.Vec3(dim.w / 2, dim.h / 2, dim.d / 2);
+  body.position.set(t.x, dim.h / 2 + 0.002, t.z); body.quaternion.setFromEuler(0, t.yaw, 0);
+  body.addEventListener('collide', e => { if (e.body === tableBody) return; const v = Math.abs(e.contact.getImpactVelocityAlongNormal()); if (v > 0.5) SFX.clack(t.idx, Math.min(1, v / 3)); });
+  world.addBody(body); return body;
+}
+/* Takilmayi onleyen itme. Olcum: taslarin %94'u itiliyordu, yani
+   bu bir kurtarma degil zincirin normal calisma bicimi olmustu; itilen
+   taslarin yanal savrulmasi itilmeyenlerin 3.5 katiydi (en cok 1.38'e
+   karsi 0.40) ve vazo kiran taslarin hepsi itilmisti.
+   Ayarlanabilir ki esigi olcerek secebilelim. */
+const TUNE = { kick: 0.9, w: 2.2, up: 0.9, upBig: 0.8 };
+function kick(t) { t.kicked = true; pushTile(t, TUNE.kick * (t.big ? 1.6 : 1)); }
+function pushTile(t, k) {
+  if (!t.body) return; const h = (t.big ? BIG : DOM).h;
+  t.body.applyImpulse(new CANNON.Vec3(Math.sin(t.yaw) * k, 0, Math.cos(t.yaw) * k), new CANNON.Vec3(0, h * 0.45, 0));
+}
+function push() {
+  if (S.phase !== 'build' || usedTiles() < 1) { SFX.deny(); return; }
+  Object.assign(S, { phase: 'run', runT: 0, still: 0, fallen: 0, lastFallT: 0, winAt: 0, slowT: 0, slowK: 1, breakPos: null, events: [] });
+  ghost.visible = false; breakMark.visible = false; $('hint').style.display = 'none'; resetStatics();
+  for (const t of S.tiles) { t.body = makeBody(t); t.fallen = false; t.fallT = -9; t.sunk = false; t.flash = 0; t.mesh.visible = true; }
+  for (const fk of forks) { const b = new CANNON.Body({ mass: 2, material: domMat, shape: new CANNON.Box(new CANNON.Vec3(FORK.w / 2, FORK.h / 2, FORK.d / 2)), linearDamping: 0.01, angularDamping: 0.02 });
+    b.collisionFilterGroup = 2; b.half = new CANNON.Vec3(FORK.w / 2, FORK.h / 2, FORK.d / 2); b.position.set(fk.def.x, FORK.h / 2 + 0.002, fk.def.z); b.quaternion.setFromEuler(0, fk.def.yaw, 0); world.addBody(b); fk.body = b; }
+  for (const ch of S.chains) ch.tiles.forEach((t, i) => { t.next = ch.tiles[i + 1] || null; t.kicked = false; });
+  for (const fk of forks) fk.kicked = false;
+  const s = S.chains[0].tiles[0]; S.focus.set(s.x, 0, s.z); pushTile(s, 2);
+  SFX.init(); SFX.push(); buzz(15); updateHud();
+}
+function backToBuild() {   // dizilimi koru, taşları yerine koy
+  for (const t of S.tiles) { if (t.body) world.removeBody(t.body); t.body = null; t.fallen = false; t.sunk = false; t.flash = 0; t.mesh.visible = true; t.mesh.material.emissiveIntensity = 0;
+    t.mesh.position.set(t.x, (t.big ? BIG.h : DOM.h) / 2, t.z); t.mesh.quaternion.setFromEuler(new THREE.Euler(0, t.yaw, 0)); }
+  S.phase = 'build'; S.winAt = 0; S.events = []; resetStatics(); $('over').style.display = 'none';
+  if (S.breakPos) { breakMark.position.set(S.breakPos.x, 0.015, S.breakPos.z); breakMark.visible = true; }
+  updateHud();
+}
+function ringBell(b) {
+  b.rung = true; b.swing = 1; b.glow.intensity = 6; bump($('hBells'));
+  const all = rungCount() === bells.length;
+  confetti(new THREE.Vector3(b.def.x, 2.0, b.def.z), all ? 80 : 30); buzz(all ? [20, 40, 60] : 25);
+  if (all) { S.slowT = 1.1; S.shake = 0.25; SFX.bell(false); S.winAt = S.time + 1.6; }
+  else { S.slowT = Math.max(S.slowT, 0.35); S.shake = Math.max(S.shake, 0.12); SFX.bell(true); pop({ x: b.def.x, y: 2.3, z: b.def.z }, '🔔 ' + rungCount() + '/' + bells.length, '#FFD27A', 24); }
+  updateHud();
+}
+function blow(tn) {
+  tn.blown = true; world.removeBody(tn.body); tn.m.visible = false; tn.ring.visible = false;
+  const p = new THREE.Vector3(tn.def.x, 0.4, tn.def.z);
+  boomT = 0; boomBall.position.copy(p); boomLight.position.set(p.x, 1.2, p.z);
+  confetti(p, 40, '#c8321e', 1.3); puff(p.x, p.z, 10, '#6b5a4a', 2.2);
+  S.shake = Math.max(S.shake, 0.45); S.slowT = Math.max(S.slowT, 0.3); SFX.boom(); buzz([60, 30, 40]);
+  for (const t of S.tiles) if (t.body && t.fallen) { const dx = t.body.position.x - p.x, dz = t.body.position.z - p.z, d = Math.hypot(dx, dz);   // devrilmiş taşları savur
+    if (d < 2.2 && d > 0.01) t.body.applyImpulse(new CANNON.Vec3(dx / d * (2.2 - d) * 1.4, (2.2 - d) * 1.2, dz / d * (2.2 - d) * 1.4), new CANNON.Vec3(0, 0, 0)); }
+  S.events.push({ t: S.runT + 0.06, fn: () => { for (const ci of tn.outChains) pushTile(S.chains[ci].tiles[0], 2.2); } });
+}
+function fireFork(fk) {
+  fk.fired = true; SFX.fork(); buzz(20); puff(fk.def.x, fk.def.z, 4);
+  if (fk.body) fk.body.applyImpulse(new CANNON.Vec3(fk.f.s * 3.2, 0, fk.f.c * 3.2), new CANNON.Vec3(0, FORK.h * 0.45, 0));
+}
+function breakVase(v) {
+  v.broken = true; v.g.visible = false;
+  confetti(new THREE.Vector3(v.def.x, 0.45, v.def.z), 45, v.col, 0.7); puff(v.def.x, v.def.z, 5, '#e8d8c0', 1.2);
+  SFX.shatter(); buzz([30, 20, 30]); S.shake = Math.max(S.shake, 0.18);
+  if (S.phase === 'run') fail('vase', v);   // zincir tamamen durana kadar gecerli: son can calsa bile vazo kirilirsa kaybedilir
+}
+
+/* ---------------- EFEKT ---------------- */
+const CONF_N = 260;
+const confMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 0.02, 0.06), new THREE.MeshBasicMaterial({ color: '#ffffff' }), CONF_N);
+confMesh.frustumCulled = false; confMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CONF_N * 3).fill(1), 3); scene.add(confMesh);
+const conf = [];
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _e = new THREE.Euler();
+const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
+function confetti(p, n, col, size) { if (G.FAST) return;
+  for (let i = 0; i < n; i++) { if (conf.length >= CONF_N) conf.shift(); const a = rnd(0, 6.28), v = rnd(1.5, 5);
+    const c = col ? new THREE.Color(col).offsetHSL(0, 0, rnd(-0.12, 0.12)) : new THREE.Color().setHSL(Math.random(), 0.8, 0.6);
+    conf.push({ x: p.x, y: p.y, z: p.z, vx: Math.cos(a) * v, vy: rnd(4, 9), vz: Math.sin(a) * v, rx: rnd(0, 6), ry: rnd(0, 6), t: 0, life: rnd(1.6, 2.6), c, k: (size || 1) * rnd(0.7, 1.4) }); } }
+const dustTex = canvasTex(64, 64, g => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 31); gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
+const DUST_N = 70, dust = [];
+for (let i = 0; i < DUST_N; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: dustTex, transparent: true, depthWrite: false, opacity: 0 })); sp.visible = false; scene.add(sp); dust.push({ sp, t: 1, life: 1, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, k: 1 }); }
+let dustI = 0;
+function puff(x, z, n, col, size) { if (G.FAST) return;
+  for (let k = 0; k < n; k++) { const d = dust[dustI++ % DUST_N], a = rnd(0, 6.28), v = rnd(0.3, 0.9) * (size || 1);
+    Object.assign(d, { t: 0, life: rnd(0.45, 0.75) * Math.sqrt(size || 1), x: x + Math.cos(a) * 0.12, y: 0.08, z: z + Math.sin(a) * 0.12, vx: Math.cos(a) * v, vy: rnd(0.2, 0.6) * (size || 1), vz: Math.sin(a) * v, k: size || 1 });
+    d.sp.material.color.set(col || '#ffecd2'); d.sp.visible = true; } }
+const boomBall = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0, depthWrite: false }));
+boomBall.visible = false; scene.add(boomBall);
+const boomLight = new THREE.PointLight('#ffa040', 0, 10, 2); scene.add(boomLight);
+let boomT = 9;
+function pop(p, txt, col, size) {
+  if (G.FAST) return; const v = _b.set(p.x, (p.y || 1) + 0.4, p.z).project(camera); if (v.z > 1) return;
+  const d = document.createElement('div'); d.className = 'pop'; d.textContent = txt; d.style.color = col; d.style.fontSize = (size || 20) + 'px';
+  d.style.left = clamp((v.x + 1) / 2 * 100, 10, 90) + '%'; d.style.top = clamp((1 - v.y) / 2 * 100, 10, 88) + '%'; app.appendChild(d); setTimeout(() => d.remove(), 950);
+}
+
+/* ---------------- ADIM ---------------- */
+const _vq = new CANNON.Quaternion(), _vp = new CANNON.Vec3(), _vl = new CANNON.Vec3();
+function touchesVase(b, v) {   // vazo ekseni üzerindeki 3 nokta, taşın kutusuna VASE_R'den yakın mı
+  if (Math.abs(b.position.x - v.def.x) > 1.3 || Math.abs(b.position.z - v.def.z) > 1.3) return false;
+  b.quaternion.conjugate(_vq);
+  for (const y of [0.12, 0.4, 0.66]) {
+    _vp.set(v.def.x - b.position.x, y - b.position.y, v.def.z - b.position.z); _vq.vmult(_vp, _vl);
+    const cx = clamp(_vl.x, -b.half.x, b.half.x) - _vl.x, cy = clamp(_vl.y, -b.half.y, b.half.y) - _vl.y, cz = clamp(_vl.z, -b.half.z, b.half.z) - _vl.z;
+    if (cx * cx + cy * cy + cz * cz < VASE_R * VASE_R) return true;
+  }
+  return false;
+}
+function step(dt) {
+  if (!S) return;
+  S.time += dt;
+  if (S.phase === 'run' || S.phase === 'done') {
+    // son çana yaklaşırken hafif ağır çekim, çan/patlama anında daha yavaş
+    let slowTgt = 1;
+    if (S.phase === 'run' && rungCount() === bells.length - 1) { const last = bells.find(b => !b.rung);
+      if (last && Math.hypot(S.focus.x - last.def.x, S.focus.z - last.def.z) < 2.2) slowTgt = 0.55; }
+    if (S.slowT > 0) { S.slowT -= dt; slowTgt = 0.35; }
+    S.slowK += (slowTgt - S.slowK) * Math.min(1, dt * 8);
+    const sdt = dt * S.slowK;
+    world.step(PHYS_DT, sdt, PHYS_SUB);
+    S.runT += sdt;
+    for (let i = S.events.length - 1; i >= 0; i--) if (S.runT >= S.events[i].t) S.events.splice(i, 1)[0].fn();
+    let moving = false, fx = 0, fz = 0, fn = 0;
+    for (const t of S.tiles) {
+      const b = t.body; if (!b) continue;
+      // hendeğe düşen taş masadan geçip kaybolur (dev taş kıyılara yaslanır)
+      if (!t.big && b.position.y < 0.45 && inDitch(b.position.x, b.position.z)) b.collisionFilterMask = ~TABLE_G;
+      if (b.position.y < -1) { world.removeBody(b); t.body = null; t.sunk = true; t.mesh.visible = false; if (!t.fallen) { t.fallen = true; S.fallen++; t.fallT = S.runT; } continue; }
+      b.quaternion.vmult(UP, _up);
+      // sonraki taşa değdiğinde ona hafif itiş: çizilebilen her yol devrilir, virajlarda zincir yavaşlayıp takılmaz
+      // (yalnız yavaşlamışsa: hızlı zincire enerji eklemek taşları savurur)
+      if (t.next && !t.next.kicked && t.next.body && _up.y < (t.big ? TUNE.upBig : TUNE.up) && b.angularVelocity.lengthSquared() < TUNE.w * TUNE.w && _up.x * (t.next.x - t.x) + _up.z * (t.next.z - t.z) > 0) kick(t.next);
+      if (!t.fallen && _up.y < 0.75) { t.fallen = true; t.flash = 1; t.fallT = S.runT; S.fallen++; S.lastFallT = S.runT;
+        puff(b.position.x + Math.sin(t.yaw) * 0.3, b.position.z + Math.cos(t.yaw) * 0.3, t.big ? 5 : 2);
+        if (S.phase === 'run' && S.fallen % 10 === 0) { pop({ x: b.position.x, y: 1.2, z: b.position.z }, S.fallen + '!', '#FFF4E2', 18 + Math.min(12, S.fallen / 5)); SFX.combo(S.fallen / 10); } }
+      if (t.fallen && S.runT - t.fallT < 0.5) { fx += b.position.x; fz += b.position.z; fn++; }
+      if (t.fallen && S.phase === 'run') {
+        const px = b.position.x, pz = b.position.z;
+        for (const bl of bells) if (!bl.rung) { const [lx, lz] = toLocal(bl.f, px, pz); if (Math.abs(lx) < GATE_HALF - 0.1 && Math.abs(lz) < 0.4) ringBell(bl); }
+        for (const tn of tnts) if (!tn.blown) { const [lx, lz] = toLocal(tn.f, px, pz); if (Math.abs(lx) < TNT.w / 2 + 0.35 && Math.abs(lz) < TNT.d / 2 + 0.5) blow(tn); }
+        for (const fk of forks) if (!fk.fired) { const [lx, lz] = toLocal(fk.f, px, pz); if (Math.abs(lx) < FORK.w / 2 && lz > -0.85 && lz < -0.05) fireFork(fk); }
+      }
+      if (S.phase === 'run') for (const v of vases) if (!v.broken && (t.fallen || b.velocity.lengthSquared() > 0.02) && touchesVase(b, v)) breakVase(v);
+      if (b.velocity.lengthSquared() > 0.01 || b.angularVelocity.lengthSquared() > 0.04) moving = true;
+    }
+    for (const fk of forks) if (fk.body && fk.fired && !fk.kicked) { fk.body.quaternion.vmult(UP, _up); if (_up.y < 0.9) { fk.kicked = true; for (const ci of fk.outChains) kick(S.chains[ci].tiles[0]); } }
+    for (const fk of forks) if (fk.body && S.phase === 'run') for (const v of vases) if (!v.broken && touchesVase(fk.body, v)) breakVase(v);
+    if (fn) S.focus.set(fx / fn, 0, fz / fn);
+    if (S.phase === 'run') {
+      S.still = moving ? 0 : S.still + dt;
+      // zincir durdu: hiç hareket yok ya da 2 sn boyunca yeni taş devrilmedi (duvara yaslanan taş titreyebiliyor)
+      if (!S.winAt && S.runT > 0.8 && !S.events.length && (S.still > 1.2 || S.runT - S.lastFallT > 2.0)) fail('stall');
+      if (S.winAt && S.time >= S.winAt) win();
+    }
+  }
+  for (const t of S.tiles) {
+    if (t.flash > 0) t.flash = Math.max(0, t.flash - dt * 2.2);
+    if (t.pop < 1 && !t.body) { t.pop = Math.min(1, t.pop + dt * 7); const k = t.pop; t.mesh.scale.setScalar(k < 1 ? 0.6 + 0.4 * k + Math.sin(k * Math.PI) * 0.18 : 1); }   // yerleşme "pop"
+  }
+  for (const b of bells) { b.swing *= Math.exp(-1.8 * dt); b.glow.intensity *= Math.exp(-1.5 * dt); }
+  for (const p of conf) { p.t += dt; p.vy -= 12 * dt; p.vx *= 0.99; p.vz *= 0.99; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.rx += dt * 6; p.ry += dt * 4; if (p.y < 0.02) { p.y = 0.02; p.vy = 0; p.vx *= 0.8; p.vz *= 0.8; } }
+  for (let i = conf.length - 1; i >= 0; i--) if (conf[i].t > conf[i].life) conf.splice(i, 1);
+  for (const d of dust) if (d.t < d.life) { d.t += dt; d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt; d.vx *= 0.92; d.vz *= 0.92; }
+  boomT += dt;
+  S.shake = Math.max(0, S.shake - dt * 0.8);
+}
+function win() {
+  S.phase = 'done'; SFX.win(); buzz([30, 40, 60]);
+  const used = usedTiles(), st = used <= LV.stars[0] ? 3 : used <= LV.stars[1] ? 2 : 1;
+  if (st > (save.best[LV.i] || 0)) save.best[LV.i] = st;
+  save.max = Math.max(save.max, LV.i + 1); saveGame();
+  if (!G.FAST) for (let k = 0; k < st; k++) setTimeout(() => SFX.star(k), 300 + k * 220);
+  const stars = [0, 1, 2].map(k => '<span class="star' + (k < st ? '' : ' off') + '" style="animation-delay:' + (0.3 + k * 0.22) + 's">★</span>').join('');
+  const tip = st < 3 ? '<br><small>3 yıldız: en fazla ' + LV.stars[0] + ' taş</small>' : '';
+  const last = LV.i + 1 >= LEVELS.length;
+  showCard(last ? 'Hepsi bitti!' : 'Çan çaldı!', '<span class="stars">' + stars + '</span><br>' + used + ' taş · ' + S.fallen + ' devrildi' + tip,
+    [['Düzenle', () => backToBuild()], [last ? 'Bölüm 1 ▶' : 'Sonraki ▶', () => loadLevel(last ? 0 : LV.i + 1)]]);
+  updateHud();
+}
+// kopma yeri: kısmen devrilmiş ilk hat › tetiklenmemiş kol (TNT/çatal) › çalmayan çana en yakın hat ucu
+function findBreak() {
+  for (const ch of S.chains) { const T = ch.tiles; let i = 0; while (i < T.length && T[i].fallen) i++;
+    if (i > 0 && i < T.length) return { pos: { x: (T[i - 1].x + T[i].x) / 2, z: (T[i - 1].z + T[i].z) / 2 }, title: 'Zincir koptu', msg: 'Kırmızı halkadaki aralığı düzelt' }; }
+  for (const ch of S.chains) if (ch.src && ch.tiles.length > 1 && !ch.tiles[0].fallen) {
+    const tnt = tnts.includes(ch.src);
+    return { pos: ch.src.def, title: tnt ? 'TNT patlamadı' : 'Çatal devrilmedi', msg: tnt ? 'Zinciri TNT’ye değdir' : 'Zinciri çatalın arkasına getir' }; }
+  const miss = bells.find(b => !b.rung); let best = S.chains[0].tiles[S.chains[0].tiles.length - 1], bd = 1e9;
+  if (miss) for (const ch of S.chains) { const e = ch.tiles[ch.tiles.length - 1], d = Math.hypot(e.x - miss.def.x, e.z - miss.def.z); if (d < bd) { bd = d; best = e; } }
+  return { pos: best, title: 'Çana ulaşmadı', msg: (bells.length - rungCount()) + ' çan çalmadı · yolu uzat' };
+}
+function fail(reason, v) {
+  S.phase = 'done'; SFX.fail(); buzz([40, 30]);
+  const r = reason === 'vase' ? { pos: v.def, title: 'Vazo kırıldı', msg: 'Taşlar vazoya değmesin, yolu kaydır' } : findBreak();
+  S.breakPos = { x: r.pos.x, z: r.pos.z };
+  pop({ x: r.pos.x, y: 1, z: r.pos.z }, r.title, '#FFB26A', 22);
+  const s0 = S;
+  setTimeout(() => { if (S !== s0 || S.phase !== 'done') return;
+    showCard(r.title, S.fallen + ' / ' + S.tiles.length + ' taş devrildi<br>' + r.msg, [['↻ Baştan', () => newState()], ['Düzenle', () => backToBuild()]]); }, 900);
+}
+function showCard(title, html, btns) {
+  if (G.FAST) return;
+  $('ovT').textContent = title; $('ovP').innerHTML = html;
+  const box = $('ovBtns'); box.innerHTML = '';
+  btns.forEach(([label, fn], i) => { const b = document.createElement('button'); b.className = 'btn' + (i === 1 ? ' go' : ''); b.style.margin = '0 5px'; b.textContent = label; b.onclick = () => { SFX.init(); fn(); }; box.appendChild(b); });
+  $('over').style.display = 'flex';
+}
+function banner(t, s, long) { if (G.FAST) return; $('bnT').textContent = t; $('bnS').textContent = s; const b = $('banner'); b.className = ''; void b.offsetWidth; b.className = long ? 'show long' : 'show'; }
+function bump(el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+
+/* ---------------- ÇİZİM ---------------- */
+function render() {
+  if (!S) return;
+  const T = S.time, build = S.phase === 'build';
+  for (const t of S.tiles) { if (t.body) { t.mesh.position.copy(t.body.position); t.mesh.quaternion.copy(t.body.quaternion); }
+    const mt = t.mesh.material;
+    if (build && t.risky) { mt.emissive.setRGB(1, 0.12, 0.08); mt.emissiveIntensity = 0.45 + 0.35 * Math.sin(T * 8); }
+    else { if (t.risky) mt.emissive.copy(t.col); mt.emissiveIntensity = t.flash * 0.9; } }
+  for (const fk of forks) if (fk.body) { fk.m.position.copy(fk.body.position); fk.m.quaternion.copy(fk.body.quaternion); }
+  for (const b of bells) {
+    b.pivot.rotation.x = Math.sin(T * 14) * 0.45 * b.swing;
+    b.strip.material.color.set(b.rung ? '#9be37a' : '#ffd27a');
+    b.strip.material.opacity = b.rung ? 0.4 : 0.35 + 0.2 * Math.sin(T * 4);
+  }
+  for (const v of vases) v.ring.material.opacity = build ? 0.3 + 0.12 * Math.sin(T * 3) : 0.12;
+  for (const tn of tnts) { tn.ring.material.opacity = 0.3 + 0.15 * Math.sin(T * 5); tn.ring.scale.setScalar(1 + 0.05 * Math.sin(T * 5)); }
+  for (const fk of forks) { fk.arrowG.visible = build; const [ax, az] = fromLocal(fk.f, 0, -0.75 - 0.08 * Math.sin(T * 5)); fk.arrowG.position.set(ax, 0.02, az); fk.arrowG.rotation.y = fk.def.yaw; }
+  for (const ch of S.chains) { const a = ch.arrow, t0 = ch.tiles[0]; a.visible = build && ch.tiles.length === 1;
+    if (a.visible) { const k = 0.78 + 0.12 * Math.sin(T * 5); a.position.set(t0.x + Math.sin(t0.yaw) * k, 0.02, t0.z + Math.cos(t0.yaw) * k); a.rotation.y = t0.yaw; } }
+  if (breakMark.visible) breakMark.scale.setScalar(1 + 0.15 * Math.sin(T * 6));
+  boomBall.visible = boomT < 0.45;
+  if (boomBall.visible) { const k = boomT / 0.45; boomBall.scale.setScalar(0.3 + k * 1.8); boomBall.material.opacity = 0.85 * (1 - k); }
+  boomLight.intensity = boomT < 0.6 ? 40 * (1 - boomT / 0.6) : 0;
+  for (let i = 0; i < CONF_N; i++) { const p = conf[i];
+    if (p) { _m.compose(_a.set(p.x, p.y, p.z), _q.setFromEuler(_e.set(p.rx, p.ry, 0)), _s.setScalar(p.k * Math.min(1, (p.life - p.t) * 2))); confMesh.setColorAt(i, p.c); }
+    else _m.copy(ZERO_M);
+    confMesh.setMatrixAt(i, _m); }
+  confMesh.instanceMatrix.needsUpdate = true; confMesh.instanceColor.needsUpdate = true;
+  for (const d of dust) { if (d.t >= d.life) { d.sp.visible = false; continue; } const k = d.t / d.life; d.sp.position.set(d.x, d.y, d.z); d.sp.scale.setScalar((0.25 + k * 0.55) * d.k); d.sp.material.opacity = 0.6 * (1 - k); }
+  // kamera: kurarken sabit, zincir koşarken son devrilen taşları takip eder
+  const tgtLook = _a.copy(CAM_LOOK), tgtPos = _b.copy(CAM_POS);
+  if (!build) { const f = S.focus; tgtLook.set(f.x * 0.6, 0, f.z * 0.6 + 0.2); tgtPos.set(f.x * 0.45, 10.5, f.z * 0.6 + 7.8); }
+  const k = G.FAST ? 1 : 1 - Math.exp(-3 * 0.016);
+  camLook.lerp(tgtLook, k); camPos.lerp(tgtPos, k);
+  camera.position.copy(camPos); if (S.shake > 0) camera.position.add(_a.set(rnd(-1, 1), rnd(-1, 1), 0).multiplyScalar(S.shake));
+  camera.lookAt(camLook);
+  renderer.render(scene, camera);
+}
+
+/* ---------------- ARAYÜZ + GİRDİ ---------------- */
+const unlocked = i => ALL || i <= save.max;
+function updateHud() {
+  const el = $('hLeft'), left = stockLeft(), v = String(left);
+  if (el.textContent !== v) { el.textContent = v; bump(el); }
+  $('hStock').classList.toggle('low', left <= 5);
+  $('hBells').textContent = rungCount() + '/' + bells.length;
+  const build = S.phase === 'build';
+  $('bGo').disabled = !build || usedTiles() < 1;
+  $('bUndo').disabled = $('bClear').disabled = !build || usedTiles() < 1;
+  $('lvPrev').disabled = !build || LV.i === 0; $('lvNext').disabled = !build || LV.i === LEVELS.length - 1 || !unlocked(LV.i + 1);
+  const best = save.best[LV.i] || 0;
+  $('lvName').innerHTML = (LV.i + 1) + ' · ' + LV.name + (best ? ' <span class="best">' + '★'.repeat(best) + '</span>' : '');
+}
+const ray = new THREE.Raycaster(), tablePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+function tablePoint(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera({ x: (e.clientX - r.left) / r.width * 2 - 1, y: -((e.clientY - r.top) / r.height * 2 - 1) }, camera);
+  const p = new THREE.Vector3(); return ray.ray.intersectPlane(tablePlane, p) ? p : null;
+}
+let drawId = null;
+renderer.domElement.addEventListener('pointerdown', e => { SFX.init(); if (!S || S.phase !== 'build') return; drawId = e.pointerId;
+  try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) {} const p = tablePoint(e); if (p) { pickChain(p.x, p.z); extendTo(p.x, p.z); } });
+renderer.domElement.addEventListener('pointermove', e => { if (drawId !== e.pointerId || S.phase !== 'build') return; const p = tablePoint(e); if (p) { ghost.visible = false; extendTo(p.x, p.z); } });
+const endDraw = () => { drawId = null; ghost.visible = false; };
+renderer.domElement.addEventListener('pointerup', endDraw); renderer.domElement.addEventListener('pointercancel', endDraw);
+const setMute = m => { save.mute = !!m; saveGame(); SFX.setMute(save.mute);
+  $('bSound').textContent = save.mute ? '🔇' : '🔊'; $('bSound').classList.toggle('off', save.mute); };
+setMute(save.mute);
+$('bSound').addEventListener('click', () => { SFX.init(); setMute(!save.mute); if (!save.mute) SFX.place(0); });
+$('bGo').addEventListener('click', () => { SFX.init(); push(); });
+$('bUndo').addEventListener('click', () => { SFX.init(); if (S.phase === 'build') undo(); });
+$('bClear').addEventListener('click', () => { SFX.init(); if (S.phase === 'build') newState(); });
+$('lvPrev').addEventListener('click', () => { SFX.init(); if (S.phase === 'build') loadLevel(LV.i - 1); });
+$('lvNext').addEventListener('click', () => { SFX.init(); if (S.phase === 'build' && unlocked(LV.i + 1)) loadLevel(LV.i + 1); });
+
+/* ---------------- DÖNGÜ ---------------- */
+function fit() { const w = app.clientWidth, h = app.clientHeight; renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', fit);
+let lastTs = 0;
+function loop(ts) { requestAnimationFrame(loop); if (window.PAUSE) return; const dt = Math.min(0.033, lastTs ? (ts - lastTs) / 1000 : 0); lastTs = ts; if (dt > 0) step(dt); render(); }
+fit(); loadLevel(unlocked(save.level || 0) ? save.level || 0 : save.max); requestAnimationFrame(loop);
+Object.assign(G, { TUNE, step, render, push, extendTo, newState, backToBuild, loadLevel, blockedAt, planStep, riskAt, toLocal, fromLocal, ditchHit, undo, LEVELS, camera, world,
+  setActive: i => { S.active = i; }, usedTiles });
+for (const k of ['S', 'LV', 'bells', 'vases', 'tnts', 'forks']) Object.defineProperty(G, k, { get: () => ({ S, LV, bells, vases, tnts, forks })[k] });
+</script>
+</body>
+</html>
