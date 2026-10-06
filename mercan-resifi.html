@@ -209,6 +209,7 @@ var ART = {"c0_0": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFoAAABOCAYAAA
 // Engeller: kum (altindaki canli zincirde kullanilinca kirilir), ag (canli zincire giremez; yaninda zincir agi keser),
 // murekkep (yaninda zincir olmazsa yayilir), mayin (sayac biterse kaybedersin; zincire katarsan sonduruldu), inci (cip x3, +2 carpan).
 const W = 360, H = 640, DT = 1 / 60, SUT = 7, SAT = 8, HC = 46, BX = (360 - SUT * HC) / 2, BY = 112, RENK_N = 4, SV_MAKS = 5;
+const AKINTI_MAKS = 5;
 const RENKLER = ['#ff6a8a', '#ffc23a', '#2ad0c8', '#8a6aff'];
 const BOLUMLER = [
   { ad: 'Sığ Sular', hamle: 12, kolay: 0.3, hedef: [25000, 120000, 400000], ogretici: true },
@@ -262,7 +263,7 @@ function coz(O) { const z = O.zincir;
       tas.forEach((i, k) => { const j = yuva[k]; if (j !== i) { O.grid[j] = O.grid[i]; O.grid[i] = null; hareket.push([i, j]); } });
       for (let k = tas.length, q = 0; k < yuva.length; k++, q++) { const i = yuva[k]; O.grid[i] = yeniCanli(O, i); yeni.push([i, q]); } }
     O.olaylar.push({ tip: 'dustu', hareket, yeni }); z.asama = 'kume'; z.t = O.kare + 14; return; }
-  if (z.asama === 'kume') { const K = kumeler(O); if (!K.length) return hamleBitti(O); O.dalga++; const ek = O.dalga; O.carp += ek; O.olaylar.push({ tip: 'kaskad', dalga: O.dalga, ek });
+  if (z.asama === 'kume') { const K = O.dalga >= AKINTI_MAKS ? [] : kumeler(O); if (!K.length) return hamleBitti(O); /* bir hamlede en fazla 5 akinti dalgasi */ O.dalga++; const ek = O.dalga; O.carp += ek; O.olaylar.push({ tip: 'kaskad', dalga: O.dalga, ek });
     for (const k0 of K) { const k = k0.filter(i => O.grid[i] && !O.grid[i].mur); if (k.length < 2) continue; const hedef = k[0], t = O.grid[hedef]; const d = zincirDegeri(O, k); O.cip += d.cip; O.carp += Math.ceil(d.carp / 3); O.olaylar.push({ tip: 'zincir', yol: k.slice().reverse(), yolS: k.slice().reverse().map(i => O.grid[i]), hedef, sv: d.sv, renk: t.renk, adet: k.length, oto: true });
       for (const i of k) { if (O.kum[i]) { O.kum[i]--; O.cip += 20; O.olaylar.push({ tip: 'kumKirildi', i, kalan: O.kum[i] }); } if (O.grid[i].mayin) O.olaylar.push({ tip: 'mayinSondu', i }); } yanEtki(O, k); for (const i of k) if (i !== hedef) O.grid[i] = null; O.grid[hedef] = { id: O.sid++, renk: t.renk, sv: d.sv }; O.birles++; O.enSv = Math.max(O.enSv, d.sv); if (d.sv === SV_MAKS) balina(O, hedef); }
     z.asama = 'dus'; z.t = O.kare + 14; } }
@@ -421,7 +422,7 @@ function ciz(t, dt) {
   // kum (altta)
   for (let i = 0; i < SUT * SAT; i++) if (O.kum[i] && img('kum')) { const p = XY(i); ctx.globalAlpha = O.kum[i] > 1 ? 1 : 0.6; resimCiz(ctx, img('kum'), HC - 2, p.x, p.y); ctx.globalAlpha = 1; } else if (O.kum[i]) { const p = XY(i); ctx.fillStyle = O.kum[i] > 1 ? '#e8c47a' : '#f2d89a'; yuv(p.x - HC / 2 + 3, p.y - HC / 2 + 3, HC - 6, HC - 6, 11); ctx.fill(); ctx.fillStyle = 'rgba(160,110,40,.35)'; for (let k = 0; k < 7; k++) { ctx.beginPath(); ctx.arc(p.x - 14 + (k * 7) % 28, p.y - 12 + (k * 11) % 26, 1.3, 0, 7); ctx.fill(); } }
   // ipucu zinciri
-  const ip = ipucuZincir(t); if (ip && !yol.length) { ctx.strokeStyle = `rgba(255,255,255,${0.35 + 0.25 * Math.sin(t / 150)})`; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ip.forEach((i, k) => { const p = XY(i); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.stroke(); }
+  const ip = ipucuZincir(t); if (ip && !yol.length) { ctx.strokeStyle = `rgba(255,214,40,${0.55 + 0.3 * Math.sin(t / 150)})`; ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ip.forEach((i, k) => { const p = XY(i); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); ctx.stroke(); }
   // cizilen zincir (ip)
   if (yol.length) { const r0 = O.grid[yol[0]] && O.grid[yol[0]].renk, hx = RENKLER[r0] || '#fff'; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 14; ctx.beginPath(); yol.forEach((i, k) => { const p = XY(i); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }); if (cizUc) ctx.lineTo(cizUc.x, cizUc.y); ctx.stroke();
     ctx.strokeStyle = hx; ctx.lineWidth = 8; ctx.stroke();
@@ -502,7 +503,7 @@ function olaylar(t) {
         fx('fx_patla', p.x, p.y, 150, 0.6, { rot: 1 }); fx('fx_halka', p.x, p.y, 120, 0.7, { b0: 0.3, b1: 2 }); fx('fx_sicra', p.x, p.y - 20, 130, 0.7);
         for (let q = 0; q < 3; q++) parca.push({ k: 'dalga', x: p.x, y: p.y, vx: 0, vy: 0, o: 1, s: 0.5 + q * 0.2, z: 14 + q * 10, c: q ? '#bff8ff' : '#ffe14a', gen: 150 }); sicrat(p.x, p.y, 50, 340);
         for (let q = 0; q < 60; q++) parca.push({ k: 'konf', x: p.x, y: p.y, vx: (Math.random() - 0.5) * 420, vy: -200 - Math.random() * 260, o: 1, s: 1.4, c: ['#ff6a8a', '#ffc23a', '#2ad0c8', '#8a6aff', '#fff'][q % 5] }); kombo(180, 94, 'BALİNA DALGASI!!!', '#ffe14a', 26); }, 120 + 45 * 6); }
-    else if (e.tip === 'kaskad') { fx('fx_girdap', 180, 94, 90 + Math.min(80, e.dalga * 18), 0.9, { b0: 0.5, b1: 1.3, rot: -6, alt: 1 }); sars(100 + e.dalga * 40, 3 + e.dalga); kombo(180, 94, e.dalga > 1 ? `AKINTI ×${e.dalga}!` : 'AKINTI!', e.dalga >= 4 ? '#ff9ad0' : e.dalga >= 3 ? '#ffe14a' : '#9affe8', 20 + Math.min(14, e.dalga * 3)); SES.kaskad(e.dalga); kutuPop.carp = t; }
+    else if (e.tip === 'kaskad') { fx('fx_girdap', 180, 94, 90 + Math.min(80, e.dalga * 18), 0.9, { b0: 0.5, b1: 1.3, rot: -6, alt: 1 }); sars(100 + e.dalga * 40, 3 + e.dalga); kombo(180, 94, e.dalga >= AKINTI_MAKS ? `AKINTI ×${e.dalga} MAKS!` : e.dalga > 1 ? `AKINTI ×${e.dalga}!` : 'AKINTI!', e.dalga >= 4 ? '#ff9ad0' : e.dalga >= 3 ? '#ffe14a' : '#9affe8', 20 + Math.min(14, e.dalga * 3)); SES.kaskad(e.dalga); kutuPop.carp = t; }
     else if (e.tip === 'dustu') { const kol = new Set(); for (const [i, k] of e.yeni) { const s = O.grid[i], p = XY(i); if (s) V[s.id] = { x: p.x, y: BY - HC * (k + 1) - 8, vy: 220, yeni: true, uygun: s.uygun }; kol.add(i % SUT); }
       for (const c of kol) { const x = BX + (c + 0.5) * HC; fx('fx_kabarcik', x, BY + 4, 34, 0.45, { b0: 0.3, b1: 1.1 }); for (let q = 0; q < 4; q++) parca.push({ k: 'kab', x: x + (Math.random() - 0.5) * 30, y: BY + 4, vx: (Math.random() - 0.5) * 40, vy: -20 - Math.random() * 40, o: 1, s: 0.6, z: 1.5 + Math.random() * 2.5, c: '#fff', yer: 1 }); }
       if (kol.size) SES.dokulKisa(kol.size); }
