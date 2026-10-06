@@ -462,7 +462,7 @@ function hudCiz(t) {
     ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '900 8px Trebuchet MS'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(etiket, 0, -11); ctx.fillStyle = '#fff'; ctx.font = `900 ${deger.length > 7 ? 14 : 18}px Trebuchet MS`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.strokeText(deger, 0, 5); ctx.fillText(deger, 0, 5); ctx.restore(); };
   const sayimda = sahne && sahne.tip === 'sayim', on = yol.length >= 2 && O.durum === 'hazir' ? zincirDegeri(O, yol) : null;
   cipGor += ((sayimda ? sahne.e.cip : on ? on.cip : O.cip) - cipGor) * 0.3; carpGor += ((sayimda ? sahne.e.carp : on ? on.carp : O.carp) - carpGor) * 0.3;
-  kut(126, '#2ab0ff', '#1a6ad0', bicim(cipGor), pc, 'ÇİP'); kut(234, '#ff6a8a', '#d0305a', (Math.round(carpGor * 10) / 10).toString().replace('.', ','), pm, 'ÇARPAN');
+  kut(126, '#2ab0ff', '#1a6ad0', bicim(cipGor), pc, 'PUAN'); kut(234, '#ff6a8a', '#d0305a', (Math.round(carpGor * 10) / 10).toString().replace('.', ','), pm, 'ÇARPAN');
   ctx.fillStyle = '#fff'; ctx.font = '900 20px Trebuchet MS'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,50,100,.7)'; ctx.strokeText('×', 180, 41); ctx.fillText('×', 180, 41);
   ctx.font = '900 9px Trebuchet MS'; ctx.fillStyle = '#fff'; ctx.fillText('HAMLE', 38, 26); ctx.font = `900 ${26 * (t - hamlePop < 220 ? 1 + 0.35 * (1 - (t - hamlePop) / 220) : 1)}px Trebuchet MS`; ctx.fillStyle = O.hamle <= 3 ? (Math.sin(t / 120) > 0 ? '#ffe14a' : '#fff') : '#fff'; ctx.strokeText(O.hamle, 38, 48); ctx.fillText(O.hamle, 38, 48);
   const hedefP = sayimda && sahne.asama < 2 ? O.puan - sahne.e.kazanc : O.puan; puanGor += (hedefP - puanGor) * 0.12; const H3 = O.S.hedef[2], f = Math.min(1, puanGor / H3), y = 524;
@@ -530,7 +530,7 @@ function sahneCiz(t) { if (!sahne) return; const S = sahne, e = S.e, gec = (t - 
     ctx.save(); ctx.translate(180, y); const sc = S.asama >= 2 ? Math.max(0, 1 - (gec - T2) / (T3 - T2)) : Math.min(1, (gec - T1) / 90 + 0.3); ctx.scale(sc, sc); ctx.rotate(Math.sin(t / 90) * 0.03 * (S.dev ? 1 : 0));
     ctx.fillStyle = 'rgba(0,50,100,.6)'; yuv(-145, -36, 290, 72, 22); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2; ctx.stroke();
     ctx.font = `900 ${boy}px Trebuchet MS`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 8; ctx.strokeStyle = '#003050'; ctx.strokeText(bicim(deger), 0, -4); const gr = ctx.createLinearGradient(0, -boy / 2, 0, boy / 2); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, S.dev ? '#ffb02a' : S.buyuk ? '#ffe14a' : '#bff8ff'); ctx.fillStyle = gr; ctx.fillText(bicim(deger), 0, -4);
-    ctx.font = '900 11px Trebuchet MS'; ctx.fillStyle = '#d0f6ff'; ctx.fillText(`${bicim(e.cip)} çip × ${String(Math.round(e.carp * 10) / 10).replace('.', ',')} çarpan`, 0, boy / 2 + 8); ctx.restore();
+    ctx.font = '900 11px Trebuchet MS'; ctx.fillStyle = '#d0f6ff'; ctx.fillText(`${bicim(e.cip)} puan × ${String(Math.round(e.carp * 10) / 10).replace('.', ',')} çarpan`, 0, boy / 2 + 8); ctx.restore();
     if (S.asama === 1 && f >= 1) { S.asama = 2; SES.patlaSayi(S.dev ? 2 : S.buyuk ? 1 : 0); flasZ = t; flasR = S.dev ? '255,220,120' : '230,255,255'; if (!S.kucuk) { sars(S.dev ? 420 : 200, S.dev ? 12 : 6); titre(S.dev ? [60, 40, 100] : 25); sicrat(180, y, S.dev ? 40 : 18, 300); }
       for (let q = 0; q < (S.dev ? 80 : S.buyuk ? 40 : S.kucuk ? 6 : 16); q++) parca.push({ k: 'konf', x: 180, y, vx: (Math.random() - 0.5) * 420, vy: -150 - Math.random() * 260, o: 1, s: 1.4, c: ['#ff6a8a', '#ffc23a', '#2ad0c8', '#8a6aff', '#fff'][q % 5] });
       if (S.dev) kombo(180, 230, 'OKYANUS FIRTINASI!', '#ffb02a', 26); else if (S.buyuk) kombo(180, 230, 'MUHTEŞEM!', '#ffe14a', 26);
@@ -582,9 +582,9 @@ const ekranAcik = () => !$('ekran').classList.contains('gizli');
 function ekranAc(html) { const e = $('ekran'); e.innerHTML = `<div class="kart">${html}</div>`; e.classList.remove('gizli'); }
 function ekranKapat() { $('ekran').classList.add('gizli'); son = performance.now(); acc = 0; }
 const canliImg = (s, h) => `<img src="${canliSprite(s).toDataURL()}" style="height:${h}px">`;
-const YENI = { kum: ['Kumlu koy', 'Bazı canlılar <b>kumun üstünde</b>. O canlıyı zincirde kullanınca kum dağılır (+20 çip). Koyu kum iki kez ister.', '🏖️'], ag: ['Balıkçı ağları', '<b>Ağdaki canlı</b> zincire giremez ve düşmez. <b>Yanından</b> zincir geçirirsen ağ kesilir!', '🕸️'],
-  mur: ['Ahtapot mürekkebi', '<b>Mürekkep</b> yanından zincir geçince dağılır (+30 çip). Bir hamlede hiç mürekkep dağıtmazsan <b>yayılır</b>!', null], mayin: ['Deniz mayını', 'Mayınlı canlının sayısı <b>her hamlede</b> azalır. Sıfıra inmeden onu zincire kat, yoksa <b>patlar</b>!', '💣'],
-  inci: ['İnci', '<b>İncili canlılar</b> 3 kat çip ve <b>+2 çarpan</b> verir. Onları uzun zincirlere kat!', null] };
+const YENI = { kum: ['Kumlu koy', 'Bazı canlılar <b>kumun üstünde</b>. O canlıyı zincirde kullanınca kum dağılır (+20 puan). Koyu kum iki kez ister.', '🏖️'], ag: ['Balıkçı ağları', '<b>Ağdaki canlı</b> zincire giremez ve düşmez. <b>Yanından</b> zincir geçirirsen ağ kesilir!', '🕸️'],
+  mur: ['Ahtapot mürekkebi', '<b>Mürekkep</b> yanından zincir geçince dağılır (+30 puan). Bir hamlede hiç mürekkep dağıtmazsan <b>yayılır</b>!', null], mayin: ['Deniz mayını', 'Mayınlı canlının sayısı <b>her hamlede</b> azalır. Sıfıra inmeden onu zincire kat, yoksa <b>patlar</b>!', '💣'],
+  inci: ['İnci', '<b>İncili canlılar</b> 3 kat puan ve <b>+2 çarpan</b> verir. Onları uzun zincirlere kat!', null] };
 function bolumBaslat(n) { O = bolumKur(n); sole = null; V = {}; parca = []; hayalet = []; sahne = null; puanGor = 0; cipGor = 0; carpGor = 1; yol = []; ogret = O.S.ogretici ? { adim: 0 } : null; ipucuZ = performance.now(); ekranKapat(); ip('');
   for (let i = 0; i < SUT * SAT; i++) { const s = O.grid[i]; if (!s) continue; const p = XY(i), r = (i / SUT) | 0; V[s.id] = { x: p.x, y: BY - (SAT - r) * HC - (i % SUT) * 14 - 40, vy: 0 }; }
   const S = O.S, ust = `<div class="ust">${n + 1}. RESİF · ${O.hamle} HAMLE</div><h1>${S.ad}</h1><p>Hedef: <b>${bicim(S.hedef[0])}</b> · ⭐⭐ ${bicim(S.hedef[1])} · ⭐⭐⭐ ${bicim(S.hedef[2])}</p>`;
@@ -595,7 +595,7 @@ function bolumBaslat(n) { O = bolumKur(n); sole = null; V = {}; parca = []; haya
   else { ekranAc(`${ust}<button class="btn" id="bTamam">Dal ▶</button>`); $('bTamam').onclick = () => { SES.hazirla(); kapat(); }; } }
 function giris(sonra) { ekranAc(`<div class="ust">NASIL OYNANIR</div><h1>Mercan Resifi</h1><div class="sira3">${[0, 1, 2, 3, 4, 5].map(sv => canliImg({ renk: sv % 4, sv }, 42)).join('<span style="align-self:center;color:#2a8ac0">›</span>')}</div>
   <p><b>Aynı renkteki</b> komşu canlıları parmağınla <b>birleştir</b> (en az 2, çapraz da olur). Bırakınca hepsi son halkaya yüzer ve <b>daha büyük</b> bir canlıya dönüşür!</p>
-  <p>Her canlı <b style="color:#1a7ad0">ÇİP</b>, her halka <b style="color:#d0305a">ÇARPAN</b> verir. Uzun zincir = büyük canlı = dev puan. <b>BALİNA</b> dalgayla çevresini temizler!</p><button class="btn" id="bBasla">Dal! ▶</button>`);
+  <p>Her canlı <b style="color:#1a7ad0">PUAN</b>, her halka <b style="color:#d0305a">ÇARPAN</b> verir. Uzun zincir = büyük canlı = dev puan. <b>BALİNA</b> dalgayla çevresini temizler!</p><button class="btn" id="bBasla">Dal! ▶</button>`);
   $('bBasla').onclick = () => { SES.hazirla(); kayit.gordu.giris = 1; kaydet(); if (sonra) sonra(); else ekranKapat(); }; }
 function bitisEkrani() { const y = yildiz(O), N = BOLUMLER.length; ip('');
   if (O.kazandi) { const eski = kayit.yildiz[O.n] || 0; kayit.yildiz[O.n] = Math.max(eski, y); kayit.acik = Math.max(kayit.acik, Math.min(O.n + 1, N - 1)); kaydet(); SES.kazan();
