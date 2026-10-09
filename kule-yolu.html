@@ -32,7 +32,7 @@ html, body { margin: 0; height: 100%; background: #1c2a14; overflow: hidden; fon
 .dugmeler.dikey { display: grid; gap: 8px; } .dugmeler.dikey .btn { margin: 0; }
 .kartEkran.sars { animation: kartSars .25s; } @keyframes kartSars { 30% { transform: translate(-4px, 3px) rotate(-1deg); } 60% { transform: translate(4px, -2px) rotate(1deg); } }
 #dalgaBar::after { content: ''; position: absolute; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); animation: parilti 2.2s linear infinite; } @keyframes parilti { from { left: -30%; } to { left: 110%; } }
-#bHiz.acik { background: linear-gradient(#ffb43a, #e0701a); }
+#bHiz.acik { background: linear-gradient(#ffb43a, #e0701a); } #bHiz.cokHizli { background: linear-gradient(#ff6a5a, #c8201a); box-shadow: 0 4px 0 rgba(90,10,10,.5), 0 0 12px rgba(255,90,60,.7); } #bHiz.zipla { animation: zipla .3s; }
 #onizleme { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); width: max-content; z-index: 25; display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: center; max-width: 94%; background: rgba(20,30,60,.72); border-radius: 12px; padding: 4px 8px; font-size: 12px; font-weight: 800; pointer-events: none; }
 #onizleme b { color: #ffe14a; margin-right: 3px; }
 .dChip { background: rgba(255,255,255,.14); border-radius: 8px; padding: 1px 6px; } .d-sef { background: #c0262c; } .d-kurt { background: rgba(140,150,170,.45); } .d-iri { background: rgba(70,140,50,.6); }
@@ -1642,7 +1642,8 @@ function duraklatAc() { if (!st || ekranAcik()) return; duraklat = true; MUZIK.c
   $('bDevam').onclick = kapat; $('bYeniden').onclick = () => { kapat(); bolumBaslat(st.bolge); }; $('bHaritaD').onclick = () => { duraklat = false; haritaAc(); }; }
 $('bDur').addEventListener('click', (ev) => { ev.stopPropagation(); duraklatAc(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && st && !st.bitti && st.faz === 'dalga') duraklatAc(); });
-$('bHiz').addEventListener('click', (ev) => { ev.stopPropagation(); hizK = hizK === 1 ? 2 : 1; $('bHiz').textContent = hizK + 'x'; $('bHiz').classList.toggle('acik', hizK === 2); });
+function hizGoster() { const b = $('bHiz'); b.textContent = hizK + 'x'; b.classList.toggle('acik', hizK === 2); b.classList.toggle('cokHizli', hizK === 5); }
+$('bHiz').addEventListener('click', (ev) => { ev.stopPropagation(); hizK = hizK === 1 ? 2 : hizK === 2 ? 5 : 1; kayit.hiz = hizK; kaydet(); hizGoster(); cal('tik', 0.8 + hizK * 0.15, 0.4); const b = $('bHiz'); b.classList.remove('zipla'); void b.offsetWidth; b.classList.add('zipla'); });
 for (const id of ['bSavas', 'bErken', 'bGeri', 'bHiz', 'bDur', 'bilgi', 'kartSec']) $(id).addEventListener('pointerdown', ev => ev.stopPropagation());
 if (ART.meteor) $('bMeteor').innerHTML = `<img src="${ART.meteor}">`;
 const ekranAcik = () => !$('ekran').classList.contains('gizli') || !$('kartSec').classList.contains('gizli');
@@ -1772,7 +1773,7 @@ function bolgeTanit(n) {
 function bolumBaslat(n = 0) {
   st = TD.yeni({ olayTut: true, tohum: (Math.random() * 1e9) | 0, bolge: n, kartAcik: acikKartlar(), atolye: kayit.atolye }); for (const g of kGor.values()) tahta.remove(g); kGor.clear(); for (const m of mGor.values()) m.visible = false; mGor.clear(); dGor.clear(); sonKombolar = new Set(); isinlar.length = 0;
   if (kahG) { scene.remove(kahG); kahG = null; }
-  tahtaKur(); dukkanKur(); desteGuncelle(); $('kartSec').classList.add('gizli'); hizK = 1; $('bHiz').textContent = '1x'; $('bHiz').classList.remove('acik'); bilgiKapat(); secili = null; yolGeriAlinabilir = true;
+  tahtaKur(); dukkanKur(); desteGuncelle(); $('kartSec').classList.add('gizli'); hizK = [1, 2, 5].includes(kayit.hiz) ? kayit.hiz : 1; hizGoster(); bilgiKapat(); secili = null; yolGeriAlinabilir = true;
   ogr = kayit.ogr3 || n > 0 ? OGR_SON : 0; hudGuncelle(); setTimeout(ogrGoster, 300);
   if (ogr >= OGR_SON) ipucu('Kule kur, <b>SAVAŞ</b>\'a bas. Dalga bitince yolu uzatacaksın.', 3000);
   afis('BÖLGE ' + (n + 1) + '<br><small>' + st.b.ad + '</small>'); duraklat = false; MUZIK.yogun = 0; if (kayit.muzik) muzikBaslat();
@@ -1787,7 +1788,7 @@ function dongu(now) {
   requestAnimationFrame(dongu);
   const gercek = Math.min(0.05, (now - son) / 1000); son = now; if (!st) { renderer.shadowMap.needsUpdate = true; renderer.render(scene, camera); return; }
   let olcek = duraklat ? 0 : hizK; if (yavasT > 0 && !duraklat) { yavasT -= gercek; olcek *= 0.25; }
-  acc += gercek * olcek; let n = 0; while (acc >= ADIM && n < 10) { TD.adim(st, ADIM); olaylariIsle(); acc -= ADIM; n++; } if (n >= 10) acc = 0;
+  acc += gercek * olcek; let n = 0; while (acc >= ADIM && n < 24) { TD.adim(st, ADIM); olaylariIsle(); acc -= ADIM; n++; } if (n >= 24) acc = 0;
   olaylariIsle(); gorselGuncelle(gercek, gercek * olcek); hudGuncelle();
   if (ogr === 7) ogrFiciKontrol();
   const fazAnah = st.faz + st.dalga; if (fazAnah !== sonOgrFaz) { sonOgrFaz = fazAnah; if (ogr < OGR_SON) setTimeout(ogrGoster, 1400); }
